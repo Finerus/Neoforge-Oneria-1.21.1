@@ -1,36 +1,38 @@
 package net.oneria.oneriamod;
 
-import java.util.List;
-
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-// An example config class. This is not required, but it's a good idea to have one to keep your config organized.
-// Demonstrates how to use Neo's config APIs
+// Cette classe définit et stocke les spécifications de configuration.
+// Les valeurs seront lues depuis le fichier 'config/oneria-common.toml'.
 public class Config {
-    private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
-    public static final ModConfigSpec.BooleanValue LOG_DIRT_BLOCK = BUILDER
-            .comment("Whether to log the dirt block on common setup")
-            .define("logDirtBlock", true);
+    public static final ModConfigSpec SPEC;
 
-    public static final ModConfigSpec.IntValue MAGIC_NUMBER = BUILDER
-            .comment("A magic number")
-            .defineInRange("magicNumber", 42, 0, Integer.MAX_VALUE);
+    // -- Section Tab List Obfuscation --
+    public static final ModConfigSpec.BooleanValue ENABLE_TAB_OBFUSCATION;
+    public static final ModConfigSpec.BooleanValue OBFUSCATED_NAME_BOLD;
+    public static final ModConfigSpec.ConfigValue<String> CUSTOM_TAB_PREFIX;
 
-    public static final ModConfigSpec.ConfigValue<String> MAGIC_NUMBER_INTRODUCTION = BUILDER
-            .comment("What you want the introduction message to be for the magic number")
-            .define("magicNumberIntroduction", "The magic number is... ");
+    static {
+        // Initialisation du constructeur de spécification de configuration
+        ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
-    // a list of strings that are treated as resource locations for items
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> ITEM_STRINGS = BUILDER
-            .comment("A list of items to log on common setup.")
-            .defineListAllowEmpty("items", List.of("minecraft:iron_ingot"), () -> "", Config::validateItemName);
+        BUILDER.comment("Configuration des fonctionnalités d'ONERIA").push("tab_obfuscation");
 
-    static final ModConfigSpec SPEC = BUILDER.build();
+        ENABLE_TAB_OBFUSCATION = BUILDER
+                .comment("Active ou désactive l'obfuscation (§k) des noms des joueurs dans la Tab List (Appuyez sur Tab).")
+                .define("enableTabObfuscation", true); // Valeur par défaut: true
 
-    private static boolean validateItemName(final Object obj) {
-        return obj instanceof String itemName && BuiltInRegistries.ITEM.containsKey(ResourceLocation.parse(itemName));
+        OBFUSCATED_NAME_BOLD = BUILDER
+                .comment("Active ou désactive le style gras sur le nom obfusqué.")
+                .define("obfuscatedNameBold", true); // Valeur par défaut: true
+
+        CUSTOM_TAB_PREFIX = BUILDER
+                .comment("Ajoute un préfixe personnalisé devant le nom du joueur dans la Tab List. Laissez vide pour aucun préfixe. Supporte les codes couleur Minecraft (§c, §l, etc.).")
+                .define("customTabPrefix", "[ONERIA] "); // Valeur par défaut: "[ONERIA] "
+
+        BUILDER.pop(); // Fin de la section tab_obfuscation
+
+        SPEC = BUILDER.build();
     }
 }
