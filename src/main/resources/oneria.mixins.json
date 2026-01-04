@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.oneria.oneriamod.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ClientboundPlayerInfoUpdatePacketAccessor",
+    "MixinServerCommonPacketListenerImpl"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
