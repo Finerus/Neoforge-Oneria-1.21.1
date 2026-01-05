@@ -26,13 +26,13 @@ public abstract class MixinServerCommonPacketListenerImpl {
             remap = false
     )
     private Packet<?> modifyPacket(Packet<?> packet) {
-        // 1. Si le mod est désactivé, on renvoie le paquet original immédiatement
+        // 1. If mod is disabled, return original packet immediately
         if (!OneriaConfig.ENABLE_BLUR.get()) return packet;
 
-        // 2. On cast l'objet "this" (le mixin) vers l'objet réel (ServerCommonPacketListenerImpl)
+        // 2. Cast "this" (the mixin) to the real object (ServerCommonPacketListenerImpl)
         Object self = this;
 
-        // Vérifier que l'instance réelle est bien un ServerGamePacketListenerImpl
+        // Check that the real instance is indeed a ServerGamePacketListenerImpl
         if (!(self instanceof ServerGamePacketListenerImpl)) {
             return packet;
         }
@@ -42,18 +42,18 @@ public abstract class MixinServerCommonPacketListenerImpl {
         if (receiver == null) return packet;
 
         if (packet instanceof ClientboundPlayerInfoUpdatePacket infoPacket) {
-            // 3. Vérification Whitelist
+            // 3. Whitelist Check
             boolean isWhitelisted = OneriaConfig.WHITELIST.get().contains(receiver.getGameProfile().getName());
 
-            // 4. Vérification OP (si OPS_SEE_ALL est activé)
+            // 4. OP Check (if OPS_SEE_ALL is enabled)
             boolean isOpExempt = OneriaConfig.OPS_SEE_ALL.get() && receiver.hasPermissions(2);
 
-            // Si le joueur est whitelisté OU OP avec exemption, il voit tout
+            // If player is whitelisted OR OP with exemption, they see everything
             if (isWhitelisted || isOpExempt) return packet;
 
             EnumSet<ClientboundPlayerInfoUpdatePacket.Action> actions = infoPacket.actions();
 
-            // 5. Logique de remplacement
+            // 5. Replacement Logic
             if (actions.contains(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME) ||
                     actions.contains(ClientboundPlayerInfoUpdatePacket.Action.ADD_PLAYER)) {
 
@@ -66,35 +66,35 @@ public abstract class MixinServerCommonPacketListenerImpl {
                     Component displayName;
 
                     if (targetPlayer != null) {
-                        // Récupérer le préfixe et le nom
+                        // Retrieve prefix and name
                         String prefix = OneriaMod.getPlayerPrefix(targetPlayer);
                         String name = targetPlayer.getGameProfile().getName();
 
-                        // Vérifier si on doit obfusquer
+                        // Check if we need to obfuscate
                         boolean isSelf = targetPlayer.getUUID().equals(receiver.getUUID());
                         boolean shouldBlur = false;
 
                         if (isSelf) {
-                            // Mode debug : s'obfusquer soi-même si DEBUG_SELF_BLUR est activé
+                            // Debug mode: blur self if DEBUG_SELF_BLUR is enabled
                             shouldBlur = OneriaConfig.DEBUG_SELF_BLUR.get();
                         } else {
-                            // Pour les autres joueurs : vérifier la distance
+                            // For other players: check distance
                             double distSq = receiver.distanceToSqr(targetPlayer);
                             shouldBlur = distSq > maxDistSq;
                         }
 
                         if (shouldBlur) {
-                            // Récupérer la longueur configurée pour le pseudo obfusqué
+                            // Get configured length for obfuscated name
                             int nameLength = OneriaConfig.OBFUSCATED_NAME_LENGTH.get();
                             String obfuscatedName = "X".repeat(nameLength);
 
-                            // Vérifier si on doit aussi obfusquer le préfixe
+                            // Check if we should also obfuscate prefix
                             if (OneriaConfig.OBFUSCATE_PREFIX.get() && !prefix.isEmpty()) {
-                                // Obfusquer le préfixe aussi (on garde sa longueur approximative)
+                                // Obfuscate prefix too (keeping approximate length)
                                 String obfuscatedPrefix = "§k" + "X".repeat(Math.max(1, prefix.length() / 2));
                                 displayName = Component.literal(obfuscatedPrefix + " §k" + obfuscatedName);
                             } else {
-                                // Ne pas obfusquer le préfixe, seulement le pseudo
+                                // Do not obfuscate prefix, only name
                                 displayName = Component.literal(prefix + "§k" + obfuscatedName);
                             }
                         } else {
@@ -110,14 +110,14 @@ public abstract class MixinServerCommonPacketListenerImpl {
                     ));
                 }
 
-                // Injection via constructeur vide + Setter Accessor
+                // Injection via empty constructor + Setter Accessor
                 ClientboundPlayerInfoUpdatePacket newPacket = new ClientboundPlayerInfoUpdatePacket(actions, List.of());
                 ((ClientboundPlayerInfoUpdatePacketAccessor) newPacket).setEntries(newEntries);
                 return newPacket;
             }
         }
 
-        // Retour par défaut OBLIGATOIRE
+        // Mandatory default return
         return packet;
     }
 }

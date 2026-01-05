@@ -1,5 +1,6 @@
 package net.oneria.oneriamod;
 
+import com.mojang.logging.LogUtils;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
@@ -12,21 +13,25 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import org.slf4j.Logger;
 
 import java.util.EnumSet;
 
 @Mod("oneriamod")
 public class OneriaMod {
     public static final String MODID = "oneriamod";
+    public static final Logger LOGGER = LogUtils.getLogger();
     private int tickCounter = 0;
 
     public OneriaMod(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.SERVER, OneriaConfig.SPEC);
         NeoForge.EVENT_BUS.register(this);
-        NeoForge.EVENT_BUS.register(OneriaCommands.class); // Enregistrement des commandes
+
+        // Initialize Schedule System
+        OneriaScheduleManager.reload();
     }
 
-    // Récupération sécurisée du préfixe LuckPerms
+    // Securely retrieve LuckPerms prefix
     public static String getPlayerPrefix(ServerPlayer player) {
         try {
             LuckPerms luckPerms = LuckPermsProvider.get();
@@ -36,7 +41,7 @@ public class OneriaMod {
                 return prefix != null ? prefix : "";
             }
         } catch (Exception e) {
-            // LuckPerms non chargé ou erreur
+            // LuckPerms not loaded or error
         }
         return "";
     }
@@ -45,18 +50,21 @@ public class OneriaMod {
     public void onServerTick(ServerTickEvent.Post event) {
         if (!OneriaConfig.ENABLE_BLUR.get()) return;
 
-        // On ne met pas à jour à chaque tick pour économiser la bande passante (ici toutes les 10 ticks = 0.5s)
+        // Do not update every tick to save bandwidth (here every 10 ticks = 0.5s)
         if (tickCounter++ % 10 == 0) {
             var server = event.getServer();
             if (server == null) return;
 
-            // On force l'envoi d'un paquet UPDATE_DISPLAY_NAME pour tous les joueurs
-            // Notre Mixin va intercepter ce paquet et modifier le contenu à la volée
+            // Force sending an UPDATE_DISPLAY_NAME packet for all players
+            // Our Mixin will intercept this packet and modify the content on the fly
             ClientboundPlayerInfoUpdatePacket packet = new ClientboundPlayerInfoUpdatePacket(
                     EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME),
                     server.getPlayerList().getPlayers()
             );
             server.getPlayerList().broadcastAll(packet);
         }
+
+        // Schedule System Tick
+        OneriaScheduleManager.tick(event.getServer());
     }
 }
