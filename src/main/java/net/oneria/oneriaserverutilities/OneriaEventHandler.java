@@ -1,4 +1,4 @@
-package net.oneria.oneriamod;
+package net.oneria.oneriaserverutilities;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -9,14 +9,14 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
-@EventBusSubscriber(modid = OneriaMod.MODID)
+@EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class OneriaEventHandler {
 
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-        OneriaMod.LOGGER.info("Player {} logged in", player.getName().getString());
+        OneriaServerUtilities.LOGGER.info("Player {} logged in", player.getName().getString());
 
         // Execute after a short delay (2 seconds)
         new Thread(() -> {
@@ -36,7 +36,7 @@ public class OneriaEventHandler {
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
-        OneriaMod.LOGGER.info("Player {} logged out", player.getName().getString());
+        OneriaServerUtilities.LOGGER.info("Player {} logged out", player.getName().getString());
         OneriaPermissions.invalidateCache(player.getUUID());
     }
 
@@ -45,7 +45,7 @@ public class OneriaEventHandler {
 
         if (kickMessage != null) {
             player.connection.disconnect(kickMessage);
-            OneriaMod.LOGGER.info("Kicked {} (server closed, non-staff)", player.getName().getString());
+            OneriaServerUtilities.LOGGER.info("Kicked {} (server closed, non-staff)", player.getName().getString());
         } else if (OneriaConfig.ENABLE_SCHEDULE.get()) {
             if (OneriaPermissions.isStaff(player)) {
                 if (!OneriaScheduleManager.isServerOpen()) {
@@ -85,7 +85,7 @@ public class OneriaEventHandler {
                         OneriaConfig.WELCOME_SOUND_PITCH.get().floatValue()
                 );
             } catch (Exception e) {
-                OneriaMod.LOGGER.warn("Failed to play welcome sound: {}", soundName);
+                OneriaServerUtilities.LOGGER.warn("Failed to play welcome sound: {}", soundName);
             }
         }
     }

@@ -54,6 +54,7 @@ dependencies {
 
     // Annotation processor pour les Mixins (souvent déjà présent, vérifie)
     annotationProcessor "org.spongepowered:mixin:0.8.5:processor"
+
 }
 
 processResources {
@@ -76,7 +77,7 @@ tasks.withType(ProcessResources).configureEach {
     inputs.properties replaceProperties
 
     filesMatching(['META-INF/neoforge.mods.toml']) {
-        expand replaceProperties
+        expand replaceProperties + [file: [jarVersion: mod_version]]
     }
 }
 

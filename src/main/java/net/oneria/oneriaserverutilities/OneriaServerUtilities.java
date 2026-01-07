@@ -1,4 +1,4 @@
-package net.oneria.oneriamod;
+package net.oneria.oneriaserverutilities;
 
 import com.mojang.logging.LogUtils;
 import net.luckperms.api.LuckPerms;
@@ -17,18 +17,20 @@ import org.slf4j.Logger;
 
 import java.util.EnumSet;
 
-@Mod("oneriamod")
-public class OneriaMod {
-    public static final String MODID = "oneriamod";
+@Mod("oneriaserverutilities")
+public class OneriaServerUtilities {
+    public static final String MODID = "oneriaserverutilities";
     public static final Logger LOGGER = LogUtils.getLogger();
     private int tickCounter = 0;
 
-    public OneriaMod(IEventBus modEventBus, ModContainer modContainer) {
+    public OneriaServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.SERVER, OneriaConfig.SPEC);
         NeoForge.EVENT_BUS.register(this);
 
         // Initialize Schedule System
         OneriaScheduleManager.reload();
+
+        // Le NicknameManager s'initialise automatiquement au premier appel
     }
 
     // Securely retrieve LuckPerms prefix

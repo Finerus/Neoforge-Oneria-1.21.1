@@ -1,4 +1,4 @@
-package net.oneria.oneriamod;
+package net.oneria.oneriaserverutilities;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -29,7 +29,7 @@ public class OneriaScheduleManager {
             hasClosedToday = false;
             hasOpenedToday = false;
         } catch (Exception e) {
-            OneriaMod.LOGGER.error("Error parsing schedule times: " + e.getMessage());
+            OneriaServerUtilities.LOGGER.error("Error parsing schedule times: " + e.getMessage());
             // Default values on error
             openingTime = LocalTime.of(19, 0);
             closingTime = LocalTime.of(23, 59);
@@ -147,7 +147,7 @@ public class OneriaScheduleManager {
         // Kick non-staff players
         for (ServerPlayer player : playersToKick) {
             player.connection.disconnect(Component.literal(kickMessage));
-            OneriaMod.LOGGER.info("Kicked {} (server closed, non-staff)", player.getName().getString());
+            OneriaServerUtilities.LOGGER.info("Kicked {} (server closed, non-staff)", player.getName().getString());
         }
 
         sentWarnings.clear();

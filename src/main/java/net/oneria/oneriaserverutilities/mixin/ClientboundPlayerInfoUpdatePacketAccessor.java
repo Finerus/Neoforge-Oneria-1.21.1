@@ -1,4 +1,4 @@
-package net.oneria.oneriamod.mixin;
+package net.oneria.oneriaserverutilities.mixin;
 
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import org.spongepowered.asm.mixin.Mixin;

@@ -1,4 +1,4 @@
-package net.oneria.oneriamod;
+package net.oneria.oneriaserverutilities;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 import java.util.Arrays;

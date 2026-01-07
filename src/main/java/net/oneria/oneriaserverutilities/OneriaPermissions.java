@@ -1,4 +1,4 @@
-package net.oneria.oneriamod;
+package net.oneria.oneriaserverutilities;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
