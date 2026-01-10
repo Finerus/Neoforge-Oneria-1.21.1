@@ -48,6 +48,21 @@ public class OneriaServerUtilities {
         return "";
     }
 
+    // Securely retrieve LuckPerms suffix
+    public static String getPlayerSuffix(ServerPlayer player) {
+        try {
+            LuckPerms luckPerms = LuckPermsProvider.get();
+            User user = luckPerms.getUserManager().getUser(player.getUUID());
+            if (user != null) {
+                String suffix = user.getCachedData().getMetaData().getSuffix();
+                return suffix != null ? suffix : "";
+            }
+        } catch (Exception e) {
+            // LuckPerms not loaded or error
+        }
+        return "";
+    }
+
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         if (!OneriaConfig.ENABLE_BLUR.get()) return;

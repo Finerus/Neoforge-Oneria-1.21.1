@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.arguments.EntityArgument;
@@ -35,6 +36,23 @@ import java.util.Optional;
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class OneriaCommands {
 
+    // SuggestionProvider pour les plateformes (évite le crash au démarrage)
+    private static final SuggestionProvider<CommandSourceStack> PLATFORM_SUGGESTIONS = (ctx, builder) -> {
+        try {
+            if (OneriaConfig.PLATFORMS != null && OneriaConfig.PLATFORMS.get() != null) {
+                for (String platform : OneriaConfig.PLATFORMS.get()) {
+                    String[] parts = platform.split(";");
+                    if (parts.length > 0) {
+                        builder.suggest(parts[0]);
+                    }
+                }
+            }
+        } catch (IllegalStateException e) {
+            // Config pas encore chargée, on ignore silencieusement
+        }
+        return builder.buildFuture();
+    };
+
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
@@ -60,10 +78,6 @@ public class OneriaCommands {
 
         // Setters (On-the-fly modifications)
         var setNode = Commands.literal("set");
-
-        // Dans la section CONFIG NODE
-        configNode.then(Commands.literal("reload")
-                .executes(OneriaCommands::reloadConfig));
 
         // Obfuscation settings
         setNode.then(Commands.literal("proximity")
@@ -190,16 +204,13 @@ public class OneriaCommands {
                 )
         );
 
-        // Platforms
+        // Platforms (CORRECTION ICI : utilisation du SuggestionProvider)
         staffNode.then(Commands.literal("platform")
                 .executes(OneriaCommands::platformSelf)
                 .then(Commands.argument("target", EntityArgument.player())
                         .executes(OneriaCommands::platformTarget)
                         .then(Commands.argument("platform_id", StringArgumentType.word())
-                                .suggests((ctx, builder) -> {
-                                    OneriaConfig.PLATFORMS.get().forEach(p -> builder.suggest(p.split(";")[0]));
-                                    return builder.buildFuture();
-                                })
+                                .suggests(PLATFORM_SUGGESTIONS)  // ← FIX : Plus de crash !
                                 .executes(OneriaCommands::platformTargetSpecific)
                         )
                 )
@@ -254,9 +265,27 @@ public class OneriaCommands {
         // Register root
         dispatcher.register(oneriaRoot);
 
-// =========================================================================
-// HANDY ALIASES
-// =========================================================================
+        // =========================================================================
+        // COLORS COMMAND
+        // =========================================================================
+        try {
+            if (OneriaConfig.ENABLE_COLORS_COMMAND != null && OneriaConfig.ENABLE_COLORS_COMMAND.get()) {
+                dispatcher.register(Commands.literal("colors")
+                        .executes(ctx -> {
+                            if (!OneriaConfig.ENABLE_COLORS_COMMAND.get()) {
+                                ctx.getSource().sendFailure(Component.literal("§cColors command is disabled."));
+                                return 0;
+                            }
+                            return OneriaCommands.showColors(ctx);
+                        }));
+            }
+        } catch (IllegalStateException e) {
+            // Config pas encore chargée, on ignore
+        }
+
+        // =========================================================================
+        // HANDY ALIASES
+        // =========================================================================
         dispatcher.register(Commands.literal("schedule")
                 .executes(OneriaCommands::showSchedule));
 
@@ -269,10 +298,7 @@ public class OneriaCommands {
                 .then(Commands.argument("target", EntityArgument.player())
                         .executes(OneriaCommands::platformTarget)
                         .then(Commands.argument("platform_id", StringArgumentType.word())
-                                .suggests((ctx, builder) -> {
-                                    OneriaConfig.PLATFORMS.get().forEach(p -> builder.suggest(p.split(";")[0]));
-                                    return builder.buildFuture();
-                                })
+                                .suggests(PLATFORM_SUGGESTIONS)  // ← FIX : Plus de crash !
                                 .executes(OneriaCommands::platformTargetSpecific)
                         )
                 ));
@@ -653,6 +679,11 @@ public class OneriaCommands {
         list.append("§6╚═══════════════════════════════════╝");
 
         context.getSource().sendSuccess(() -> Component.literal(list.toString()), false);
+        return 1;
+    }
+
+    private static int showColors(CommandContext<CommandSourceStack> ctx) {
+        ctx.getSource().sendSuccess(() -> OneriaChatFormatter.getColorsHelp(), false);
         return 1;
     }
 }

@@ -53,6 +53,16 @@ public class OneriaConfig {
     public static final ModConfigSpec.BooleanValue LOG_TO_CONSOLE;
     public static final ModConfigSpec.BooleanValue NOTIFY_TARGET;
 
+    // === CHAT SYSTEM ===
+    public static final ModConfigSpec.BooleanValue ENABLE_CHAT_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> PLAYER_NAME_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> CHAT_MESSAGE_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> CHAT_MESSAGE_COLOR;
+    public static final ModConfigSpec.BooleanValue ENABLE_TIMESTAMP;
+    public static final ModConfigSpec.ConfigValue<String> TIMESTAMP_FORMAT;
+    public static final ModConfigSpec.BooleanValue MARKDOWN_ENABLED;
+    public static final ModConfigSpec.BooleanValue ENABLE_COLORS_COMMAND;
+
     static {
         // ===============================================================================
         // CATEGORY: OBFUSCATION (TabList & Nametags)
@@ -187,6 +197,60 @@ public class OneriaConfig {
         LOG_TO_STAFF = BUILDER.comment("Notify other staff members when a silent command is used.").define("logToStaff", true);
         LOG_TO_CONSOLE = BUILDER.comment("Log silent commands to the server console.").define("logToConsole", true);
         NOTIFY_TARGET = BUILDER.comment("If 'true', the target receives a message (useful for debug, otherwise leave false).").define("notifyTarget", false);
+
+        BUILDER.pop();
+
+        // ===============================================================================
+        // CATEGORY: CHAT SYSTEM
+        // ===============================================================================
+        BUILDER.push("Chat System");
+
+        ENABLE_CHAT_FORMAT = BUILDER
+                .comment("Enable custom chat formatting system")
+                .define("enableChatFormat", true);
+
+        PLAYER_NAME_FORMAT = BUILDER
+                .comment("Player name format in chat",
+                        "Variables: $prefix, $name, $suffix",
+                        "$prefix = LuckPerms prefix",
+                        "$name = player name or nickname",
+                        "$suffix = LuckPerms suffix")
+                .define("playerNameFormat", "$prefix $name $suffix");
+
+        CHAT_MESSAGE_FORMAT = BUILDER
+                .comment("Chat message format",
+                        "Variables: $time, $name, $msg",
+                        "$time = timestamp (if enabled)",
+                        "$name = formatted player name",
+                        "$msg = player's message",
+                        "You can use color codes with §")
+                .define("chatMessageFormat", "$time | $name: $msg");
+
+        CHAT_MESSAGE_COLOR = BUILDER
+                .comment("Global color for chat messages",
+                        "Choose: AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE, BLACK, GOLD,",
+                        "GRAY, BLUE, GREEN, DARK_GRAY, DARK_AQUA, DARK_RED,",
+                        "DARK_PURPLE, DARK_GREEN, DARK_BLUE")
+                .define("chatMessageColor", "WHITE");
+
+        ENABLE_TIMESTAMP = BUILDER
+                .comment("Show timestamp in chat messages")
+                .define("enableTimestamp", true);
+
+        TIMESTAMP_FORMAT = BUILDER
+                .comment("Timestamp format (Java SimpleDateFormat)",
+                        "Examples: HH:mm, HH:mm:ss, hh:mm a",
+                        "Read more: https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html")
+                .define("timestampFormat", "HH:mm");
+
+        MARKDOWN_ENABLED = BUILDER
+                .comment("Enable markdown styling in chat",
+                        "**bold**, *italic*, __underline__, ~~strikethrough~~")
+                .define("markdownEnabled", true);
+
+        ENABLE_COLORS_COMMAND = BUILDER
+                .comment("Enable /colors command to show available colors")
+                .define("enableColorsCommand", true);
 
         BUILDER.pop();
 

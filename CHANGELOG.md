@@ -1,6 +1,77 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-01-10
+
+**Added**
+
+* **Advanced Chat System:** Fully integrated chat formatting system similar to Better Forge Chat Reborn:
+  - Customizable player name format with LuckPerms prefix/suffix support (`$prefix $name $suffix`).
+  - Flexible chat message format with timestamp and color support (`$time | $name: $msg`).
+  - Global chat message color configuration (16 Minecraft colors available).
+  - Timestamp system with customizable Java SimpleDateFormat.
+  - **Markdown Support:** Real-time markdown styling in chat messages:
+    - `**text**` → **Bold**
+    - `*text*` → *Italic*
+    - `__text__` → Underline
+    - `~~text~~` → Strikethrough
+  - `/colors` command to display all available colors and formatting codes with visual preview.
+  - Full integration with existing nickname system - nicknames appear in chat automatically.
+  - LuckPerms suffix support added to complement existing prefix system.
+
+**Improved**
+
+* **Chat Integration:** Chat system now respects all existing mod features:
+  - Nicknames set via `/oneria nick` are automatically used in chat.
+  - LuckPerms prefixes and suffixes are properly displayed.
+  - Staff permissions work seamlessly with chat formatting.
+  - All color codes (§ and &) are fully supported.
+
+* **Configuration:** New unified chat configuration section in `OneriaConfig.java`:
+  - `enableChatFormat` - Toggle entire chat system on/off.
+  - `playerNameFormat` - Customize name display with variables.
+  - `chatMessageFormat` - Full message template customization.
+  - `chatMessageColor` - Global message color setting.
+  - `enableTimestamp` - Show/hide timestamps.
+  - `timestampFormat` - Custom timestamp format.
+  - `markdownEnabled` - Enable/disable markdown parsing.
+  - `enableColorsCommand` - Toggle `/colors` command availability.
+
+**Technical**
+
+* **New Classes:**
+  - `OneriaChatFormatter` - Central chat formatting logic with markdown parser.
+  - `MixinServerGamePacketListenerImpl` - Chat message interception and formatting.
+
+* **Enhanced Classes:**
+  - `OneriaConfig` - Added complete Chat System configuration section.
+  - `OneriaServerUtilities` - Added `getPlayerSuffix()` method for LuckPerms suffix retrieval.
+  - `OneriaCommands` - Added `/colors` command for color reference.
+
+* **Mixin Updates:**
+  - New mixin for `ServerGamePacketListenerImpl` to intercept chat messages.
+  - Proper cancellation and custom message broadcasting.
+
+**Performance**
+
+* Efficient regex-based markdown parsing with minimal overhead.
+* Chat formatting only applies when enabled in config.
+* Cached LuckPerms data retrieval for better performance.
+
+**Migration Notes**
+
+* No breaking changes - chat system is fully backward compatible.
+* Existing nicknames will automatically appear in formatted chat.
+* Default configuration provides a clean, modern chat experience.
+* Chat formatting can be disabled entirely by setting `enableChatFormat = false`.
+
+**Known Compatibility**
+
+* ✅ Fully compatible with LuckPerms for prefixes/suffixes.
+* ✅ Works seamlessly with existing nickname system.
+* ✅ Compatible with all existing mod features (blur, schedule, platforms, etc.).
+* ✅ Does not conflict with Minecraft's vanilla chat system.
+
 ## [1.1.0] - 2026-01-07
 
 **Breaking Changes**
