@@ -1,6 +1,99 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [1.1.2] - 2026-01-15
+
+**Added**
+
+* **Nametag Visibility System:** Server-side nametag hiding using scoreboard teams:
+  - Toggle nametag visibility for all players with `/oneria config set hideNametags true/false`.
+  - Automatic synchronization on player login/logout.
+  - Team-based implementation for full server-side control.
+  - Configuration option `hideNametags` in Obfuscation Settings.
+  - Nametag state automatically reloads with `/oneria config reload`.
+
+* **Color System Improvements:** Fixed `/colors` command display issues:
+  - Color codes in examples are no longer interpreted incorrectly.
+  - Clean visual presentation with proper formatting.
+  - Clear distinction between color preview and usage codes.
+  - Usage examples show only `&` codes (typeable in-game).
+
+**Improved**
+
+* **Chat System:** Enhanced color parsing for better reliability:
+  - `ColorHelper` class now properly parses all Minecraft color codes.
+  - Improved segment-based parsing for complex formatting.
+  - Better handling of mixed colors and formatting codes.
+  - Full support for both `&` and `§` syntax throughout the mod.
+
+* **Nametag Manager:** Robust synchronization system:
+  - Automatic sync on every player connection/disconnection.
+  - State verification on config reload to ensure consistency.
+  - Proper team cleanup when system is disabled.
+  - Detailed logging for debugging nametag operations.
+
+* **Command Organization:** Added nametag configuration commands:
+  - `/oneria config set hideNametags <true/false>` - Toggle nametag visibility.
+  - Nametag status displayed in `/oneria config status`.
+  - Instant application without server restart required.
+
+**Fixed**
+
+* **Colors Command Display:** Resolved visual glitches in `/colors` output:
+  - Color codes in examples no longer interfere with display.
+  - Proper spacing and alignment in color reference table.
+  - Formatting codes display correctly with usage syntax.
+  - Component construction prevents code interpretation in examples.
+
+* **Nametag Synchronization:** Fixed edge cases in nametag visibility:
+  - Nametags properly hide/show when config changes.
+  - Team membership correctly updated on player events.
+  - No lingering team data after system disable.
+
+* **Chat Color Parsing:** Fixed color codes not working in chat:
+  - `OneriaChatFormatter` now uses `ColorHelper.parseColors()`.
+  - All chat messages properly display colors and formatting.
+  - Markdown and color codes work together seamlessly.
+
+**Technical**
+
+* **New Classes:**
+  - `NametagManager` - Centralized nametag visibility control using scoreboard teams.
+  - `ColorHelper` - Advanced color code parser with segment-based processing.
+  - `TextSegment` (inner class) - Represents text portions with their styling.
+
+* **Enhanced Classes:**
+  - `OneriaEventHandler` - Added nametag sync on player login/logout.
+  - `OneriaCommands` - Added `hideNametags` configuration command.
+  - `OneriaChatFormatter` - Refactored to use `ColorHelper` for color parsing.
+
+**Performance**
+
+* Nametag system uses native scoreboard teams - zero performance impact.
+* Color parsing optimized with segment-based processing.
+* Sync operations only trigger on player events and config changes.
+
+**Configuration**
+
+* **New Options:**
+  - `hideNametags` (Boolean) - Hide all player nametags above heads.
+    - Location: `[Obfuscation Settings]` section.
+    - Default: `false`.
+    - Instantly toggleable via command.
+
+**Known Limitations**
+
+* Nametag hiding uses scoreboard teams - may conflict with other mods using team-based systems.
+* Individual nametag control per player is not supported (all or nothing).
+
+**Migration Notes**
+
+* No breaking changes - fully backward compatible with 1.1.1.
+* Nametag visibility can be toggled at any time without restart.
+* `hideNametags` defaults to `false` - no behavior change unless explicitly enabled.
+* `/colors` command now displays correctly - no configuration needed.
+* Color codes work seamlessly in all contexts (chat, commands, nicknames).
+
 ## [1.1.1] - 2026-01-10
 
 **Added**

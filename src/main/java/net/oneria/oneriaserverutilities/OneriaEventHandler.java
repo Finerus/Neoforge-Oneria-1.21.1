@@ -25,6 +25,12 @@ public class OneriaEventHandler {
                 player.getServer().execute(() -> {
                     checkScheduleOnJoin(player);
                     sendWelcomeMessage(player);
+
+                    // Synchroniser les nametags pour ce joueur
+                    NametagManager.onPlayerJoin(player);
+
+                    // Re-synchroniser pour tout le monde au cas où
+                    NametagManager.syncNametagVisibility(player.getServer());
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -37,7 +43,17 @@ public class OneriaEventHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         OneriaServerUtilities.LOGGER.info("Player {} logged out", player.getName().getString());
+
+        // Nettoyer le cache des permissions
         OneriaPermissions.invalidateCache(player.getUUID());
+
+        // Retirer le joueur de la team des nametags
+        NametagManager.onPlayerLogout(player);
+
+        // Re-synchroniser pour les joueurs restants
+        if (player.getServer() != null) {
+            NametagManager.syncNametagVisibility(player.getServer());
+        }
     }
 
     private static void checkScheduleOnJoin(ServerPlayer player) {

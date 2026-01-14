@@ -1,6 +1,6 @@
 # Oneria Mod
 
-**Oneria Mod** is a comprehensive utility mod designed specifically for immersive Roleplay (RP) servers. It provides advanced proximity-based obfuscation, automated schedule management, staff moderation tools, and seamless LuckPerms integration to create a professional and controlled RP environment.
+**Oneria Mod** is a comprehensive utility mod designed specifically for immersive Roleplay (RP) servers. It provides advanced proximity-based obfuscation, automated schedule management, staff moderation tools, advanced chat formatting, and seamless LuckPerms integration to create a professional and controlled RP environment.
 
 ---
 
@@ -15,7 +15,20 @@ Create true immersion by hiding player identities based on distance:
 * **LuckPerms Prefix Support:** Option to hide or show rank prefixes based on distance.
 * **Whitelist System:** Specific players or staff members can bypass the blur system entirely.
 * **Nickname Support:** Full integration with custom nicknames set via `/oneria nick`.
+* **Nametag Visibility Control:** Hide all player nametags server-side using scoreboard teams.
 * **Highly Configurable:** Adjust obfuscation distance, length, and behavior.
+
+### Advanced Chat System
+
+Professional chat formatting with markdown and color support:
+
+* **Custom Chat Format:** Fully customizable chat message template with variables (`$time`, `$name`, `$msg`).
+* **LuckPerms Integration:** Display prefixes and suffixes from LuckPerms in chat.
+* **Markdown Support:** Real-time formatting with `**bold**`, `*italic*`, `__underline__`, `~~strikethrough~~`.
+* **Color Codes:** Full support for both `&` and `§` color codes in chat messages.
+* **Timestamp System:** Optional timestamps with customizable Java SimpleDateFormat.
+* **Global Message Color:** Set a default color for all chat messages.
+* **Colors Command:** `/colors` displays all available colors and formatting codes with visual preview.
 
 ### Advanced Schedule System
 
@@ -43,7 +56,7 @@ Enhance player experience from the moment they join:
 
 * **Custom Welcome Messages:** Display multi-line welcome messages with color codes and variable support.
 * **Sound Effects:** Play specific sounds when a player joins (fully customizable).
-* **LuckPerms Ready:** Deep integration with LuckPerms for permissions, prefixes, and group management.
+* **LuckPerms Ready:** Deep integration with LuckPerms for permissions, prefixes, suffixes, and group management.
 * **Schedule Integration:** Welcome messages include server status and time remaining.
 
 ### Data Persistence
@@ -98,6 +111,7 @@ Smart data management for reliability:
 | Command | Permission | Description |
 |:--------|:-----------|:------------|
 | `/oneria schedule` or `/schedule` or `/horaires` | Everyone | Displays server opening/closing times and status. |
+| `/colors` | Everyone | Displays all available color codes and formatting options. |
 
 ### Convenient Aliases
 
@@ -106,6 +120,7 @@ Smart data management for reliability:
 | `/platform [target] [id]` | `/oneria staff platform [target] [id]` | Quick access to platform teleportation for staff. |
 | `/schedule` | `/oneria schedule` | Quick access to server schedule information. |
 | `/horaires` | `/oneria schedule` | French alias for schedule command. |
+| `/colors` | N/A | Displays color and formatting reference guide. |
 
 ---
 
@@ -122,7 +137,18 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * `obfuscatePrefix` - Whether to hide rank prefixes when obfuscating.
 * `opsSeeAll` - Operators always see all names clearly.
 * `debugSelfBlur` - Enable self-blur for testing purposes.
+* `hideNametags` - Hide all player nametags above heads (default: false).
 * `whitelist` - List of players who bypass the blur system.
+
+#### Chat System
+* `enableChatFormat` - Enable custom chat formatting system.
+* `playerNameFormat` - Player name format in chat (variables: `$prefix`, `$name`, `$suffix`).
+* `chatMessageFormat` - Complete chat message format (variables: `$time`, `$name`, `$msg`).
+* `chatMessageColor` - Global color for chat messages (16 Minecraft colors available).
+* `enableTimestamp` - Show timestamp in chat messages.
+* `timestampFormat` - Timestamp format (Java SimpleDateFormat, default: "HH:mm").
+* `markdownEnabled` - Enable markdown styling (`**bold**`, `*italic*`, etc.).
+* `enableColorsCommand` - Enable `/colors` command.
 
 #### Permissions System
 * `staffTags` - Scoreboard tags considered as staff (default: `["admin", "modo", "staff", "builder"]`).
@@ -167,12 +193,12 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 ### Requirements
 * **Minecraft:** 1.21.1
 * **NeoForge:** 21.1.215 or higher
-* **Optional:** LuckPerms (for advanced permissions and prefix support)
+* **Optional:** LuckPerms (for advanced permissions, prefix/suffix support, and chat integration)
 
 ### Steps
 1. Download the latest `oneriamod-X.X.X.jar` from the releases page.
 2. Place the JAR file into your server's `mods` folder.
-3. **(Optional)** Install [LuckPerms](https://luckperms.net/) for advanced permission management.
+3. **(Optional)** Install [LuckPerms](https://luckperms.net/) for advanced permission management and chat prefixes/suffixes.
 4. Start your server to generate the configuration file.
 5. Edit `serverconfig/oneriamod-server.toml` to customize your settings.
 6. Reload with `/oneria config reload` or restart the server.
@@ -185,11 +211,19 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * **Permission Caching:** Results cached for 30 seconds to minimize overhead.
 * **Tick Optimization:** Schedule system checks only every 20 seconds (400 ticks).
 * **Efficient Packet Handling:** Minimal performance impact on TabList updates.
+* **Optimized Color Parsing:** Segment-based parsing for complex formatting with minimal overhead.
 
 ### Compatibility
 * **Server-Side Only:** No client-side installation required.
-* **Mixin-Based:** Uses Mixin for clean packet interception.
+* **Mixin-Based:** Uses Mixin for clean packet interception and chat formatting.
 * **API Ready:** Public API available for other mods (`OneriaPermissions.isStaff()`, etc.).
+* **LuckPerms Integration:** Full support for prefixes, suffixes, and group-based permissions.
+
+### New in 1.1.2
+* **Enhanced Color System:** Fixed `/colors` command display with proper color code handling.
+* **Nametag Visibility Control:** Server-side nametag hiding using scoreboard teams.
+* **Improved Chat Parsing:** `ColorHelper` class for reliable color code processing.
+* **Better Component Building:** Prevents code interpretation in examples and help text.
 
 ---
 

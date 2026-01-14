@@ -62,6 +62,7 @@ public class OneriaConfig {
     public static final ModConfigSpec.ConfigValue<String> TIMESTAMP_FORMAT;
     public static final ModConfigSpec.BooleanValue MARKDOWN_ENABLED;
     public static final ModConfigSpec.BooleanValue ENABLE_COLORS_COMMAND;
+    public static final ModConfigSpec.BooleanValue HIDE_NAMETAGS;
 
     static {
         // ===============================================================================
@@ -103,6 +104,13 @@ public class OneriaConfig {
                         "If 'true', applies the blur to yourself for testing purposes.",
                         "Never leave enabled in production.")
                 .define("debugSelfBlur", false);
+
+        // Dans la section "Obfuscation Settings", après DEBUG_SELF_BLUR
+        HIDE_NAMETAGS = BUILDER
+                .comment("CONFIGURATION: Hide Nametags",
+                        "If 'true', hides all player nametags above their heads.",
+                        "Uses scoreboard teams to hide names server-side.")
+                .define("hideNametags", false);
 
         WHITELIST = BUILDER
                 .comment("WHITELIST: Immune Players",
@@ -224,7 +232,7 @@ public class OneriaConfig {
                         "$name = formatted player name",
                         "$msg = player's message",
                         "You can use color codes with §")
-                .define("chatMessageFormat", "$time | $name: $msg");
+                .define("chatMessageFormat", "[$time] $name: $msg");
 
         CHAT_MESSAGE_COLOR = BUILDER
                 .comment("Global color for chat messages",

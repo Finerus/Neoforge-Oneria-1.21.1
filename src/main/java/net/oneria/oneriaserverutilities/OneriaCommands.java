@@ -157,6 +157,75 @@ public class OneriaCommands {
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> updateConfigBool(ctx, OneriaConfig.USE_LUCKPERMS_GROUPS, "Use LuckPerms Groups"))));
 
+        setNode.then(Commands.literal("hideNametags")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> {
+                            boolean val = BoolArgumentType.getBool(ctx, "value");
+                            OneriaConfig.HIDE_NAMETAGS.set(val);
+                            OneriaConfig.SPEC.save();
+
+                            // Synchroniser immédiatement pour tous les joueurs
+                            NametagManager.syncNametagVisibility(ctx.getSource().getServer());
+
+                            ctx.getSource().sendSuccess(() ->
+                                            Component.literal("§a[Oneria] Hide Nametags : " + (val ? "§aENABLED" : "§cDISABLED")),
+                                    true
+                            );
+                            return 1;
+                        })));
+
+        // Chat settings
+        setNode.then(Commands.literal("enableChatFormat")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_CHAT_FORMAT, "Chat Format"))));
+
+        setNode.then(Commands.literal("enableTimestamp")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_TIMESTAMP, "Timestamp"))));
+
+        setNode.then(Commands.literal("markdownEnabled")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.MARKDOWN_ENABLED, "Markdown"))));
+
+        setNode.then(Commands.literal("chatMessageColor")
+                .then(Commands.argument("color", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            builder.suggest("AQUA").suggest("RED").suggest("LIGHT_PURPLE")
+                                    .suggest("YELLOW").suggest("WHITE").suggest("BLACK")
+                                    .suggest("GOLD").suggest("GRAY").suggest("BLUE")
+                                    .suggest("GREEN").suggest("DARK_GRAY").suggest("DARK_AQUA")
+                                    .suggest("DARK_RED").suggest("DARK_PURPLE")
+                                    .suggest("DARK_GREEN").suggest("DARK_BLUE");
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            String color = StringArgumentType.getString(ctx, "color");
+                            OneriaConfig.CHAT_MESSAGE_COLOR.set(color);
+                            OneriaConfig.SPEC.save();
+                            ctx.getSource().sendSuccess(() ->
+                                            Component.literal("§a[Oneria] Chat Message Color set to: " + color),
+                                    true
+                            );
+                            return 1;
+                        })));
+
+        setNode.then(Commands.literal("timestampFormat")
+                .then(Commands.argument("format", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            String format = StringArgumentType.getString(ctx, "format");
+                            OneriaConfig.TIMESTAMP_FORMAT.set(format);
+                            OneriaConfig.SPEC.save();
+                            ctx.getSource().sendSuccess(() ->
+                                            Component.literal("§a[Oneria] Timestamp Format set to: " + format),
+                                    true
+                            );
+                            return 1;
+                        })));
+
+        setNode.then(Commands.literal("enableColorsCommand")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_COLORS_COMMAND, "Colors Command"))));
+
         configNode.then(setNode);
         oneriaRoot.then(configNode);
 
@@ -266,22 +335,18 @@ public class OneriaCommands {
         dispatcher.register(oneriaRoot);
 
         // =========================================================================
-        // COLORS COMMAND
+        // COLORS COMMAND - CORRECTION
         // =========================================================================
-        try {
-            if (OneriaConfig.ENABLE_COLORS_COMMAND != null && OneriaConfig.ENABLE_COLORS_COMMAND.get()) {
-                dispatcher.register(Commands.literal("colors")
-                        .executes(ctx -> {
-                            if (!OneriaConfig.ENABLE_COLORS_COMMAND.get()) {
-                                ctx.getSource().sendFailure(Component.literal("§cColors command is disabled."));
-                                return 0;
-                            }
-                            return OneriaCommands.showColors(ctx);
-                        }));
-            }
-        } catch (IllegalStateException e) {
-            // Config pas encore chargée, on ignore
-        }
+        dispatcher.register(Commands.literal("colors")
+                .executes(ctx -> {
+                    // Vérifier si la commande est activée
+                    if (OneriaConfig.ENABLE_COLORS_COMMAND != null &&
+                            !OneriaConfig.ENABLE_COLORS_COMMAND.get()) {
+                        ctx.getSource().sendFailure(Component.literal("§cColors command is disabled."));
+                        return 0;
+                    }
+                    return OneriaCommands.showColors(ctx);
+                }));
 
         // =========================================================================
         // HANDY ALIASES
@@ -314,7 +379,10 @@ public class OneriaCommands {
         OneriaScheduleManager.reload();
         OneriaPermissions.clearCache();
         NicknameManager.reload();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Configuration and nicknames reloaded!"), true);
+
+        NametagManager.syncNametagVisibility(ctx.getSource().getServer());
+
+        ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Configuration, nicknames and nametags reloaded!"), true);
         return 1;
     }
 
@@ -370,12 +438,19 @@ public class OneriaCommands {
                         "§6║  §eProximity: §f" + OneriaConfig.PROXIMITY_DISTANCE.get() + " blocks\n" +
                         "§6║  §eObfuscate Prefix: §f" + OneriaConfig.OBFUSCATE_PREFIX.get() + "\n" +
                         "§6║  §eOPs See All: §f" + OneriaConfig.OPS_SEE_ALL.get() + "\n" +
+                        "§6║  §eHide Nametags: §f" + OneriaConfig.HIDE_NAMETAGS.get() + "\n" +
                         "§6║\n" +
                         "§6║ §7Schedule\n" +
                         "§6║  §eEnabled: §f" + OneriaConfig.ENABLE_SCHEDULE.get() + "\n" +
                         "§6║  §eStatus: " + (OneriaScheduleManager.isServerOpen() ? "§aOPEN" : "§cCLOSED") + "\n" +
                         "§6║  §eOpening: §f" + OneriaConfig.OPENING_TIME.get() + "\n" +
                         "§6║  §eClosing: §f" + OneriaConfig.CLOSING_TIME.get() + "\n" +
+                        "§6║\n" +
+                        "§6║ §7Chat System\n" +
+                        "§6║  §eChat Format: §f" + OneriaConfig.ENABLE_CHAT_FORMAT.get() + "\n" +
+                        "§6║  §eTimestamp: §f" + OneriaConfig.ENABLE_TIMESTAMP.get() + "\n" +
+                        "§6║  §eMarkdown: §f" + OneriaConfig.MARKDOWN_ENABLED.get() + "\n" +
+                        "§6║  §eMessage Color: §f" + OneriaConfig.CHAT_MESSAGE_COLOR.get() + "\n" +
                         "§6║\n" +
                         "§6║ §7Moderation\n" +
                         "§6║  §eSilent Commands: §f" + OneriaConfig.ENABLE_SILENT_COMMANDS.get() + "\n" +
@@ -592,13 +667,13 @@ public class OneriaCommands {
             ServerPlayer target = EntityArgument.getPlayer(context, "player");
             String nickname = StringArgumentType.getString(context, "nickname");
 
-            // Support des codes couleur & et §
+            // Support color codes & and §
             String formattedNickname = nickname.replace("&", "§");
 
-            // Stocker dans le NicknameManager
+            // Store in NicknameManager
             NicknameManager.setNickname(target.getUUID(), formattedNickname);
 
-            // Forcer la mise à jour du TabList pour tous
+            // Force TabList update for everyone
             target.getServer().getPlayerList().broadcastAll(
                     new ClientboundPlayerInfoUpdatePacket(
                             EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME),
@@ -607,16 +682,16 @@ public class OneriaCommands {
             );
 
             context.getSource().sendSuccess(() ->
-                    Component.literal("§a[Oneria] Nickname de §f" + target.getName().getString() +
-                            "§a défini : " + formattedNickname), true);
+                    Component.literal("§a[Oneria] Nickname for §f" + target.getName().getString() +
+                            "§a set to: " + formattedNickname), true);
 
-            target.sendSystemMessage(Component.literal("§aVotre surnom a été changé en : " + formattedNickname));
+            target.sendSystemMessage(Component.literal("§aYour nickname has been changed to: " + formattedNickname));
 
             OneriaServerUtilities.LOGGER.info("Nickname set for {}: {}", target.getName().getString(), formattedNickname);
 
             return 1;
         } catch (Exception e) {
-            context.getSource().sendFailure(Component.literal("§cErreur lors de la définition du surnom."));
+            context.getSource().sendFailure(Component.literal("§cError while setting nickname."));
             OneriaServerUtilities.LOGGER.error("Error setting nickname", e);
             return 0;
         }
@@ -626,10 +701,10 @@ public class OneriaCommands {
         try {
             ServerPlayer target = EntityArgument.getPlayer(context, "player");
 
-            // Retirer du NicknameManager
+            // Remove from NicknameManager
             NicknameManager.removeNickname(target.getUUID());
 
-            // Forcer la mise à jour du TabList
+            // Force TabList update
             target.getServer().getPlayerList().broadcastAll(
                     new ClientboundPlayerInfoUpdatePacket(
                             EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME),
@@ -638,15 +713,15 @@ public class OneriaCommands {
             );
 
             context.getSource().sendSuccess(() ->
-                    Component.literal("§a[Oneria] Nickname de §f" + target.getName().getString() + "§a réinitialisé."), true);
+                    Component.literal("§a[Oneria] Nickname for §f" + target.getName().getString() + "§a reset."), true);
 
-            target.sendSystemMessage(Component.literal("§aVotre surnom a été réinitialisé."));
+            target.sendSystemMessage(Component.literal("§aYour nickname has been reset."));
 
             OneriaServerUtilities.LOGGER.info("Nickname reset for {}", target.getName().getString());
 
             return 1;
         } catch (Exception e) {
-            context.getSource().sendFailure(Component.literal("§cErreur lors de la réinitialisation."));
+            context.getSource().sendFailure(Component.literal("§cError while resetting nickname."));
             OneriaServerUtilities.LOGGER.error("Error resetting nickname", e);
             return 0;
         }
@@ -657,12 +732,12 @@ public class OneriaCommands {
 
         if (count == 0) {
             context.getSource().sendSuccess(() ->
-                    Component.literal("§e[Oneria] Aucun nickname actif."), false);
+                    Component.literal("§e[Oneria] No active nicknames."), false);
             return 1;
         }
 
         StringBuilder list = new StringBuilder("§6╔═══════════════════════════════════╗\n");
-        list.append("§6║ §e§lNICKNAMES ACTIFS §6(§e").append(count).append("§6)\n");
+        list.append("§6║ §e§lACTIVE NICKNAMES §6(§e").append(count).append("§6)\n");
         list.append("§6╠═══════════════════════════════════╣\n");
 
         context.getSource().getServer().getPlayerList().getPlayers().forEach(player -> {
@@ -685,5 +760,54 @@ public class OneriaCommands {
     private static int showColors(CommandContext<CommandSourceStack> ctx) {
         ctx.getSource().sendSuccess(() -> OneriaChatFormatter.getColorsHelp(), false);
         return 1;
+    }
+
+    public static Component getColorsHelp() {
+        StringBuilder help = new StringBuilder();
+        help.append("§6╔═══════════════════════════════╗\n");
+        help.append("§6║  §e§lAVAILABLE COLORS§r          §6║\n");
+        help.append("§6╠═══════════════════════════════╣\n");
+
+        String[][] colors = {
+                {"§0", "BLACK", "&0 or §0"},
+                {"§1", "DARK_BLUE", "&1 or §1"},
+                {"§2", "DARK_GREEN", "&2 or §2"},
+                {"§3", "DARK_AQUA", "&3 or §3"},
+                {"§4", "DARK_RED", "&4 or §4"},
+                {"§5", "DARK_PURPLE", "&5 or §5"},
+                {"§6", "GOLD", "&6 or §6"},
+                {"§7", "GRAY", "&7 or §7"},
+                {"§8", "DARK_GRAY", "&8 or §8"},
+                {"§9", "BLUE", "&9 or §9"},
+                {"§a", "GREEN", "&a or §a"},
+                {"§b", "AQUA", "&b or §b"},
+                {"§c", "RED", "&c or §c"},
+                {"§d", "LIGHT_PURPLE", "&d or §d"},
+                {"§e", "YELLOW", "&e or §e"},
+                {"§f", "WHITE", "&f or §f"}
+        };
+
+        for (String[] color : colors) {
+            help.append(String.format("§6║ %s§r %-13s §7%s §6║\n",
+                    color[0] + "███",
+                    color[1],
+                    color[2]
+            ));
+        }
+
+        help.append("§6║                               §6║\n");
+        help.append("§6║ §7Formatting Codes:           §6║\n");
+        help.append("§6║ §l§lBold§r §7(&l or §l)          §6║\n");
+        help.append("§6║ §o§oItalic§r §7(&o or §o)        §6║\n");
+        help.append("§6║ §n§nUnderline§r §7(&n or §n)     §6║\n");
+        help.append("§6║ §m§mStrike§r §7(&m or §m)        §6║\n");
+        help.append("§6║ §k§kObfuscated§r §7(&k or §k)   §6║\n");
+        help.append("§6║ §r§rReset§r §7(&r or §r)         §6║\n");
+        help.append("§6║                               §6║\n");
+        help.append("§6║ §7Usage: Just type & or §     §6║\n");
+        help.append("§6║ §7followed by the code!       §6║\n");
+        help.append("§6╚═══════════════════════════════╝");
+
+        return ColorHelper.parseColors(help.toString());
     }
 }
