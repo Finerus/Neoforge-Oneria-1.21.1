@@ -226,6 +226,14 @@ public class OneriaCommands {
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_COLORS_COMMAND, "Colors Command"))));
 
+        setNode.then(Commands.literal("enableSneakStealth")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_SNEAK_STEALTH, "Sneak Stealth Mode"))));
+
+        setNode.then(Commands.literal("sneakProximityDistance")
+                .then(Commands.argument("value", IntegerArgumentType.integer(1, 32))
+                        .executes(ctx -> updateConfigInt(ctx, OneriaConfig.SNEAK_PROXIMITY_DISTANCE, "Sneak Detection Distance"))));
+
         configNode.then(setNode);
         oneriaRoot.then(configNode);
 
@@ -439,6 +447,8 @@ public class OneriaCommands {
                         "§6║  §eObfuscate Prefix: §f" + OneriaConfig.OBFUSCATE_PREFIX.get() + "\n" +
                         "§6║  §eOPs See All: §f" + OneriaConfig.OPS_SEE_ALL.get() + "\n" +
                         "§6║  §eHide Nametags: §f" + OneriaConfig.HIDE_NAMETAGS.get() + "\n" +
+                        "§6║  §eSneak Stealth: §f" + OneriaConfig.ENABLE_SNEAK_STEALTH.get() + "\n" +
+                        "§6║  §eSneak Distance: §f" + OneriaConfig.SNEAK_PROXIMITY_DISTANCE.get() + " blocks\n" +
                         "§6║\n" +
                         "§6║ §7Schedule\n" +
                         "§6║  §eEnabled: §f" + OneriaConfig.ENABLE_SCHEDULE.get() + "\n" +

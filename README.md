@@ -1,6 +1,6 @@
 # Oneria Mod
 
-**Oneria Mod** is a comprehensive utility mod designed specifically for immersive Roleplay (RP) servers. It provides advanced proximity-based obfuscation, automated schedule management, staff moderation tools, advanced chat formatting, and seamless LuckPerms integration to create a professional and controlled RP environment.
+**Oneria Mod** is a comprehensive utility mod designed specifically for immersive Roleplay (RP) servers. It provides advanced proximity-based obfuscation, sneak stealth mechanics, automated schedule management, staff moderation tools, advanced chat formatting, and seamless LuckPerms integration to create a professional and controlled RP environment.
 
 ---
 
@@ -8,15 +8,17 @@
 
 ### Roleplay Obfuscation (Proximity Blur System)
 
-Create true immersion by hiding player identities based on distance:
+Create true immersion by hiding player identities based on distance and stealth:
 
 * **Proximity-Based Names:** Player names in the TabList and overhead become obfuscated when they are beyond a configurable distance.
+* **Sneak Stealth Mode:** Players who are crouching become significantly harder to detect (2 blocks vs 8 blocks by default).
+* **Dynamic Distance Calculation:** System automatically adjusts detection range based on player crouch state.
 * **Anti-Metagaming:** Prevents players from knowing someone's name without meeting them in-game.
 * **LuckPerms Prefix Support:** Option to hide or show rank prefixes based on distance.
 * **Whitelist System:** Specific players or staff members can bypass the blur system entirely.
 * **Nickname Support:** Full integration with custom nicknames set via `/oneria nick`.
 * **Nametag Visibility Control:** Hide all player nametags server-side using scoreboard teams.
-* **Highly Configurable:** Adjust obfuscation distance, length, and behavior.
+* **Highly Configurable:** Adjust obfuscation distance, sneak distance, length, and behavior.
 
 ### Advanced Chat System
 
@@ -124,7 +126,7 @@ Smart data management for reliability:
 
 ---
 
-## ⚙Configuration
+## Configuration
 
 The configuration file is located at `serverconfig/oneriamod-server.toml`. It's fully documented and organized into logical sections:
 
@@ -139,6 +141,8 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * `debugSelfBlur` - Enable self-blur for testing purposes.
 * `hideNametags` - Hide all player nametags above heads (default: false).
 * `whitelist` - List of players who bypass the blur system.
+* **`enableSneakStealth`** - Enable stealth mode for sneaking players (default: true).
+* **`sneakProximityDistance`** - Detection distance for sneaking players in blocks (default: 2, range: 1-32).
 
 #### Chat System
 * `enableChatFormat` - Enable custom chat formatting system.
@@ -188,6 +192,61 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 
 ---
 
+## Sneak Stealth System
+
+### Overview
+
+The sneak stealth system adds a realistic stealth mechanic where players who are crouching (sneaking) become significantly harder to detect. Their names will only be visible to nearby players within a much smaller radius.
+
+### How It Works
+
+* **Normal Detection:** Players standing normally are visible at the standard proximity distance (default: 8 blocks).
+* **Sneak Detection:** Players who are crouching are only visible at the sneak proximity distance (default: 2 blocks).
+* **Dynamic Switching:** The system automatically detects the player's crouch state and applies the appropriate distance.
+* **Admin Override:** Staff members with `opsSeeAll` enabled always see all players, regardless of sneak state.
+
+### Use Cases
+
+* **Stealth Roleplay:** Hide from other players by crouching in crowded areas.
+* **Hide and Seek:** Perfect for RP mini-games where players need to hide.
+* **Ambush Scenarios:** Set up surprise encounters without revealing your presence in TabList.
+* **Privacy:** Move through areas without being immediately recognized by distant players.
+* **Realistic Immersion:** Crouching for stealth mirrors real-world behavior and expectations.
+
+### Configuration Commands
+
+```bash
+# Toggle sneak stealth system
+/oneria config set enableSneakStealth true/false
+
+# Set sneak detection distance (1-32 blocks)
+/oneria config set sneakProximityDistance 2
+
+# Check current settings
+/oneria config status
+```
+
+### Example Scenarios
+
+**Scenario 1: Hiding in a Crowd**
+- Player A is crouching in a busy marketplace
+- Player B is 5 blocks away (beyond sneak distance of 2)
+- Player B sees "§k?????" instead of Player A's name
+- Player A successfully remains anonymous
+
+**Scenario 2: Close Encounter**
+- Player A is crouching behind a building
+- Player B walks within 2 blocks
+- Player B can now see Player A's name
+- Player A's cover is blown
+
+**Scenario 3: Admin Surveillance**
+- Staff member with opsSeeAll monitoring the server
+- Can see all players' names regardless of sneak state or distance
+- Perfect for moderation and rule enforcement
+
+---
+
 ## Installation
 
 ### Requirements
@@ -212,6 +271,7 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * **Tick Optimization:** Schedule system checks only every 20 seconds (400 ticks).
 * **Efficient Packet Handling:** Minimal performance impact on TabList updates.
 * **Optimized Color Parsing:** Segment-based parsing for complex formatting with minimal overhead.
+* **Sneak Detection:** Native `isCrouching()` check with zero overhead.
 
 ### Compatibility
 * **Server-Side Only:** No client-side installation required.
@@ -219,11 +279,11 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * **API Ready:** Public API available for other mods (`OneriaPermissions.isStaff()`, etc.).
 * **LuckPerms Integration:** Full support for prefixes, suffixes, and group-based permissions.
 
-### New in 1.1.2
-* **Enhanced Color System:** Fixed `/colors` command display with proper color code handling.
-* **Nametag Visibility Control:** Server-side nametag hiding using scoreboard teams.
-* **Improved Chat Parsing:** `ColorHelper` class for reliable color code processing.
-* **Better Component Building:** Prevents code interpretation in examples and help text.
+### New in 1.1.3
+* **Sneak Stealth System:** Dynamic distance calculation based on player crouch state.
+* **Enhanced Obfuscation:** Seamless integration of sneak mechanics with existing blur system.
+* **Configurable Sneak Distance:** Adjustable detection range for crouching players (1-32 blocks).
+* **Admin Exemption:** Staff with opsSeeAll always see sneaking players.
 
 ---
 

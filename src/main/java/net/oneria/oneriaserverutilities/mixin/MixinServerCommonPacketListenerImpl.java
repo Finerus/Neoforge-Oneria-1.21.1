@@ -78,6 +78,8 @@ public abstract class MixinServerCommonPacketListenerImpl {
         List<ClientboundPlayerInfoUpdatePacket.Entry> originalEntries = ((ClientboundPlayerInfoUpdatePacketAccessor) infoPacket).getEntries();
         List<ClientboundPlayerInfoUpdatePacket.Entry> newEntries = new ArrayList<>();
         double maxDistSq = Math.pow(OneriaConfig.PROXIMITY_DISTANCE.get(), 2);
+        double sneakMaxDistSq = Math.pow(OneriaConfig.SNEAK_PROXIMITY_DISTANCE.get(), 2);
+        boolean sneakStealthEnabled = OneriaConfig.ENABLE_SNEAK_STEALTH.get();
 
         for (ClientboundPlayerInfoUpdatePacket.Entry entry : originalEntries) {
             ServerPlayer targetPlayer = receiver.server.getPlayerList().getPlayer(entry.profileId());
@@ -108,7 +110,14 @@ public abstract class MixinServerCommonPacketListenerImpl {
                 else {
                     // En mode debug, on floute même soi-même
                     double distSq = receiver.distanceToSqr(targetPlayer);
-                    boolean shouldBlur = debugMode || (distSq > maxDistSq);
+
+                    // Déterminer la distance maximale en fonction du sneak
+                    double effectiveMaxDistSq = maxDistSq;
+                    if (sneakStealthEnabled && targetPlayer.isCrouching()) {
+                        effectiveMaxDistSq = sneakMaxDistSq;
+                    }
+
+                    boolean shouldBlur = debugMode || (distSq > effectiveMaxDistSq);
 
                     String displayedName;
                     if (hasNickname && nickname != null) {

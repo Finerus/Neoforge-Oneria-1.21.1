@@ -1,6 +1,79 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [1.1.3] - 2026-01-16
+
+**Added**
+
+* **Sneak Stealth System:** Advanced stealth mechanics for enhanced roleplay immersion:
+  - Players who are sneaking (crouching) become significantly harder to detect.
+  - Configurable sneak detection distance (default: 2 blocks vs normal 8 blocks).
+  - Sneaking players' names are obfuscated beyond the sneak distance, even if within normal proximity.
+  - Admin exemption: Staff with `opsSeeAll` can always see sneaking players.
+  - Toggle system with `/oneria config set enableSneakStealth true/false`.
+  - Adjustable sneak distance with `/oneria config set sneakProximityDistance <1-32>`.
+  - Perfect for stealth RP scenarios, hiding, and surprise interactions.
+
+**Improved**
+
+* **Obfuscation Logic:** Enhanced distance calculation for dynamic stealth:
+  - System now checks if target player is crouching before applying distance rules.
+  - Automatic switching between normal proximity distance and sneak proximity distance.
+  - Seamless integration with existing blur system - no conflicts.
+  - Performance-optimized with minimal overhead per tick.
+
+* **Configuration Commands:** New sneak-related commands:
+  - `/oneria config set enableSneakStealth <true/false>` - Toggle sneak stealth system.
+  - `/oneria config set sneakProximityDistance <1-32>` - Set sneak detection range.
+  - Sneak status displayed in `/oneria config status` output.
+
+**Technical**
+
+* **Enhanced Classes:**
+  - `OneriaConfig` - Added `ENABLE_SNEAK_STEALTH` and `SNEAK_PROXIMITY_DISTANCE` configuration options.
+  - `MixinServerCommonPacketListenerImpl` - Enhanced `modifyPacket()` with dynamic distance calculation based on crouch state.
+  - `OneriaCommands` - Added sneak configuration commands and status display.
+
+* **Performance:**
+  - Crouch state check uses native Minecraft `isCrouching()` method - zero overhead.
+  - Distance calculation only performed when blur system is active.
+  - No additional packet modifications required.
+
+**Configuration**
+
+* **New Options:**
+  - `enableSneakStealth` (Boolean) - Enable stealth mode for sneaking players.
+    - Location: `[Obfuscation Settings]` section.
+    - Default: `true`.
+    - When enabled, sneaking players use reduced detection distance.
+
+  - `sneakProximityDistance` (Integer) - Detection distance for sneaking players.
+    - Location: `[Obfuscation Settings]` section.
+    - Default: `2` blocks.
+    - Range: 1-32 blocks.
+    - Only applies when `enableSneakStealth` is enabled.
+
+**Use Cases**
+
+* **Stealth Roleplay:** Players can sneak to avoid being detected in crowded areas.
+* **Hide and Seek:** Perfect for RP games where players need to hide.
+* **Ambush Scenarios:** Players can set up surprise encounters without revealing their presence.
+* **Privacy:** Players can move through areas without being immediately recognized.
+* **Realistic Immersion:** Crouching for stealth mirrors real-world behavior.
+
+**Migration Notes**
+
+* No breaking changes - fully backward compatible with 1.1.2.
+* Sneak stealth is enabled by default - disable with `/oneria config set enableSneakStealth false` if not desired.
+* Existing blur system settings remain unchanged.
+* Admin exemptions (`opsSeeAll`) automatically apply to sneak detection.
+
+**Known Limitations**
+
+* Sneak detection only affects TabList names, not physical player visibility.
+* Players can still see other players' models when sneaking - only names are hidden.
+* Sneak distance applies uniformly to all players (no per-player customization).
+
 ## [1.1.2] - 2026-01-15
 
 **Added**
@@ -316,7 +389,7 @@ All notable changes to this project will be documented in this file.
 * **Schedule System:** Added automatic server opening/closing logic with automated kick for non-staff players.
 * **Silent Commands:** Implemented /oneria staff module (gamemode, tp, effects) with stealth logging.
 * **Whitelist System:** Added a specific whitelist to bypass the blur system for selected players.
-* **LuckPerms Integration:** Support for LuckPerms prefixes and group-based staff permissions.
+* **LuckPerms Integration:** Support for LuckPerms prefixes and group-based permissions.
 * **Welcome System:** Customizable welcome messages with sound support upon login.
 
 **Fixed**

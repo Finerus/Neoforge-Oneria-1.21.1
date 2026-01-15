@@ -14,6 +14,8 @@ public class OneriaConfig {
     public static final ModConfigSpec.ConfigValue<List<? extends String>> WHITELIST;
     public static final ModConfigSpec.IntValue OBFUSCATED_NAME_LENGTH;
     public static final ModConfigSpec.BooleanValue OBFUSCATE_PREFIX;
+    public static final ModConfigSpec.BooleanValue ENABLE_SNEAK_STEALTH;
+    public static final ModConfigSpec.IntValue SNEAK_PROXIMITY_DISTANCE;
     public static final ModConfigSpec.BooleanValue OPS_SEE_ALL;
     public static final ModConfigSpec.BooleanValue DEBUG_SELF_BLUR;
 
@@ -93,6 +95,19 @@ public class OneriaConfig {
                         "If 'true', prefixes (ranks, titles) will also be hidden in the TabList.",
                         "Recommended for strict RP.")
                 .define("obfuscatePrefix", true);
+
+        ENABLE_SNEAK_STEALTH = BUILDER
+                .comment("CONFIGURATION: Sneak Stealth Mode",
+                        "If 'true', players who are sneaking become harder to detect.",
+                        "Their name will only be visible at a much closer distance.")
+                .define("enableSneakStealth", true);
+
+        SNEAK_PROXIMITY_DISTANCE = BUILDER
+                .comment("CONFIGURATION: Sneak Detection Distance",
+                        "The distance (in blocks) at which sneaking players can be detected.",
+                        "Only applies when enableSneakStealth is true.",
+                        "Default value: 2 blocks.")
+                .defineInRange("sneakProximityDistance", 2, 1, 32);
 
         OPS_SEE_ALL = BUILDER
                 .comment("CONFIGURATION: Admin View",
