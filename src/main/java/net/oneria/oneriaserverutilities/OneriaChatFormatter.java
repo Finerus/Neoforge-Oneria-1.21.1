@@ -55,8 +55,8 @@ public class OneriaChatFormatter {
         chatFormat = chatFormat.replace("$name", playerName);
         chatFormat = chatFormat.replace("$msg", finalMessageBody);
 
-        // ✅ CORRECTION : Utiliser ColorHelper au lieu de Component.literal
-        return ColorHelper.parseColors(chatFormat);
+        // ✅ Utiliser ColorHelper avec translateAlternateColorCodes pour supporter & et §
+        return ColorHelper.parseColors(ColorHelper.translateAlternateColorCodes(chatFormat));
     }
 
     /**

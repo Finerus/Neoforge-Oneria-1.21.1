@@ -33,11 +33,16 @@ public abstract class MixinServerGamePacketListenerImpl {
             return;
         }
 
-        // Annuler l'envoi vanilla
-        ci.cancel();
-
         // Récupérer le contenu du message
         String message = chatMessage.signedContent();
+
+        // ✅ NOUVEAU : Ignorer les messages qui commencent par / (commandes)
+        if (message.startsWith("/")) {
+            return; // Laisser vanilla gérer les commandes
+        }
+
+        // Annuler l'envoi vanilla
+        ci.cancel();
 
         // Formater le message avec notre système
         Component formattedMessage = OneriaChatFormatter.formatChatMessage(player, message);

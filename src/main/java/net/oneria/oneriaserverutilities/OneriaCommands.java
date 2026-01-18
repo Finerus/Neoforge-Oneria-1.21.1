@@ -818,6 +818,6 @@ public class OneriaCommands {
         help.append("§6║ §7followed by the code!       §6║\n");
         help.append("§6╚═══════════════════════════════╝");
 
-        return ColorHelper.parseColors(help.toString());
+        return Component.literal(help.toString());
     }
 }
