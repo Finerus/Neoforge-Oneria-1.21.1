@@ -18,7 +18,28 @@ public class OneriaEventHandler {
 
         OneriaServerUtilities.LOGGER.info("Player {} logged in", player.getName().getString());
 
-        // Execute after a short delay (2 seconds)
+        // Custom join message - AVEC PROTECTION
+        try {
+            if (OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE != null &&
+                    OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
+
+                String joinMsg = OneriaConfig.JOIN_MESSAGE.get();
+                if (!joinMsg.equalsIgnoreCase("none")) {
+                    String nickname = NicknameManager.getDisplayName(player);
+                    String formatted = joinMsg
+                            .replace("{player}", player.getName().getString())
+                            .replace("{nickname}", nickname);
+
+                    Component message = ColorHelper.parseColors(formatted);
+                    player.getServer().getPlayerList().broadcastSystemMessage(message, false);
+                }
+            }
+        } catch (Exception e) {
+            // Config pas encore chargée, on skip silencieusement
+            OneriaServerUtilities.LOGGER.debug("Config not loaded yet for join message");
+        }
+
+        // Execute after a short delay
         new Thread(() -> {
             try {
                 Thread.sleep(2000);
@@ -44,8 +65,32 @@ public class OneriaEventHandler {
 
         OneriaServerUtilities.LOGGER.info("Player {} logged out", player.getName().getString());
 
+        // Custom leave message - AVEC PROTECTION
+        try {
+            if (OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE != null &&
+                    OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
+
+                String leaveMsg = OneriaConfig.LEAVE_MESSAGE.get();
+                if (!leaveMsg.equalsIgnoreCase("none")) {
+                    String nickname = NicknameManager.getDisplayName(player);
+                    String formatted = leaveMsg
+                            .replace("{player}", player.getName().getString())
+                            .replace("{nickname}", nickname);
+
+                    Component message = ColorHelper.parseColors(formatted);
+                    player.getServer().getPlayerList().broadcastSystemMessage(message, false);
+                }
+            }
+        } catch (Exception e) {
+            // Config pas encore chargée, on skip silencieusement
+            OneriaServerUtilities.LOGGER.debug("Config not loaded yet for leave message");
+        }
+
         // Nettoyer le cache des permissions
         OneriaPermissions.invalidateCache(player.getUUID());
+
+        // Nettoyer le cache des warnings de border
+        WorldBorderManager.clearCache(player.getUUID());
 
         // Retirer le joueur de la team des nametags
         NametagManager.onPlayerLogout(player);

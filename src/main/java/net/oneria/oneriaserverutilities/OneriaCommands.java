@@ -234,6 +234,65 @@ public class OneriaCommands {
                 .then(Commands.argument("value", IntegerArgumentType.integer(1, 32))
                         .executes(ctx -> updateConfigInt(ctx, OneriaConfig.SNEAK_PROXIMITY_DISTANCE, "Sneak Detection Distance"))));
 
+        // Dans OneriaCommands.java, ajoute dans la méthode onRegisterCommands, section setNode :
+
+// Join/Leave messages settings
+        setNode.then(Commands.literal("enableCustomJoinLeave")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE, "Custom Join/Leave Messages"))));
+
+        setNode.then(Commands.literal("joinMessage")
+                .then(Commands.argument("message", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            String msg = StringArgumentType.getString(ctx, "message");
+                            OneriaConfig.JOIN_MESSAGE.set(msg);
+                            OneriaConfig.SPEC.save();
+                            ctx.getSource().sendSuccess(() ->
+                                            Component.literal("§a[Oneria] Join Message set to: " + msg),
+                                    true
+                            );
+                            return 1;
+                        })));
+
+        setNode.then(Commands.literal("leaveMessage")
+                .then(Commands.argument("message", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            String msg = StringArgumentType.getString(ctx, "message");
+                            OneriaConfig.LEAVE_MESSAGE.set(msg);
+                            OneriaConfig.SPEC.save();
+                            ctx.getSource().sendSuccess(() ->
+                                            Component.literal("§a[Oneria] Leave Message set to: " + msg),
+                                    true
+                            );
+                            return 1;
+                        })));
+
+        // World Border settings
+        setNode.then(Commands.literal("enableWorldBorderWarning")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_WORLD_BORDER_WARNING, "World Border Warning"))));
+
+        setNode.then(Commands.literal("worldBorderDistance")
+                .then(Commands.argument("value", IntegerArgumentType.integer(100, 100000))
+                        .executes(ctx -> updateConfigInt(ctx, OneriaConfig.WORLD_BORDER_DISTANCE, "World Border Distance"))));
+
+        setNode.then(Commands.literal("worldBorderMessage")
+                .then(Commands.argument("message", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            String msg = StringArgumentType.getString(ctx, "message");
+                            OneriaConfig.WORLD_BORDER_MESSAGE.set(msg);
+                            OneriaConfig.SPEC.save();
+                            ctx.getSource().sendSuccess(() ->
+                                            Component.literal("§a[Oneria] World Border Message set to: " + msg),
+                                    true
+                            );
+                            return 1;
+                        })));
+
+        setNode.then(Commands.literal("worldBorderCheckInterval")
+                .then(Commands.argument("value", IntegerArgumentType.integer(20, 200))
+                        .executes(ctx -> updateConfigInt(ctx, OneriaConfig.WORLD_BORDER_CHECK_INTERVAL, "World Border Check Interval"))));
+
         configNode.then(setNode);
         oneriaRoot.then(configNode);
 
@@ -315,7 +374,26 @@ public class OneriaCommands {
         oneriaRoot.then(whitelistNode);
 
         // -------------------------------------------------------------------------
-        // 4. MODULE: NICKNAME (Requires OP Level 2)
+        // 4. MODULE: BLACKLIST (Requires OP Level 2)
+        // -------------------------------------------------------------------------
+        var blacklistNode = Commands.literal("blacklist")
+                .requires(source -> source.hasPermission(2));
+
+        blacklistNode.then(Commands.literal("add")
+                .then(Commands.argument("player", StringArgumentType.string())
+                        .executes(OneriaCommands::addToBlacklist)));
+
+        blacklistNode.then(Commands.literal("remove")
+                .then(Commands.argument("player", StringArgumentType.string())
+                        .executes(OneriaCommands::removeFromBlacklist)));
+
+        blacklistNode.then(Commands.literal("list")
+                .executes(OneriaCommands::listBlacklist));
+
+        oneriaRoot.then(blacklistNode);
+
+        // -------------------------------------------------------------------------
+        // 5. MODULE: NICKNAME (Requires OP Level 2)
         // -------------------------------------------------------------------------
         var nickNode = Commands.literal("nick")
                 .requires(source -> source.hasPermission(2));
@@ -334,7 +412,7 @@ public class OneriaCommands {
         oneriaRoot.then(nickNode);
 
         // -------------------------------------------------------------------------
-        // 5. MODULE: SCHEDULE (Public)
+        // 6. MODULE: SCHEDULE (Public)
         // -------------------------------------------------------------------------
         oneriaRoot.then(Commands.literal("schedule")
                 .executes(OneriaCommands::showSchedule));
@@ -437,38 +515,70 @@ public class OneriaCommands {
     }
 
     private static int showStatus(CommandContext<CommandSourceStack> context) {
-        context.getSource().sendSuccess(() -> Component.literal(
-                "§6╔═══════════════════════════════════╗\n" +
-                        "§6║  §e§lONERIA MOD - STATUS§r          §6║\n" +
-                        "§6╠═══════════════════════════════════╣\n" +
-                        "§6║ §7Obfuscation\n" +
-                        "§6║  §eBlur: §f" + OneriaConfig.ENABLE_BLUR.get() + "\n" +
-                        "§6║  §eProximity: §f" + OneriaConfig.PROXIMITY_DISTANCE.get() + " blocks\n" +
-                        "§6║  §eObfuscate Prefix: §f" + OneriaConfig.OBFUSCATE_PREFIX.get() + "\n" +
-                        "§6║  §eOPs See All: §f" + OneriaConfig.OPS_SEE_ALL.get() + "\n" +
-                        "§6║  §eHide Nametags: §f" + OneriaConfig.HIDE_NAMETAGS.get() + "\n" +
-                        "§6║  §eSneak Stealth: §f" + OneriaConfig.ENABLE_SNEAK_STEALTH.get() + "\n" +
-                        "§6║  §eSneak Distance: §f" + OneriaConfig.SNEAK_PROXIMITY_DISTANCE.get() + " blocks\n" +
-                        "§6║\n" +
-                        "§6║ §7Schedule\n" +
-                        "§6║  §eEnabled: §f" + OneriaConfig.ENABLE_SCHEDULE.get() + "\n" +
-                        "§6║  §eStatus: " + (OneriaScheduleManager.isServerOpen() ? "§aOPEN" : "§cCLOSED") + "\n" +
-                        "§6║  §eOpening: §f" + OneriaConfig.OPENING_TIME.get() + "\n" +
-                        "§6║  §eClosing: §f" + OneriaConfig.CLOSING_TIME.get() + "\n" +
-                        "§6║\n" +
-                        "§6║ §7Chat System\n" +
-                        "§6║  §eChat Format: §f" + OneriaConfig.ENABLE_CHAT_FORMAT.get() + "\n" +
-                        "§6║  §eTimestamp: §f" + OneriaConfig.ENABLE_TIMESTAMP.get() + "\n" +
-                        "§6║  §eMarkdown: §f" + OneriaConfig.MARKDOWN_ENABLED.get() + "\n" +
-                        "§6║  §eMessage Color: §f" + OneriaConfig.CHAT_MESSAGE_COLOR.get() + "\n" +
-                        "§6║\n" +
-                        "§6║ §7Moderation\n" +
-                        "§6║  §eSilent Commands: §f" + OneriaConfig.ENABLE_SILENT_COMMANDS.get() + "\n" +
-                        "§6║  §ePlatforms: §f" + OneriaConfig.ENABLE_PLATFORMS.get() + "\n" +
-                        "§6║  §eWelcome Message: §f" + OneriaConfig.ENABLE_WELCOME.get() + "\n" +
-                        "§6╚═══════════════════════════════════╝"
-        ), false);
-        return 1;
+        try {
+            // Helper pour accéder aux configs de manière safe
+            final java.util.function.Function<java.util.function.Supplier<?>, String> safe = (supplier) -> {
+                try {
+                    Object val = supplier.get();
+                    return val != null ? val.toString() : "N/A";
+                } catch (Exception e) {
+                    return "N/A";
+                }
+            };
+
+            // Helper pour le status du schedule
+            String scheduleStatus;
+            try {
+                scheduleStatus = OneriaScheduleManager.isServerOpen() ? "§aOPEN" : "§cCLOSED";
+            } catch (Exception e) {
+                scheduleStatus = "§7N/A";
+            }
+
+            String statusMessage =
+                    "§6╔═══════════════════════════════════╗\n" +
+                            "§6║  §e§lONERIA MOD - STATUS§r          §6║\n" +
+                            "§6╠═══════════════════════════════════╣\n" +
+                            "§6║ §7Obfuscation\n" +
+                            "§6║  §eBlur: §f" + safe.apply(() -> OneriaConfig.ENABLE_BLUR.get()) + "\n" +
+                            "§6║  §eProximity: §f" + safe.apply(() -> OneriaConfig.PROXIMITY_DISTANCE.get()) + " blocks\n" +
+                            "§6║  §eObfuscate Prefix: §f" + safe.apply(() -> OneriaConfig.OBFUSCATE_PREFIX.get()) + "\n" +
+                            "§6║  §eOPs See All: §f" + safe.apply(() -> OneriaConfig.OPS_SEE_ALL.get()) + "\n" +
+                            "§6║  §eHide Nametags: §f" + safe.apply(() -> OneriaConfig.HIDE_NAMETAGS.get()) + "\n" +
+                            "§6║  §eSneak Stealth: §f" + safe.apply(() -> OneriaConfig.ENABLE_SNEAK_STEALTH.get()) + "\n" +
+                            "§6║  §eSneak Distance: §f" + safe.apply(() -> OneriaConfig.SNEAK_PROXIMITY_DISTANCE.get()) + " blocks\n" +
+                            "§6║\n" +
+                            "§6║ §7Schedule\n" +
+                            "§6║  §eEnabled: §f" + safe.apply(() -> OneriaConfig.ENABLE_SCHEDULE.get()) + "\n" +
+                            "§6║  §eStatus: " + scheduleStatus + "\n" +
+                            "§6║  §eOpening: §f" + safe.apply(() -> OneriaConfig.OPENING_TIME.get()) + "\n" +
+                            "§6║  §eClosing: §f" + safe.apply(() -> OneriaConfig.CLOSING_TIME.get()) + "\n" +
+                            "§6║\n" +
+                            "§6║ §7Chat System\n" +
+                            "§6║  §eChat Format: §f" + safe.apply(() -> OneriaConfig.ENABLE_CHAT_FORMAT.get()) + "\n" +
+                            "§6║  §eTimestamp: §f" + safe.apply(() -> OneriaConfig.ENABLE_TIMESTAMP.get()) + "\n" +
+                            "§6║  §eMarkdown: §f" + safe.apply(() -> OneriaConfig.MARKDOWN_ENABLED.get()) + "\n" +
+                            "§6║  §eMessage Color: §f" + safe.apply(() -> OneriaConfig.CHAT_MESSAGE_COLOR.get()) + "\n" +
+                            "§6║\n" +
+                            "§6║ §7Join/Leave Messages\n" +
+                            "§6║  §eEnabled: §f" + safe.apply(() -> OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) + "\n" +
+                            "§6║\n" +
+                            "§6║ §7World Border\n" +
+                            "§6║  §eEnabled: §f" + safe.apply(() -> OneriaConfig.ENABLE_WORLD_BORDER_WARNING.get()) + "\n" +
+                            "§6║  §eDistance: §f" + safe.apply(() -> OneriaConfig.WORLD_BORDER_DISTANCE.get()) + " blocks\n" +
+                            "§6║\n" +
+                            "§6║ §7Moderation\n" +
+                            "§6║  §eSilent Commands: §f" + safe.apply(() -> OneriaConfig.ENABLE_SILENT_COMMANDS.get()) + "\n" +
+                            "§6║  §ePlatforms: §f" + safe.apply(() -> OneriaConfig.ENABLE_PLATFORMS.get()) + "\n" +
+                            "§6║  §eWelcome Message: §f" + safe.apply(() -> OneriaConfig.ENABLE_WELCOME.get()) + "\n" +
+                            "§6╚═══════════════════════════════════╝";
+
+            context.getSource().sendSuccess(() -> Component.literal(statusMessage), false);
+            return 1;
+        } catch (Exception e) {
+            context.getSource().sendFailure(Component.literal("§c[Oneria] Error displaying status: " + e.getMessage()));
+            OneriaServerUtilities.LOGGER.error("Error in showStatus", e);
+            return 0;
+        }
     }
 
     // --- WHITELIST HANDLERS ---
@@ -506,6 +616,45 @@ public class OneriaCommands {
             context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist is empty."), false);
         } else {
             context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist: §f" + String.join(", ", whitelist)), false);
+        }
+        return 1;
+    }
+
+    // --- BLACKLIST HANDLERS ---
+
+    private static int addToBlacklist(CommandContext<CommandSourceStack> context) {
+        String player = StringArgumentType.getString(context, "player");
+        List<String> list = new ArrayList<>(OneriaConfig.BLACKLIST.get());
+        if (!list.contains(player)) {
+            list.add(player);
+            OneriaConfig.BLACKLIST.set(list);
+            OneriaConfig.SPEC.save();
+            context.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " added to blacklist (always hidden)."), true);
+        } else {
+            context.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is already in blacklist."));
+        }
+        return 1;
+    }
+
+    private static int removeFromBlacklist(CommandContext<CommandSourceStack> context) {
+        String player = StringArgumentType.getString(context, "player");
+        List<String> list = new ArrayList<>(OneriaConfig.BLACKLIST.get());
+        if (list.remove(player)) {
+            OneriaConfig.BLACKLIST.set(list);
+            OneriaConfig.SPEC.save();
+            context.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " removed from blacklist."), true);
+        } else {
+            context.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is not in blacklist."));
+        }
+        return 1;
+    }
+
+    private static int listBlacklist(CommandContext<CommandSourceStack> context) {
+        List<? extends String> blacklist = OneriaConfig.BLACKLIST.get();
+        if (blacklist.isEmpty()) {
+            context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist is empty."), false);
+        } else {
+            context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist (always hidden): §f" + String.join(", ", blacklist)), false);
         }
         return 1;
     }

@@ -1,6 +1,130 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-01-21
+
+**Added**
+
+* **Join/Leave Messages System:** Fully customizable player connection messages:
+  - Custom join messages with color code support and variables (`{player}`, `{nickname}`).
+  - Custom leave messages with same variable support.
+  - Option to disable messages completely by setting to "none".
+  - Configuration commands: `/oneria config set joinMessage <message>` and `/oneria config set leaveMessage <message>`.
+  - Toggle with `/oneria config set enableCustomJoinLeave true/false`.
+
+* **World Border Warning System:** Automatic distance-based warnings from spawn:
+  - Configurable warning distance (default: 2000 blocks from spawn).
+  - Players receive ONE warning message when exceeding the limit.
+  - Warning automatically resets when player returns to safe zone.
+  - Configurable check interval for performance optimization (default: 40 ticks / 2 seconds).
+  - Custom warning message with variables (`{distance}`, `{player}`).
+  - Warning sound effect (note block bass) played on trigger.
+  - Configuration commands:
+    - `/oneria config set enableWorldBorderWarning true/false`
+    - `/oneria config set worldBorderDistance <100-100000>`
+    - `/oneria config set worldBorderMessage <message>`
+    - `/oneria config set worldBorderCheckInterval <20-200>`
+
+* **Blacklist System:** Always-hidden player functionality:
+  - New blacklist to permanently hide specific players from TabList.
+  - Players in blacklist are always obfuscated regardless of distance.
+  - Useful for staff in stealth mode or hidden NPCs.
+  - Commands:
+    - `/oneria blacklist add <player>` - Add player to always-hidden list.
+    - `/oneria blacklist remove <player>` - Remove from blacklist.
+    - `/oneria blacklist list` - Display all blacklisted players.
+  - Stored in config under `Obfuscation Settings`.
+
+**Improved**
+
+* **LuckPerms Compatibility:** Enhanced support for servers without LuckPerms:
+  - Mod no longer crashes when LuckPerms is not installed.
+  - Graceful fallback to vanilla permissions and scoreboard tags.
+  - Better error handling with `IllegalStateException` catching.
+  - Debug logging instead of error messages for missing LuckPerms.
+  - All LuckPerms-dependent features (prefixes, suffixes, group permissions) safely disabled when unavailable.
+
+* **Schedule System Reliability:** More robust initialization and error handling:
+  - Fixed `NullPointerException` when config loads late.
+  - Added null checks in `tick()`, `isServerOpen()`, and `getTimeUntilNextEvent()`.
+  - Schedule now gracefully handles uninitialized state.
+  - Better logging for initialization events.
+  - Config loading listener ensures proper initialization timing.
+
+* **Configuration System:** Better error handling across all config access:
+  - All config-dependent systems check for null before accessing values.
+  - Graceful degradation when config is not yet loaded.
+  - Improved debug logging for initialization states.
+
+**Fixed**
+
+* **Config Loading Race Condition:** Fixed "Cannot get config value before spec is built" errors:
+  - Moved Join/Leave and World Border config sections before `SPEC = BUILDER.build()`.
+  - All config values now properly initialized on server start.
+  - Fixed `/oneria config status` showing "N/A" for new features.
+
+* **Schedule Initialization:** Fixed crash on world creation:
+  - `OneriaScheduleManager.reload()` now checks for null config values.
+  - No longer attempts to parse times before config is loaded.
+  - Added proper return statements to prevent execution with null values.
+
+* **LuckPerms Dependencies:** Fixed crashes in modpacks without LuckPerms:
+  - `getPlayerPrefix()` and `getPlayerSuffix()` now catch `IllegalStateException`.
+  - `OneriaPermissions.checkStaffStatus()` safely handles missing LuckPerms.
+  - Staff detection falls back to vanilla tags and OP levels.
+
+**Technical**
+
+* **New Classes:**
+  - `WorldBorderManager` - Distance-based warning system with spawn proximity checks.
+
+* **Enhanced Classes:**
+  - `OneriaConfig` - Added `ENABLE_CUSTOM_JOIN_LEAVE`, `JOIN_MESSAGE`, `LEAVE_MESSAGE`, `ENABLE_WORLD_BORDER_WARNING`, `WORLD_BORDER_DISTANCE`, `WORLD_BORDER_MESSAGE`, `WORLD_BORDER_CHECK_INTERVAL`, `BLACKLIST`.
+  - `OneriaEventHandler` - Integrated custom join/leave messages with proper null checks.
+  - `OneriaScheduleManager` - Added comprehensive null safety for all public methods.
+  - `OneriaServerUtilities` - Enhanced LuckPerms error handling, added config loading listener.
+  - `OneriaPermissions` - Improved LuckPerms fallback logic.
+  - `OneriaCommands` - Added blacklist management commands and new config setters.
+  - `MixinServerCommonPacketListenerImpl` - Integrated blacklist checking in obfuscation logic.
+
+**Configuration**
+
+* **New Config Sections:**
+  - `[Join and Leave Messages]` - Join/leave message customization.
+  - `[World Border Warning]` - Distance warning system settings.
+
+* **New Options:**
+  - `enableCustomJoinLeave` (Boolean) - Enable custom join/leave messages (default: true).
+  - `joinMessage` (String) - Join message template with variables (default: "§e{player} §7joined the game").
+  - `leaveMessage` (String) - Leave message template with variables (default: "§e{player} §7left the game").
+  - `enableWorldBorderWarning` (Boolean) - Enable world border warnings (default: true).
+  - `worldBorderDistance` (Integer) - Warning distance in blocks (default: 2000, range: 100-100000).
+  - `worldBorderMessage` (String) - Warning message template (default: "§c§l⚠ WARNING §r§7You've reached the limit of the world! (§c{distance} blocks§7)").
+  - `worldBorderCheckInterval` (Integer) - Check frequency in ticks (default: 40, range: 20-200).
+  - `blacklist` (List) - Players who are always hidden (default: empty list).
+
+**Performance**
+
+* World border checks use configurable intervals (default 2 seconds) to minimize overhead.
+* Distance calculation uses 2D (X, Z) coordinates only, ignoring Y for better performance.
+* One-time warning system prevents message spam.
+* Efficient state tracking with HashMap for warned players.
+
+**Migration Notes**
+
+* No breaking changes - fully backward compatible with 1.1.3.
+* Delete `serverconfig/oneriamod-server.toml` to regenerate with new options.
+* If upgrading from pre-1.2.0, verify config sections are before `SPEC = BUILDER.build()` line.
+* LuckPerms is now truly optional - mod works without it using vanilla permissions.
+* Join/leave messages are enabled by default - set to "none" to disable.
+* World border warnings are enabled by default at 2000 blocks - adjust as needed.
+
+**Known Limitations**
+
+* World border warnings are based on distance from spawn (0,0), not world border entities.
+* Blacklist applies to all contexts - no per-player exemptions.
+* Join/leave messages appear to all players - no per-player filtering.
+
 ## [1.1.3] - 2026-01-16
 
 **Added**

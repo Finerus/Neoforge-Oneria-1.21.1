@@ -67,7 +67,7 @@ public class OneriaPermissions {
             return true;
         }
 
-        // 3. Check LuckPerms (if enabled)
+        // 3. Check LuckPerms (if enabled AND available)
         if (OneriaConfig.USE_LUCKPERMS_GROUPS.get()) {
             try {
                 LuckPerms luckPerms = LuckPermsProvider.get();
@@ -86,8 +86,13 @@ public class OneriaPermissions {
                         }
                     }
                 }
+            } catch (IllegalStateException e) {
+                // LuckPerms not loaded - silently continue
             } catch (Exception e) {
-                // LuckPerms not available, ignore
+                // LuckPerms error - log once and continue
+                if (e.getMessage() != null && !e.getMessage().contains("not loaded")) {
+                    OneriaServerUtilities.LOGGER.debug("LuckPerms check failed: {}", e.getMessage());
+                }
             }
         }
 

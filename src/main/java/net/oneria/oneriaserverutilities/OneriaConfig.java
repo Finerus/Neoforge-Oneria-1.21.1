@@ -12,6 +12,7 @@ public class OneriaConfig {
     public static final ModConfigSpec.IntValue PROXIMITY_DISTANCE;
     public static final ModConfigSpec.BooleanValue ENABLE_BLUR;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> WHITELIST;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> BLACKLIST;
     public static final ModConfigSpec.IntValue OBFUSCATED_NAME_LENGTH;
     public static final ModConfigSpec.BooleanValue OBFUSCATE_PREFIX;
     public static final ModConfigSpec.BooleanValue ENABLE_SNEAK_STEALTH;
@@ -65,6 +66,17 @@ public class OneriaConfig {
     public static final ModConfigSpec.BooleanValue MARKDOWN_ENABLED;
     public static final ModConfigSpec.BooleanValue ENABLE_COLORS_COMMAND;
     public static final ModConfigSpec.BooleanValue HIDE_NAMETAGS;
+
+    // === JOIN/LEAVE MESSAGES ===
+    public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_JOIN_LEAVE;
+    public static final ModConfigSpec.ConfigValue<String> JOIN_MESSAGE;
+    public static final ModConfigSpec.ConfigValue<String> LEAVE_MESSAGE;
+
+    // === WORLD BORDER WARNING ===
+    public static final ModConfigSpec.BooleanValue ENABLE_WORLD_BORDER_WARNING;
+    public static final ModConfigSpec.IntValue WORLD_BORDER_DISTANCE;
+    public static final ModConfigSpec.ConfigValue<String> WORLD_BORDER_MESSAGE;
+    public static final ModConfigSpec.IntValue WORLD_BORDER_CHECK_INTERVAL;
 
     static {
         // ===============================================================================
@@ -132,6 +144,13 @@ public class OneriaConfig {
                         "List of usernames that always see everything clearly, even without OP.",
                         "Format: A list of strings.")
                 .defineList("whitelist", Arrays.asList("AdminPlayer", "Moderator"), obj -> obj instanceof String);
+
+        BLACKLIST = BUILDER
+                .comment("BLACKLIST: Always Hidden Players",
+                        "List of usernames that are ALWAYS hidden, even at close range.",
+                        "Useful for staff in stealth mode or special NPCs.",
+                        "Format: A list of strings.")
+                .defineList("blacklist", Arrays.asList(), obj -> obj instanceof String);
 
         BUILDER.pop();
 
@@ -274,6 +293,52 @@ public class OneriaConfig {
         ENABLE_COLORS_COMMAND = BUILDER
                 .comment("Enable /colors command to show available colors")
                 .define("enableColorsCommand", true);
+
+        BUILDER.pop();
+
+        // ===============================================================================
+        // CATEGORY: JOIN/LEAVE MESSAGES
+        // ===============================================================================
+        BUILDER.push("Join and Leave Messages");
+
+        ENABLE_CUSTOM_JOIN_LEAVE = BUILDER
+                .comment("Enable custom join/leave messages.")
+                .define("enableCustomJoinLeave", true);
+
+        JOIN_MESSAGE = BUILDER
+                .comment("Join message. Variables: {player}, {nickname}",
+                        "Use 'none' to disable join messages completely.")
+                .define("joinMessage", "§e{player} §7joined the game");
+
+        LEAVE_MESSAGE = BUILDER
+                .comment("Leave message. Variables: {player}, {nickname}",
+                        "Use 'none' to disable leave messages completely.")
+                .define("leaveMessage", "§e{player} §7left the game");
+
+        BUILDER.pop();
+
+        // ===============================================================================
+        // CATEGORY: WORLD BORDER WARNING
+        // ===============================================================================
+        BUILDER.push("World Border Warning");
+
+        ENABLE_WORLD_BORDER_WARNING = BUILDER
+                .comment("Enable warning when players reach world border distance.")
+                .define("enableWorldBorderWarning", true);
+
+        WORLD_BORDER_DISTANCE = BUILDER
+                .comment("Distance from spawn (in blocks) before warning is triggered.")
+                .defineInRange("worldBorderDistance", 2000, 100, 100000);
+
+        WORLD_BORDER_MESSAGE = BUILDER
+                .comment("Message displayed when player reaches border.",
+                        "Variables: {distance}, {player}")
+                .define("worldBorderMessage", "§c§l⚠ WARNING §r§7You've reached the limit of the world! (§c{distance} blocks§7)");
+
+        WORLD_BORDER_CHECK_INTERVAL = BUILDER
+                .comment("Check interval in ticks (20 ticks = 1 second).",
+                        "Higher values = less frequent checks = better performance.")
+                .defineInRange("worldBorderCheckInterval", 40, 20, 200);
 
         BUILDER.pop();
 

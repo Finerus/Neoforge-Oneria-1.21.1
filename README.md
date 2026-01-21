@@ -1,6 +1,6 @@
 # Oneria Mod
 
-**Oneria Mod** is a comprehensive utility mod designed specifically for immersive Roleplay (RP) servers. It provides advanced proximity-based obfuscation, sneak stealth mechanics, automated schedule management, staff moderation tools, advanced chat formatting, and seamless LuckPerms integration to create a professional and controlled RP environment.
+**Oneria Mod** is a comprehensive utility mod designed specifically for immersive Roleplay (RP) servers. It provides advanced proximity-based obfuscation, sneak stealth mechanics, automated schedule management, staff moderation tools, advanced chat formatting, world border warnings, custom join/leave messages, and seamless LuckPerms integration to create a professional and controlled RP environment.
 
 ---
 
@@ -16,6 +16,7 @@ Create true immersion by hiding player identities based on distance and stealth:
 * **Anti-Metagaming:** Prevents players from knowing someone's name without meeting them in-game.
 * **LuckPerms Prefix Support:** Option to hide or show rank prefixes based on distance.
 * **Whitelist System:** Specific players or staff members can bypass the blur system entirely.
+* **Blacklist System:** NEW! Specific players can be permanently hidden regardless of distance (stealth staff, NPCs).
 * **Nickname Support:** Full integration with custom nicknames set via `/oneria nick`.
 * **Nametag Visibility Control:** Hide all player nametags server-side using scoreboard teams.
 * **Highly Configurable:** Adjust obfuscation distance, sneak distance, length, and behavior.
@@ -25,12 +26,35 @@ Create true immersion by hiding player identities based on distance and stealth:
 Professional chat formatting with markdown and color support:
 
 * **Custom Chat Format:** Fully customizable chat message template with variables (`$time`, `$name`, `$msg`).
-* **LuckPerms Integration:** Display prefixes and suffixes from LuckPerms in chat.
+* **LuckPerms Integration:** Display prefixes and suffixes from LuckPerms in chat (optional - works without LuckPerms).
 * **Markdown Support:** Real-time formatting with `**bold**`, `*italic*`, `__underline__`, `~~strikethrough~~`.
 * **Color Codes:** Full support for both `&` and `§` color codes in chat messages.
 * **Timestamp System:** Optional timestamps with customizable Java SimpleDateFormat.
 * **Global Message Color:** Set a default color for all chat messages.
 * **Colors Command:** `/colors` displays all available colors and formatting codes with visual preview.
+
+### Join/Leave Messages System
+
+Fully customizable player connection messages:
+
+* **Custom Join Messages:** Define your own join message with color codes and variables.
+* **Custom Leave Messages:** Personalized disconnect messages for players.
+* **Variable Support:** Use `{player}` for real username and `{nickname}` for custom nicknames.
+* **Disable Option:** Set messages to "none" to completely disable announcements.
+* **Color Code Support:** Full `§` and `&` color code support in messages.
+* **Server-Wide Broadcast:** All players see the custom join/leave messages.
+
+### World Border Warning System
+
+Automatic distance-based warnings to keep players within boundaries:
+
+* **Configurable Distance:** Set warning trigger distance from spawn (default: 2000 blocks).
+* **One-Time Warnings:** Players receive ONE warning when exceeding limit, preventing spam.
+* **Auto-Reset:** Warning resets when player returns to safe zone, allows re-warning if they go out again.
+* **Custom Messages:** Fully customizable warning message with variables (`{distance}`, `{player}`).
+* **Sound Effects:** Warning sound (note block bass) plays when triggered.
+* **Performance Optimized:** Configurable check interval (default: every 2 seconds).
+* **2D Distance:** Uses X/Z coordinates only for realistic border detection.
 
 ### Advanced Schedule System
 
@@ -49,8 +73,9 @@ Professional moderation tools with stealth and transparency:
 * **Silent Commands:** Execute gamemode changes, teleports, and effects without broadcasting to the whole server.
 * **Staff Logging:** Every staff action is logged to the console and broadcasted to other online staff members.
 * **Teleport Platforms:** Define custom teleportation points (platforms) to move players quickly to specific RP zones.
-* **Permission System:** Multi-layered permission detection (Scoreboard tags, OP levels, LuckPerms groups).
+* **Permission System:** Multi-layered permission detection (Scoreboard tags, OP levels, LuckPerms groups - LuckPerms optional).
 * **Nickname Management:** Set custom nicknames for players with full color code support.
+* **Blacklist Management:** Hide specific players permanently for stealth operations.
 
 ### Welcome & Integration
 
@@ -58,7 +83,7 @@ Enhance player experience from the moment they join:
 
 * **Custom Welcome Messages:** Display multi-line welcome messages with color codes and variable support.
 * **Sound Effects:** Play specific sounds when a player joins (fully customizable).
-* **LuckPerms Ready:** Deep integration with LuckPerms for permissions, prefixes, suffixes, and group management.
+* **LuckPerms Ready:** Deep integration with LuckPerms for permissions, prefixes, suffixes, and group management (fully optional - works without LuckPerms).
 * **Schedule Integration:** Welcome messages include server status and time remaining.
 
 ### Data Persistence
@@ -96,9 +121,17 @@ Smart data management for reliability:
 
 | Command | Permission | Description |
 |:--------|:-----------|:------------|
-| `/oneria whitelist add <player>` | OP Level 2 | Adds a player to the blur bypass whitelist. |
+| `/oneria whitelist add <player>` | OP Level 2 | Adds a player to the blur bypass whitelist (always see all names). |
 | `/oneria whitelist remove <player>` | OP Level 2 | Removes a player from the whitelist. |
 | `/oneria whitelist list` | OP Level 2 | Lists all whitelisted players. |
+
+### Blacklist Commands
+
+| Command | Permission | Description |
+|:--------|:-----------|:------------|
+| `/oneria blacklist add <player>` | OP Level 2 | Adds a player to the always-hidden blacklist (always obfuscated). |
+| `/oneria blacklist remove <player>` | OP Level 2 | Removes a player from the blacklist. |
+| `/oneria blacklist list` | OP Level 2 | Lists all blacklisted players. |
 
 ### Nickname Commands
 
@@ -140,7 +173,8 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * `opsSeeAll` - Operators always see all names clearly.
 * `debugSelfBlur` - Enable self-blur for testing purposes.
 * `hideNametags` - Hide all player nametags above heads (default: false).
-* `whitelist` - List of players who bypass the blur system.
+* `whitelist` - List of players who bypass the blur system (always see all names).
+* **`blacklist`** - NEW! List of players who are always hidden (stealth mode).
 * **`enableSneakStealth`** - Enable stealth mode for sneaking players (default: true).
 * **`sneakProximityDistance`** - Detection distance for sneaking players in blocks (default: 2, range: 1-32).
 
@@ -154,10 +188,21 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * `markdownEnabled` - Enable markdown styling (`**bold**`, `*italic*`, etc.).
 * `enableColorsCommand` - Enable `/colors` command.
 
+#### Join and Leave Messages
+* **`enableCustomJoinLeave`** - Enable custom join/leave messages (default: true).
+* **`joinMessage`** - Join message template (variables: `{player}`, `{nickname}`, default: "§e{player} §7joined the game").
+* **`leaveMessage`** - Leave message template (variables: `{player}`, `{nickname}`, default: "§e{player} §7left the game").
+
+#### World Border Warning
+* **`enableWorldBorderWarning`** - Enable distance-based warnings (default: true).
+* **`worldBorderDistance`** - Warning trigger distance from spawn in blocks (default: 2000, range: 100-100000).
+* **`worldBorderMessage`** - Warning message template (variables: `{distance}`, `{player}`).
+* **`worldBorderCheckInterval`** - Check frequency in ticks (default: 40 = 2 seconds, range: 20-200).
+
 #### Permissions System
 * `staffTags` - Scoreboard tags considered as staff (default: `["admin", "modo", "staff", "builder"]`).
 * `opLevelBypass` - Minimum OP level to be considered staff (default: 2).
-* `useLuckPermsGroups` - Enable LuckPerms group detection.
+* `useLuckPermsGroups` - Enable LuckPerms group detection (optional - mod works without LuckPerms).
 * `luckPermsStaffGroups` - LuckPerms groups considered as staff.
 
 #### Schedule System
@@ -192,72 +237,17 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 
 ---
 
-## Sneak Stealth System
-
-### Overview
-
-The sneak stealth system adds a realistic stealth mechanic where players who are crouching (sneaking) become significantly harder to detect. Their names will only be visible to nearby players within a much smaller radius.
-
-### How It Works
-
-* **Normal Detection:** Players standing normally are visible at the standard proximity distance (default: 8 blocks).
-* **Sneak Detection:** Players who are crouching are only visible at the sneak proximity distance (default: 2 blocks).
-* **Dynamic Switching:** The system automatically detects the player's crouch state and applies the appropriate distance.
-* **Admin Override:** Staff members with `opsSeeAll` enabled always see all players, regardless of sneak state.
-
-### Use Cases
-
-* **Stealth Roleplay:** Hide from other players by crouching in crowded areas.
-* **Hide and Seek:** Perfect for RP mini-games where players need to hide.
-* **Ambush Scenarios:** Set up surprise encounters without revealing your presence in TabList.
-* **Privacy:** Move through areas without being immediately recognized by distant players.
-* **Realistic Immersion:** Crouching for stealth mirrors real-world behavior and expectations.
-
-### Configuration Commands
-
-```bash
-# Toggle sneak stealth system
-/oneria config set enableSneakStealth true/false
-
-# Set sneak detection distance (1-32 blocks)
-/oneria config set sneakProximityDistance 2
-
-# Check current settings
-/oneria config status
-```
-
-### Example Scenarios
-
-**Scenario 1: Hiding in a Crowd**
-- Player A is crouching in a busy marketplace
-- Player B is 5 blocks away (beyond sneak distance of 2)
-- Player B sees "§k?????" instead of Player A's name
-- Player A successfully remains anonymous
-
-**Scenario 2: Close Encounter**
-- Player A is crouching behind a building
-- Player B walks within 2 blocks
-- Player B can now see Player A's name
-- Player A's cover is blown
-
-**Scenario 3: Admin Surveillance**
-- Staff member with opsSeeAll monitoring the server
-- Can see all players' names regardless of sneak state or distance
-- Perfect for moderation and rule enforcement
-
----
-
 ## Installation
 
 ### Requirements
 * **Minecraft:** 1.21.1
 * **NeoForge:** 21.1.215 or higher
-* **Optional:** LuckPerms (for advanced permissions, prefix/suffix support, and chat integration)
+* **Optional:** LuckPerms (for advanced permissions, prefix/suffix support, and chat integration - NOT required)
 
 ### Steps
 1. Download the latest `oneriamod-X.X.X.jar` from the releases page.
 2. Place the JAR file into your server's `mods` folder.
-3. **(Optional)** Install [LuckPerms](https://luckperms.net/) for advanced permission management and chat prefixes/suffixes.
+3. **(Optional)** Install [LuckPerms](https://luckperms.net/) for advanced permission management and chat prefixes/suffixes (mod works without it).
 4. Start your server to generate the configuration file.
 5. Edit `serverconfig/oneriamod-server.toml` to customize your settings.
 6. Reload with `/oneria config reload` or restart the server.
@@ -272,18 +262,22 @@ The sneak stealth system adds a realistic stealth mechanic where players who are
 * **Efficient Packet Handling:** Minimal performance impact on TabList updates.
 * **Optimized Color Parsing:** Segment-based parsing for complex formatting with minimal overhead.
 * **Sneak Detection:** Native `isCrouching()` check with zero overhead.
+* **World Border Checks:** Configurable interval (default 2 seconds) with 2D distance calculation.
+* **One-Time Warnings:** Prevents message spam with efficient state tracking.
 
 ### Compatibility
 * **Server-Side Only:** No client-side installation required.
 * **Mixin-Based:** Uses Mixin for clean packet interception and chat formatting.
 * **API Ready:** Public API available for other mods (`OneriaPermissions.isStaff()`, etc.).
-* **LuckPerms Integration:** Full support for prefixes, suffixes, and group-based permissions.
+* **LuckPerms Integration:** Full support for prefixes, suffixes, and group-based permissions (optional - gracefully disabled when not present).
+* **No Dependencies:** Mod functions fully without any required dependencies.
 
-### New in 1.1.3
-* **Sneak Stealth System:** Dynamic distance calculation based on player crouch state.
-* **Enhanced Obfuscation:** Seamless integration of sneak mechanics with existing blur system.
-* **Configurable Sneak Distance:** Adjustable detection range for crouching players (1-32 blocks).
-* **Admin Exemption:** Staff with opsSeeAll always see sneaking players.
+### New in 1.2.0
+* **Join/Leave Messages:** Fully customizable connection announcements with variables and color codes.
+* **World Border Warnings:** Automatic distance-based warnings from spawn with configurable triggers.
+* **Blacklist System:** Permanently hide specific players for stealth operations.
+* **Enhanced LuckPerms Compatibility:** Mod no longer crashes when LuckPerms is absent.
+* **Improved Config Handling:** Better error handling and initialization timing.
 
 ---
 
@@ -299,7 +293,7 @@ This mod is developed for the **Oneria RP Server** and is provided as-is for com
 
 * **Development:** Finerus, OneriaTeam
 * **Special Thanks:** The Oneria RP community for testing and feedback
-* **Libraries:** NeoForge, Mixin, LuckPerms API
+* **Libraries:** NeoForge, Mixin, LuckPerms API (optional)
 
 ---
 

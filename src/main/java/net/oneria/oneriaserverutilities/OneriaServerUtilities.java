@@ -27,10 +27,13 @@ public class OneriaServerUtilities {
         modContainer.registerConfig(ModConfig.Type.SERVER, OneriaConfig.SPEC);
         NeoForge.EVENT_BUS.register(this);
 
-        // Initialize Schedule System
-        OneriaScheduleManager.reload();
-
-        // Le NicknameManager s'initialise automatiquement au premier appel
+        // Initialize Schedule System - avec un délai
+        modEventBus.addListener((net.neoforged.fml.event.config.ModConfigEvent.Loading event) -> {
+            if (event.getConfig().getType() == ModConfig.Type.SERVER) {
+                OneriaScheduleManager.reload();
+                LOGGER.info("Schedule system initialized after config load");
+            }
+        });
     }
 
     // Securely retrieve LuckPerms prefix
@@ -42,8 +45,11 @@ public class OneriaServerUtilities {
                 String prefix = user.getCachedData().getMetaData().getPrefix();
                 return prefix != null ? prefix : "";
             }
+        } catch (IllegalStateException e) {
+            // LuckPerms not loaded - this is normal
+            return "";
         } catch (Exception e) {
-            // LuckPerms not loaded or error
+            LOGGER.debug("LuckPerms not available: {}", e.getMessage());
         }
         return "";
     }
@@ -57,31 +63,38 @@ public class OneriaServerUtilities {
                 String suffix = user.getCachedData().getMetaData().getSuffix();
                 return suffix != null ? suffix : "";
             }
+        } catch (IllegalStateException e) {
+            // LuckPerms not loaded - this is normal
+            return "";
         } catch (Exception e) {
-            // LuckPerms not loaded or error
+            LOGGER.debug("LuckPerms is not available: {}", e.getMessage());
         }
         return "";
     }
 
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
-        if (!OneriaConfig.ENABLE_BLUR.get()) return;
-
         // Do not update every tick to save bandwidth (here every 10 ticks = 0.5s)
         if (tickCounter++ % 10 == 0) {
             var server = event.getServer();
             if (server == null) return;
 
-            // Force sending an UPDATE_DISPLAY_NAME packet for all players
-            // Our Mixin will intercept this packet and modify the content on the fly
-            ClientboundPlayerInfoUpdatePacket packet = new ClientboundPlayerInfoUpdatePacket(
-                    EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME),
-                    server.getPlayerList().getPlayers()
-            );
-            server.getPlayerList().broadcastAll(packet);
+            // Blur system - seulement si activé
+            if (OneriaConfig.ENABLE_BLUR.get()) {
+                // Force sending an UPDATE_DISPLAY_NAME packet for all players
+                // Our Mixin will intercept this packet and modify the content on the fly
+                ClientboundPlayerInfoUpdatePacket packet = new ClientboundPlayerInfoUpdatePacket(
+                        EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME),
+                        server.getPlayerList().getPlayers()
+                );
+                server.getPlayerList().broadcastAll(packet);
+            }
         }
 
-        // Schedule System Tick
+        // Schedule System Tick (indépendant du blur)
         OneriaScheduleManager.tick(event.getServer());
+
+        // World Border Warning System Tick (indépendant du blur)
+        WorldBorderManager.tick(event.getServer());
     }
 }

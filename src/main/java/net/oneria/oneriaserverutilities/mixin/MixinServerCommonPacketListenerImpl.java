@@ -95,8 +95,11 @@ public abstract class MixinServerCommonPacketListenerImpl {
                     nickname = NicknameManager.getNickname(targetPlayer.getUUID());
                 }
 
+                // NOUVEAU: Vérifier si le joueur est dans la blacklist
+                boolean isBlacklisted = OneriaConfig.BLACKLIST.get().contains(realName);
+
                 // CAS 1: Admin qui voit tout
-                if (isAdmin) {
+                if (isAdmin && !isBlacklisted) {
                     if (hasNickname && nickname != null) {
                         // Admin voit: Prefix + Nickname + §7§o(RealName)
                         String fullDisplay = prefix + nickname + " §7§o(" + realName + ")";
@@ -106,7 +109,7 @@ public abstract class MixinServerCommonPacketListenerImpl {
                         displayName = Component.literal(prefix + realName);
                     }
                 }
-                // CAS 2: Joueur normal - vérifier la distance
+                // CAS 2: Joueur normal - vérifier la distance OU si blacklisté
                 else {
                     // En mode debug, on floute même soi-même
                     double distSq = receiver.distanceToSqr(targetPlayer);
@@ -117,7 +120,8 @@ public abstract class MixinServerCommonPacketListenerImpl {
                         effectiveMaxDistSq = sneakMaxDistSq;
                     }
 
-                    boolean shouldBlur = debugMode || (distSq > effectiveMaxDistSq);
+                    // MODIFICATION: Forcer le blur si blacklisté
+                    boolean shouldBlur = isBlacklisted || debugMode || (distSq > effectiveMaxDistSq);
 
                     String displayedName;
                     if (hasNickname && nickname != null) {

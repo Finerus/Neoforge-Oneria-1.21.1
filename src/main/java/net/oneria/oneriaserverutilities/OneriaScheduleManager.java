@@ -23,13 +23,25 @@ public class OneriaScheduleManager {
      */
     public static void reload() {
         try {
+            // Vérifier que la config est chargée
+            if (OneriaConfig.OPENING_TIME == null || OneriaConfig.CLOSING_TIME == null) {
+                OneriaServerUtilities.LOGGER.info("[Schedule] Config not loaded yet, skipping initialization");
+                return;
+            }
+
             openingTime = LocalTime.parse(OneriaConfig.OPENING_TIME.get(), TIME_FORMATTER);
             closingTime = LocalTime.parse(OneriaConfig.CLOSING_TIME.get(), TIME_FORMATTER);
             sentWarnings.clear();
             hasClosedToday = false;
             hasOpenedToday = false;
+
+            OneriaServerUtilities.LOGGER.info("[Schedule] Initialized - Opening: {}, Closing: {}",
+                    OneriaConfig.OPENING_TIME.get(), OneriaConfig.CLOSING_TIME.get());
+        } catch (IllegalStateException e) {
+            // Config pas encore construite
+            OneriaServerUtilities.LOGGER.debug("[Schedule] Config not built yet: {}", e.getMessage());
         } catch (Exception e) {
-            OneriaServerUtilities.LOGGER.error("Error parsing schedule times: " + e.getMessage());
+            OneriaServerUtilities.LOGGER.error("[Schedule] Error parsing schedule times: " + e.getMessage());
             // Default values on error
             openingTime = LocalTime.of(19, 0);
             closingTime = LocalTime.of(23, 59);
@@ -41,6 +53,11 @@ public class OneriaScheduleManager {
      */
     public static boolean isServerOpen() {
         if (!OneriaConfig.ENABLE_SCHEDULE.get()) return true;
+
+        // PROTECTION: Si pas initialisé, considérer comme ouvert
+        if (openingTime == null || closingTime == null) {
+            return true;
+        }
 
         LocalTime now = LocalTime.now();
 
@@ -58,6 +75,11 @@ public class OneriaScheduleManager {
      */
     public static void tick(MinecraftServer server) {
         if (!OneriaConfig.ENABLE_SCHEDULE.get()) return;
+
+        // PROTECTION: Vérifier que le schedule est initialisé
+        if (openingTime == null || closingTime == null) {
+            return;
+        }
 
         // Check only every 20 seconds (400 ticks)
         if (server.getTickCount() % 400 != 0) return;
@@ -88,6 +110,7 @@ public class OneriaScheduleManager {
             closeServer(server);
         }
     }
+
 
     private static void checkWarnings(MinecraftServer server, LocalTime now) {
         for (int minutes : OneriaConfig.WARNING_TIMES.get()) {
@@ -173,6 +196,11 @@ public class OneriaScheduleManager {
      * Gets time remaining until next open/close
      */
     public static String getTimeUntilNextEvent() {
+        // PROTECTION: Si pas initialisé, retourner un message par défaut
+        if (openingTime == null || closingTime == null) {
+            return "Schedule not initialized";
+        }
+
         LocalTime now = LocalTime.now();
 
         if (isServerOpen()) {
