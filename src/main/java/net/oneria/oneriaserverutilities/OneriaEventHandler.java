@@ -18,26 +18,8 @@ public class OneriaEventHandler {
 
         OneriaServerUtilities.LOGGER.info("Player {} logged in", player.getName().getString());
 
-        // Custom join message - AVEC PROTECTION
-        try {
-            if (OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE != null &&
-                    OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
-
-                String joinMsg = OneriaConfig.JOIN_MESSAGE.get();
-                if (!joinMsg.equalsIgnoreCase("none")) {
-                    String nickname = NicknameManager.getDisplayName(player);
-                    String formatted = joinMsg
-                            .replace("{player}", player.getName().getString())
-                            .replace("{nickname}", nickname);
-
-                    Component message = ColorHelper.parseColors(formatted);
-                    player.getServer().getPlayerList().broadcastSystemMessage(message, false);
-                }
-            }
-        } catch (Exception e) {
-            // Config pas encore chargée, on skip silencieusement
-            OneriaServerUtilities.LOGGER.debug("Config not loaded yet for join message");
-        }
+        // ✅ SUPPRESSION COMPLÈTE - Le MixinPlayerList gère les messages join/leave
+        // Le message vanilla est intercepté et remplacé par MixinPlayerList.java
 
         // Execute after a short delay
         new Thread(() -> {
@@ -65,26 +47,8 @@ public class OneriaEventHandler {
 
         OneriaServerUtilities.LOGGER.info("Player {} logged out", player.getName().getString());
 
-        // Custom leave message - AVEC PROTECTION
-        try {
-            if (OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE != null &&
-                    OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
-
-                String leaveMsg = OneriaConfig.LEAVE_MESSAGE.get();
-                if (!leaveMsg.equalsIgnoreCase("none")) {
-                    String nickname = NicknameManager.getDisplayName(player);
-                    String formatted = leaveMsg
-                            .replace("{player}", player.getName().getString())
-                            .replace("{nickname}", nickname);
-
-                    Component message = ColorHelper.parseColors(formatted);
-                    player.getServer().getPlayerList().broadcastSystemMessage(message, false);
-                }
-            }
-        } catch (Exception e) {
-            // Config pas encore chargée, on skip silencieusement
-            OneriaServerUtilities.LOGGER.debug("Config not loaded yet for leave message");
-        }
+        // ✅ SUPPRESSION COMPLÈTE - Le MixinPlayerList gère les messages join/leave
+        // Le message vanilla est intercepté et remplacé par MixinPlayerList.java
 
         // Nettoyer le cache des permissions
         OneriaPermissions.invalidateCache(player.getUUID());

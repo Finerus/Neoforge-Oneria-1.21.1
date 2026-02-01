@@ -1,6 +1,42 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-02-01
+
+**Fixed**
+
+* **Double Join/Leave Messages:** Fixed critical bug where players would see duplicate connection messages:
+  - Removed redundant message broadcasting in `OneriaEventHandler`.
+  - Consolidated all join/leave message handling into `MixinPlayerList` for cleaner interception.
+  - Messages are now sent exactly once per player connection/disconnection.
+  - System properly respects the `enableCustomJoinLeave` configuration option.
+
+**Technical**
+
+* **Enhanced Classes:**
+  - `OneriaEventHandler` - Removed duplicate join/leave message code (lines 20-35 and 70-88).
+  - `MixinPlayerList` - Now the sole handler for vanilla message interception and custom message broadcasting.
+  - `oneria.mixins.json` - Added `MixinPlayerList` to the mixin registry.
+
+* **Code Quality:**
+  - Eliminated code duplication between event handler and mixin system.
+  - Improved separation of concerns (event handling vs. message interception).
+  - Better debug logging for join/leave message flow.
+
+**Migration Notes**
+
+* No configuration changes required - fully backward compatible with 1.2.0.
+* Existing `joinMessage` and `leaveMessage` settings continue to work as expected.
+* Players will now see exactly one join message and one leave message as intended.
+* If you experience any issues, ensure `MixinPlayerList` is properly registered in `oneria.mixins.json`.
+
+**Known Behavior**
+
+* Join/leave messages are handled via Mixin interception of vanilla messages.
+* The system intercepts both English ("joined the game") and French ("a rejoint la partie") variants.
+* Nickname resolution is performed dynamically when messages are sent.
+* Debug logging can be enabled to track message flow: look for `[Join]` and `[Leave]` prefixes in logs.
+
 ## [1.2.0] - 2026-01-21
 
 **Added**
@@ -124,6 +160,8 @@ All notable changes to this project will be documented in this file.
 * World border warnings are based on distance from spawn (0,0), not world border entities.
 * Blacklist applies to all contexts - no per-player exemptions.
 * Join/leave messages appear to all players - no per-player filtering.
+
+---
 
 ## [1.1.3] - 2026-01-16
 

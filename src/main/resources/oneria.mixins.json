@@ -1,16 +1,14 @@
 {
   "required": true,
-  "minVersion": "0.8",
   "package": "net.oneria.oneriaserverutilities.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
     "ClientboundPlayerInfoUpdatePacketAccessor",
-    "MixinServerCommonPacketListenerImpl",
-    "MixinServerPlayer",
     "MixinEntity",
-    "MixinServerGamePacketListenerImpl"
+    "MixinPlayerList",
+    "MixinServerCommonPacketListenerImpl",
+    "MixinServerGamePacketListenerImpl",
+    "MixinServerPlayer"
   ],
-  "injectors": {
-    "defaultRequire": 1
-  }
+  "minVersion": "0.8"
 }

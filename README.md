@@ -2,8 +2,6 @@
 
 **Oneria Mod** is a comprehensive utility mod designed specifically for immersive Roleplay (RP) servers. It provides advanced proximity-based obfuscation, sneak stealth mechanics, automated schedule management, staff moderation tools, advanced chat formatting, world border warnings, custom join/leave messages, and seamless LuckPerms integration to create a professional and controlled RP environment.
 
----
-
 ## Key Features
 
 ### Roleplay Obfuscation (Proximity Blur System)
