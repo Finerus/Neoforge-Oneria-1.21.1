@@ -157,23 +157,6 @@ public class OneriaCommands {
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> updateConfigBool(ctx, OneriaConfig.USE_LUCKPERMS_GROUPS, "Use LuckPerms Groups"))));
 
-        setNode.then(Commands.literal("hideNametags")
-                .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> {
-                            boolean val = BoolArgumentType.getBool(ctx, "value");
-                            OneriaConfig.HIDE_NAMETAGS.set(val);
-                            OneriaConfig.SPEC.save();
-
-                            // Synchroniser immédiatement pour tous les joueurs
-                            NametagManager.syncNametagVisibility(ctx.getSource().getServer());
-
-                            ctx.getSource().sendSuccess(() ->
-                                            Component.literal("§a[Oneria] Hide Nametags : " + (val ? "§aENABLED" : "§cDISABLED")),
-                                    true
-                            );
-                            return 1;
-                        })));
-
         // Chat settings
         setNode.then(Commands.literal("enableChatFormat")
                 .then(Commands.argument("value", BoolArgumentType.bool())
@@ -465,8 +448,6 @@ public class OneriaCommands {
         OneriaScheduleManager.reload();
         OneriaPermissions.clearCache();
         NicknameManager.reload();
-
-        NametagManager.syncNametagVisibility(ctx.getSource().getServer());
 
         ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Configuration, nicknames and nametags reloaded!"), true);
         return 1;

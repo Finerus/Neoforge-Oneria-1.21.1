@@ -1,6 +1,118 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+# Changelog - Oneria Mod
+All notable changes to this project will be documented in this file.
+
+## [1.2.2] - 2026-02-02
+
+**Added**
+
+* **Client-Side Nametag Hiding:** New optional feature to hide player nametags above heads:
+  - Implemented via NeoForge's `RenderNameTagEvent` for clean client-side rendering control.
+  - Completely client-side solution using packet synchronization from server.
+  - Configuration synced when players join via custom `HideNametagsPacket`.
+  - No scoreboard teams involved - purely visual hiding on client.
+  - Controlled by server config option `hideNametags` (default: false).
+
+**Fixed**
+
+* **LuckPerms Solo Crash:** Fixed crash when playing in singleplayer or on servers without LuckPerms:
+  - Added `NoClassDefFoundError` catching in `getPlayerPrefix()` and `getPlayerSuffix()`.
+  - Mod now gracefully handles LuckPerms absence with debug logging instead of crashes.
+  - All LuckPerms-dependent features safely skip when mod is not present.
+  - Enhanced error handling in `OneriaServerUtilities` for better stability.
+
+**Technical**
+
+* **New Classes:**
+  - `ClientNametagRenderer` - Client-side event handler for nametag visibility control.
+  - `HideNametagsPacket` - Custom packet for synchronizing nametag config from server to client.
+  - `ClientNametagConfig` - Client-side config storage with server state tracking.
+  - `ClientEventHandler` - Handles client disconnect events and config reset.
+  - `NetworkHandler` - Packet registration and handling for client-server communication.
+
+* **Enhanced Classes:**
+  - `OneriaEventHandler` - Now sends nametag configuration packet to clients on login.
+  - `OneriaServerUtilities` - Enhanced LuckPerms error handling with `NoClassDefFoundError` catching.
+  - `OneriaConfig` - Added `HIDE_NAMETAGS` configuration option in Obfuscation Settings section.
+
+* **Network Protocol:**
+  - Custom packet payload type: `oneriaserverutilities:hide_nametags`.
+  - Boolean payload for nametag visibility state.
+  - Sent to players on login with current server configuration.
+  - Client automatically resets state on disconnect.
+
+**Implementation Details**
+
+* **Event-Based Approach:** Uses NeoForge's native `RenderNameTagEvent` instead of mixins.
+  - More compatible and maintainable than mixin-based solutions.
+  - No obfuscation mapping issues.
+  - Clean cancellation of nametag rendering for player entities.
+
+* **Client State Management:**
+  - `hasReceivedServerConfig` flag prevents client-side config from affecting gameplay before server sync.
+  - Automatic reset on disconnect ensures clean state for next server join.
+  - Thread-safe implementation with proper state tracking.
+
+**Configuration**
+
+* **New Option:**
+  - `hideNametags` (Boolean) - Hide all player nametags above heads (default: false).
+  - Located in `[Obfuscation Settings]` section.
+  - Can be toggled via `/oneria config set hideNametags true/false`.
+  - Takes effect immediately without restart when changed.
+
+**Migration Notes**
+
+* No breaking changes - fully backward compatible with 1.2.1.
+* New nametag hiding feature is disabled by default.
+* Existing configurations continue to work without modification.
+* Feature can be enabled by setting `hideNametags = true` in server config.
+
+**Known Behavior**
+
+* Nametag hiding only affects player entities (not mobs or other entities).
+* Client must receive configuration packet from server before feature activates.
+* Configuration automatically syncs on player join/rejoin.
+* Disconnect automatically clears client-side config state.
+
+## [1.2.1] - 2026-02-01
+
+**Fixed**
+
+* **Double Join/Leave Messages:** Fixed critical bug where players would see duplicate connection messages:
+  - Removed redundant message broadcasting in `OneriaEventHandler`.
+  - Consolidated all join/leave message handling into `MixinPlayerList` for cleaner interception.
+  - Messages are now sent exactly once per player connection/disconnection.
+  - System properly respects the `enableCustomJoinLeave` configuration option.
+
+**Technical**
+
+* **Enhanced Classes:**
+  - `OneriaEventHandler` - Removed duplicate join/leave message code (lines 20-35 and 70-88).
+  - `MixinPlayerList` - Now the sole handler for vanilla message interception and custom message broadcasting.
+  - `oneria.mixins.json` - Added `MixinPlayerList` to the mixin registry.
+
+* **Code Quality:**
+  - Eliminated code duplication between event handler and mixin system.
+  - Improved separation of concerns (event handling vs. message interception).
+  - Better debug logging for join/leave message flow.
+
+**Migration Notes**
+
+* No configuration changes required - fully backward compatible with 1.2.0.
+* Existing `joinMessage` and `leaveMessage` settings continue to work as expected.
+* Players will now see exactly one join message and one leave message as intended.
+* If you experience any issues, ensure `MixinPlayerList` is properly registered in `oneria.mixins.json`.
+
+**Known Behavior**
+
+* Join/leave messages are handled via Mixin interception of vanilla messages.
+* The system intercepts both English ("joined the game") and French ("a rejoint la partie") variants.
+* Nickname resolution is performed dynamically when messages are sent.
+* Debug logging can be enabled to track message flow: look for `[Join]` and `[Leave]` prefixes in logs.
+
 ## [1.2.1] - 2026-02-01
 
 **Fixed**

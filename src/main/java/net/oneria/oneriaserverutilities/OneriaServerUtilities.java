@@ -48,6 +48,10 @@ public class OneriaServerUtilities {
         } catch (IllegalStateException e) {
             // LuckPerms not loaded - this is normal
             return "";
+        } catch (NoClassDefFoundError e) {
+            // LuckPerms not present - this is normal
+            LOGGER.debug("LuckPerms not available (NoClassDefFoundError)");
+            return "";
         } catch (Exception e) {
             LOGGER.debug("LuckPerms not available: {}", e.getMessage());
         }
@@ -65,6 +69,10 @@ public class OneriaServerUtilities {
             }
         } catch (IllegalStateException e) {
             // LuckPerms not loaded - this is normal
+            return "";
+        } catch (NoClassDefFoundError e) {
+            // LuckPerms not present - this is normal
+            LOGGER.debug("LuckPerms not available (NoClassDefFoundError)");
             return "";
         } catch (Exception e) {
             LOGGER.debug("LuckPerms is not available: {}", e.getMessage());

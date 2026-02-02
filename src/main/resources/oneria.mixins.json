@@ -1,7 +1,9 @@
 {
   "required": true,
+  "minVersion": "0.8",
   "package": "net.oneria.oneriaserverutilities.mixin",
   "compatibilityLevel": "JAVA_21",
+  "refmap": "oneria.refmap.json",
   "mixins": [
     "ClientboundPlayerInfoUpdatePacketAccessor",
     "MixinEntity",
@@ -10,5 +12,7 @@
     "MixinServerGamePacketListenerImpl",
     "MixinServerPlayer"
   ],
-  "minVersion": "0.8"
+  "injectors": {
+    "defaultRequire": 1
+  }
 }

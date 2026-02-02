@@ -16,7 +16,7 @@ Create true immersion by hiding player identities based on distance and stealth:
 * **Whitelist System:** Specific players or staff members can bypass the blur system entirely.
 * **Blacklist System:** NEW! Specific players can be permanently hidden regardless of distance (stealth staff, NPCs).
 * **Nickname Support:** Full integration with custom nicknames set via `/oneria nick`.
-* **Nametag Visibility Control:** Hide all player nametags server-side using scoreboard teams.
+* **Nametag Visibility Control:** Hide all player nametags client-side using event-based rendering control.
 * **Highly Configurable:** Adjust obfuscation distance, sneak distance, length, and behavior.
 
 ### Advanced Chat System
@@ -269,6 +269,11 @@ The configuration file is located at `serverconfig/oneriamod-server.toml`. It's 
 * **API Ready:** Public API available for other mods (`OneriaPermissions.isStaff()`, etc.).
 * **LuckPerms Integration:** Full support for prefixes, suffixes, and group-based permissions (optional - gracefully disabled when not present).
 * **No Dependencies:** Mod functions fully without any required dependencies.
+
+### New in 1.2.2
+* **Client-Side Nametag Hiding:** Event-based nametag visibility control using NeoForge's `RenderNameTagEvent`.
+* **Enhanced LuckPerms Compatibility:** Fixed crashes in singleplayer and servers without LuckPerms.
+* **Network Synchronization:** Custom packet system for syncing nametag config from server to client.
 
 ### New in 1.2.0
 * **Join/Leave Messages:** Fully customizable connection announcements with variables and color codes.

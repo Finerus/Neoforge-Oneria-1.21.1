@@ -8,6 +8,7 @@ import net.minecraft.sounds.SoundSource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class OneriaEventHandler {
@@ -17,6 +18,11 @@ public class OneriaEventHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         OneriaServerUtilities.LOGGER.info("Player {} logged in", player.getName().getString());
+
+        // Send nametag configuration to the client
+        boolean hideNametags = OneriaConfig.HIDE_NAMETAGS.get();
+        PacketDistributor.sendToPlayer(player, new HideNametagsPacket(hideNametags));
+        OneriaServerUtilities.LOGGER.info("Sent nametag config to {}: hide={}", player.getName().getString(), hideNametags);
 
         // ✅ SUPPRESSION COMPLÈTE - Le MixinPlayerList gère les messages join/leave
         // Le message vanilla est intercepté et remplacé par MixinPlayerList.java
@@ -29,11 +35,6 @@ public class OneriaEventHandler {
                     checkScheduleOnJoin(player);
                     sendWelcomeMessage(player);
 
-                    // Synchroniser les nametags pour ce joueur
-                    NametagManager.onPlayerJoin(player);
-
-                    // Re-synchroniser pour tout le monde au cas où
-                    NametagManager.syncNametagVisibility(player.getServer());
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -55,14 +56,6 @@ public class OneriaEventHandler {
 
         // Nettoyer le cache des warnings de border
         WorldBorderManager.clearCache(player.getUUID());
-
-        // Retirer le joueur de la team des nametags
-        NametagManager.onPlayerLogout(player);
-
-        // Re-synchroniser pour les joueurs restants
-        if (player.getServer() != null) {
-            NametagManager.syncNametagVisibility(player.getServer());
-        }
     }
 
     private static void checkScheduleOnJoin(ServerPlayer player) {
