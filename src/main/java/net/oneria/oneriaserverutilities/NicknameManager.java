@@ -12,6 +12,7 @@ import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import net.minecraft.network.chat.Component;
 
 /**
  * Gestionnaire de nicknames avec sauvegarde automatique
@@ -143,6 +144,31 @@ public class NicknameManager {
     public static String getDisplayName(ServerPlayer player) {
         String nickname = getNickname(player.getUUID());
         return nickname != null ? nickname : player.getGameProfile().getName();
+    }
+
+    /**
+     * Récupère le nom d'affichage pour le nametag (avec ou sans prefix/suffix)
+     */
+    public static Component getNametagDisplay(ServerPlayer player) {
+        String nickname = getNickname(player.getUUID());
+
+        if (nickname == null) {
+            return null;
+        }
+
+        try {
+            if (OneriaConfig.SHOW_NAMETAG_PREFIX_SUFFIX != null &&
+                    OneriaConfig.SHOW_NAMETAG_PREFIX_SUFFIX.get()) {
+                String prefix = OneriaServerUtilities.getPlayerPrefix(player);
+                String suffix = OneriaServerUtilities.getPlayerSuffix(player);
+                String fullDisplay = prefix + nickname + suffix;
+                return Component.literal(fullDisplay.replace("&", "§"));
+            } else {
+                return Component.literal(nickname.replace("&", "§"));
+            }
+        } catch (Exception e) {
+            return Component.literal(nickname.replace("&", "§"));
+        }
     }
 
     /**

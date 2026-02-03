@@ -5,6 +5,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.DirectionalPayloadHandler;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
+import net.oneria.oneriaserverutilities.client.ClientNametagConfig;
 
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class NetworkHandler {

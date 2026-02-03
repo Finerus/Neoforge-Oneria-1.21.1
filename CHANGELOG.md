@@ -14,6 +14,19 @@ All notable changes to this project will be documented in this file.
   - Configuration synced when players join via custom `HideNametagsPacket`.
   - No scoreboard teams involved - purely visual hiding on client.
   - Controlled by server config option `hideNametags` (default: false).
+  - Command: `/oneria config set hideNametags true/false` (was already here, just ported to the new system)
+
+* **Nametag Nickname Display:** Nicknames now visible above player heads:
+  - Optional prefix/suffix display from LuckPerms.
+  - Configurable via `showNametagPrefixSuffix` option.
+  - Command: `/oneria config set showNametagPrefixSuffix true/false`
+  - Full color code support for nicknames in nametags.
+
+* **Platform Management Command:** New `/setplatform` command for easier platform creation:
+  - Syntax: `/setplatform <name> <dimension> <x> <y> <z>`
+  - Requires OP level 2.
+  - Automatically creates or updates platform entries.
+  - Simplifies platform configuration without manual config editing.
 
 **Fixed**
 
@@ -22,6 +35,12 @@ All notable changes to this project will be documented in this file.
   - Mod now gracefully handles LuckPerms absence with debug logging instead of crashes.
   - All LuckPerms-dependent features safely skip when mod is not present.
   - Enhanced error handling in `OneriaServerUtilities` for better stability.
+
+* **Performance Issues:** Fixed severe FPS drops caused by tick loop:
+  - Added server-side check to prevent client-side tick execution.
+  - TabList update system now only runs on dedicated servers.
+  - Eliminated unnecessary packet broadcasts on client.
+  - Massive performance improvement in single-player and multiplayer.
 
 **Technical**
 
@@ -34,8 +53,10 @@ All notable changes to this project will be documented in this file.
 
 * **Enhanced Classes:**
   - `OneriaEventHandler` - Now sends nametag configuration packet to clients on login.
-  - `OneriaServerUtilities` - Enhanced LuckPerms error handling with `NoClassDefFoundError` catching.
-  - `OneriaConfig` - Added `HIDE_NAMETAGS` configuration option in Obfuscation Settings section.
+  - `OneriaServerUtilities` - Enhanced LuckPerms error handling with `NoClassDefFoundError` catching, added server-side tick protection.
+  - `OneriaConfig` - Added `HIDE_NAMETAGS` and `SHOW_NAMETAG_PREFIX_SUFFIX` configuration options.
+  - `OneriaCommands` - Added `/setplatform` command and nametag configuration commands.
+  - `MixinEntity` - Enhanced to display nicknames with optional prefix/suffix above heads.
 
 * **Network Protocol:**
   - Custom packet payload type: `oneriaserverutilities:hide_nametags`.
@@ -43,25 +64,13 @@ All notable changes to this project will be documented in this file.
   - Sent to players on login with current server configuration.
   - Client automatically resets state on disconnect.
 
-**Implementation Details**
-
-* **Event-Based Approach:** Uses NeoForge's native `RenderNameTagEvent` instead of mixins.
-  - More compatible and maintainable than mixin-based solutions.
-  - No obfuscation mapping issues.
-  - Clean cancellation of nametag rendering for player entities.
-
-* **Client State Management:**
-  - `hasReceivedServerConfig` flag prevents client-side config from affecting gameplay before server sync.
-  - Automatic reset on disconnect ensures clean state for next server join.
-  - Thread-safe implementation with proper state tracking.
-
 **Configuration**
 
-* **New Option:**
+* **New Options:**
   - `hideNametags` (Boolean) - Hide all player nametags above heads (default: false).
-  - Located in `[Obfuscation Settings]` section.
-  - Can be toggled via `/oneria config set hideNametags true/false`.
-  - Takes effect immediately without restart when changed.
+  - `showNametagPrefixSuffix` (Boolean) - Show LuckPerms prefix/suffix with nicknames in nametags (default: false).
+  - Both located in `[Obfuscation Settings]` section.
+  - Both can be toggled via `/oneria config set <option> true/false`.
 
 **Migration Notes**
 
@@ -76,6 +85,7 @@ All notable changes to this project will be documented in this file.
 * Client must receive configuration packet from server before feature activates.
 * Configuration automatically syncs on player join/rejoin.
 * Disconnect automatically clears client-side config state.
+* Nicknames in nametags support full color codes (§ and &).
 
 ## [1.2.1] - 2026-02-01
 

@@ -82,10 +82,13 @@ public class OneriaServerUtilities {
 
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
+        if (event.getServer() == null) {
+            return;
+        }
+
         // Do not update every tick to save bandwidth (here every 10 ticks = 0.5s)
         if (tickCounter++ % 10 == 0) {
             var server = event.getServer();
-            if (server == null) return;
 
             // Blur system - seulement si activé
             if (OneriaConfig.ENABLE_BLUR.get()) {

@@ -19,13 +19,25 @@ public class OneriaEventHandler {
 
         OneriaServerUtilities.LOGGER.info("Player {} logged in", player.getName().getString());
 
-        // Send nametag configuration to the client
         boolean hideNametags = OneriaConfig.HIDE_NAMETAGS.get();
         PacketDistributor.sendToPlayer(player, new HideNametagsPacket(hideNametags));
         OneriaServerUtilities.LOGGER.info("Sent nametag config to {}: hide={}", player.getName().getString(), hideNametags);
 
-        // ✅ SUPPRESSION COMPLÈTE - Le MixinPlayerList gère les messages join/leave
-        // Le message vanilla est intercepté et remplacé par MixinPlayerList.java
+        if (NicknameManager.hasNickname(player.getUUID())) {
+            String nickname = NicknameManager.getNickname(player.getUUID());
+            String nametagDisplay;
+
+            if (OneriaConfig.SHOW_NAMETAG_PREFIX_SUFFIX.get()) {
+                String prefix = OneriaServerUtilities.getPlayerPrefix(player);
+                String suffix = OneriaServerUtilities.getPlayerSuffix(player);
+                nametagDisplay = prefix + nickname + suffix;
+            } else {
+                nametagDisplay = nickname;
+            }
+
+            player.setCustomName(Component.literal(nametagDisplay.replace("&", "§")));
+            player.setCustomNameVisible(true);
+        }
 
         // Execute after a short delay
         new Thread(() -> {
@@ -34,7 +46,6 @@ public class OneriaEventHandler {
                 player.getServer().execute(() -> {
                     checkScheduleOnJoin(player);
                     sendWelcomeMessage(player);
-
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -48,13 +59,8 @@ public class OneriaEventHandler {
 
         OneriaServerUtilities.LOGGER.info("Player {} logged out", player.getName().getString());
 
-        // ✅ SUPPRESSION COMPLÈTE - Le MixinPlayerList gère les messages join/leave
-        // Le message vanilla est intercepté et remplacé par MixinPlayerList.java
-
-        // Nettoyer le cache des permissions
         OneriaPermissions.invalidateCache(player.getUUID());
 
-        // Nettoyer le cache des warnings de border
         WorldBorderManager.clearCache(player.getUUID());
     }
 

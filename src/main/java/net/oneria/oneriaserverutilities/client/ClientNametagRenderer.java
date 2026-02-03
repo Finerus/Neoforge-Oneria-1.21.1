@@ -1,18 +1,30 @@
-package net.oneria.oneriaserverutilities;
+package net.oneria.oneriaserverutilities.client;
 
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderNameTagEvent;
+import net.neoforged.neoforge.common.util.TriState;
+import net.oneria.oneriaserverutilities.OneriaServerUtilities;
 
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID, value = Dist.CLIENT)
 public class ClientNametagRenderer {
 
     @SubscribeEvent
     public static void onRenderNameTag(RenderNameTagEvent event) {
-        if (ClientNametagConfig.shouldHideNametags() && event.getEntity() instanceof Player) {
-            event.setContent(net.minecraft.network.chat.Component.empty());
+        if (!ClientNametagConfig.hasReceivedServerConfig()) {
+            return;
         }
+
+        if (!ClientNametagConfig.shouldHideNametags()) {
+            return;
+        }
+
+        if (!(event.getEntity() instanceof Player)) {
+            return;
+        }
+
+        event.setCanRender(TriState.FALSE);
     }
 }

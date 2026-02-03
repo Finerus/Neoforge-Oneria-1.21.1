@@ -27,6 +27,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -36,7 +37,6 @@ import java.util.Optional;
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class OneriaCommands {
 
-    // SuggestionProvider pour les plateformes (évite le crash au démarrage)
     private static final SuggestionProvider<CommandSourceStack> PLATFORM_SUGGESTIONS = (ctx, builder) -> {
         try {
             if (OneriaConfig.PLATFORMS != null && OneriaConfig.PLATFORMS.get() != null) {
@@ -48,7 +48,6 @@ public class OneriaCommands {
                 }
             }
         } catch (IllegalStateException e) {
-            // Config pas encore chargée, on ignore silencieusement
         }
         return builder.buildFuture();
     };
@@ -217,7 +216,13 @@ public class OneriaCommands {
                 .then(Commands.argument("value", IntegerArgumentType.integer(1, 32))
                         .executes(ctx -> updateConfigInt(ctx, OneriaConfig.SNEAK_PROXIMITY_DISTANCE, "Sneak Detection Distance"))));
 
-        // Dans OneriaCommands.java, ajoute dans la méthode onRegisterCommands, section setNode :
+        setNode.then(Commands.literal("hideNametags")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.HIDE_NAMETAGS, "Hide Nametags"))));
+
+        setNode.then(Commands.literal("showNametagPrefixSuffix")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.SHOW_NAMETAG_PREFIX_SUFFIX, "Show Nametag Prefix/Suffix"))));
 
 // Join/Leave messages settings
         setNode.then(Commands.literal("enableCustomJoinLeave")
@@ -335,6 +340,21 @@ public class OneriaCommands {
                 )
         );
 
+        // Alias /setplatform pour les admins
+        dispatcher.register(Commands.literal("setplatform")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("platform_name", StringArgumentType.word())
+                        .then(Commands.argument("dimension", ResourceLocationArgument.id())
+                                .then(Commands.argument("x", IntegerArgumentType.integer())
+                                        .then(Commands.argument("y", IntegerArgumentType.integer())
+                                                .then(Commands.argument("z", IntegerArgumentType.integer())
+                                                        .executes(OneriaCommands::setPlatform)
+                                                )
+                                        )
+                                )
+                        )
+                ));
+
         oneriaRoot.then(staffNode);
 
         // -------------------------------------------------------------------------
@@ -408,7 +428,6 @@ public class OneriaCommands {
         // =========================================================================
         dispatcher.register(Commands.literal("colors")
                 .executes(ctx -> {
-                    // Vérifier si la commande est activée
                     if (OneriaConfig.ENABLE_COLORS_COMMAND != null &&
                             !OneriaConfig.ENABLE_COLORS_COMMAND.get()) {
                         ctx.getSource().sendFailure(Component.literal("§cColors command is disabled."));
@@ -465,6 +484,14 @@ public class OneriaCommands {
         boolean val = BoolArgumentType.getBool(ctx, "value");
         config.set(val);
         OneriaConfig.SPEC.save();
+
+        if (config == OneriaConfig.HIDE_NAMETAGS) {
+            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(player -> {
+                PacketDistributor.sendToPlayer(player, new HideNametagsPacket(val));
+            });
+            OneriaServerUtilities.LOGGER.info("Broadcast nametag config update: hide={}", val);
+        }
+
         ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + name + " : " + (val ? "§aENABLED" : "§cDISABLED")), true);
         return 1;
     }
@@ -497,7 +524,6 @@ public class OneriaCommands {
 
     private static int showStatus(CommandContext<CommandSourceStack> context) {
         try {
-            // Helper pour accéder aux configs de manière safe
             final java.util.function.Function<java.util.function.Supplier<?>, String> safe = (supplier) -> {
                 try {
                     Object val = supplier.get();
@@ -760,6 +786,43 @@ public class OneriaCommands {
         }
         source.sendFailure(Component.literal("§cPlatform not found: " + platformId));
         return 0;
+    }
+
+    private static int setPlatform(CommandContext<CommandSourceStack> ctx) {
+        final String platformName = StringArgumentType.getString(ctx, "platform_name");
+        final ResourceLocation dimension = ResourceLocationArgument.getId(ctx, "dimension");
+        final int x = IntegerArgumentType.getInteger(ctx, "x");
+        final int y = IntegerArgumentType.getInteger(ctx, "y");
+        final int z = IntegerArgumentType.getInteger(ctx, "z");
+
+        String platformEntry = platformName + ";" + platformName + ";" + dimension + ";" + x + ";" + y + ";" + z;
+
+        List<String> platforms = new ArrayList<>(OneriaConfig.PLATFORMS.get());
+
+        boolean updated = false;
+        for (int i = 0; i < platforms.size(); i++) {
+            if (platforms.get(i).startsWith(platformName + ";")) {
+                platforms.set(i, platformEntry);
+                updated = true;
+                break;
+            }
+        }
+
+        if (!updated) {
+            platforms.add(platformEntry);
+        }
+
+        OneriaConfig.PLATFORMS.set(platforms);
+        OneriaConfig.SPEC.save();
+
+        final boolean wasUpdated = updated; // Pour la lambda
+        ctx.getSource().sendSuccess(() ->
+                        Component.literal("§a[Oneria] Platform '" + platformName + "' " +
+                                (wasUpdated ? "updated" : "created") + " at " + dimension + " " + x + " " + y + " " + z),
+                true
+        );
+
+        return 1;
     }
 
     // --- SCHEDULE HANDLER ---

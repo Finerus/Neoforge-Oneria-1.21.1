@@ -19,6 +19,8 @@ public class OneriaConfig {
     public static final ModConfigSpec.IntValue SNEAK_PROXIMITY_DISTANCE;
     public static final ModConfigSpec.BooleanValue OPS_SEE_ALL;
     public static final ModConfigSpec.BooleanValue DEBUG_SELF_BLUR;
+    public static final ModConfigSpec.BooleanValue HIDE_NAMETAGS;
+    public static final ModConfigSpec.BooleanValue SHOW_NAMETAG_PREFIX_SUFFIX;
 
     // === PERMISSIONS SYSTEM ===
     public static final ModConfigSpec.ConfigValue<List<? extends String>> STAFF_TAGS;
@@ -65,7 +67,6 @@ public class OneriaConfig {
     public static final ModConfigSpec.ConfigValue<String> TIMESTAMP_FORMAT;
     public static final ModConfigSpec.BooleanValue MARKDOWN_ENABLED;
     public static final ModConfigSpec.BooleanValue ENABLE_COLORS_COMMAND;
-    public static final ModConfigSpec.BooleanValue HIDE_NAMETAGS;
 
     // === JOIN/LEAVE MESSAGES ===
     public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_JOIN_LEAVE;
@@ -132,7 +133,6 @@ public class OneriaConfig {
                         "Never leave enabled in production.")
                 .define("debugSelfBlur", false);
 
-        // Dans la section "Obfuscation Settings", après DEBUG_SELF_BLUR
         HIDE_NAMETAGS = BUILDER
                 .comment("CONFIGURATION: Hide Nametags",
                         "If 'true', hides all player nametags above their heads.",
@@ -151,6 +151,12 @@ public class OneriaConfig {
                         "Useful for staff in stealth mode or special NPCs.",
                         "Format: A list of strings.")
                 .defineList("blacklist", Arrays.asList(), obj -> obj instanceof String);
+
+        SHOW_NAMETAG_PREFIX_SUFFIX = BUILDER
+                .comment("CONFIGURATION: Show Prefix/Suffix on Nametags",
+                        "If 'true', displays LuckPerms prefix/suffix with nicknames above heads.",
+                        "If 'false', shows only the nickname.")
+                .define("showNametagPrefixSuffix", false);
 
         BUILDER.pop();
 

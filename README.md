@@ -9,6 +9,8 @@
 Create true immersion by hiding player identities based on distance and stealth:
 
 * **Proximity-Based Names:** Player names in the TabList and overhead become obfuscated when they are beyond a configurable distance.
+* **Nametag Hiding:** Optional server-controlled hiding of all player nametags above heads (default: disabled).
+* **Nickname Display:** Nicknames visible above player heads with optional LuckPerms prefix/suffix.
 * **Sneak Stealth Mode:** Players who are crouching become significantly harder to detect (2 blocks vs 8 blocks by default).
 * **Dynamic Distance Calculation:** System automatically adjusts detection range based on player crouch state.
 * **Anti-Metagaming:** Prevents players from knowing someone's name without meeting them in-game.
@@ -16,7 +18,6 @@ Create true immersion by hiding player identities based on distance and stealth:
 * **Whitelist System:** Specific players or staff members can bypass the blur system entirely.
 * **Blacklist System:** NEW! Specific players can be permanently hidden regardless of distance (stealth staff, NPCs).
 * **Nickname Support:** Full integration with custom nicknames set via `/oneria nick`.
-* **Nametag Visibility Control:** Hide all player nametags client-side using event-based rendering control.
 * **Highly Configurable:** Adjust obfuscation distance, sneak distance, length, and behavior.
 
 ### Advanced Chat System
@@ -105,6 +106,9 @@ Smart data management for reliability:
 | `/oneria config reload` | OP Level 2 | Reloads the configuration file and clears all caches. |
 | `/oneria config status` | OP Level 2 | Displays the current status of all mod systems. |
 | `/oneria config set <option> <value>` | OP Level 2 | Modify any configuration option in real-time. |
+| `/oneria config set hideNametags <true/false>` | OP Level 2 | Hide all player nametags above heads. |
+| `/oneria config set showNametagPrefixSuffix <true/false>` | OP Level 2 | Show LuckPerms prefix/suffix with nicknames in nametags. |
+| `/setplatform <name> <dimension> <x> <y> <z>` | OP Level 2 | Create or update a teleportation platform. |
 
 ### Staff Commands
 
