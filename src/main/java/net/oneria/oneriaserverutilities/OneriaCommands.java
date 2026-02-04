@@ -28,6 +28,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.minecraft.world.item.ItemStack;
+import java.util.ArrayList;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -394,6 +396,51 @@ public class OneriaCommands {
                 .executes(OneriaCommands::listBlacklist));
 
         oneriaRoot.then(blacklistNode);
+
+        // -------------------------------------------------------------------------
+        // 7. MODULE: LICENSE (Requires OP Level 2)
+        // -------------------------------------------------------------------------
+        var licenseNode = Commands.literal("license")
+                .requires(source -> source.hasPermission(2));
+
+        licenseNode.then(Commands.literal("give")
+                .then(Commands.argument("player", EntityArgument.player())
+                        .then(Commands.argument("profession", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    builder.suggest("chasseur").suggest("pecheur")
+                                            .suggest("mineur").suggest("bucheron")
+                                            .suggest("forgeron").suggest("alchimiste")
+                                            .suggest("marchand").suggest("garde");
+                                    return builder.buildFuture();
+                                })
+                                .executes(OneriaCommands::giveLicense)
+                        )
+                )
+        );
+
+        licenseNode.then(Commands.literal("revoke")
+                .then(Commands.argument("player", EntityArgument.player())
+                        .then(Commands.argument("profession", StringArgumentType.word())
+                                .executes(OneriaCommands::revokeLicense)
+                        )
+                )
+        );
+
+        licenseNode.then(Commands.literal("list")
+                .then(Commands.argument("player", EntityArgument.player())
+                        .executes(OneriaCommands::listLicenses)
+                )
+        );
+
+        licenseNode.then(Commands.literal("check")
+                .then(Commands.argument("player", EntityArgument.player())
+                        .then(Commands.argument("profession", StringArgumentType.word())
+                                .executes(OneriaCommands::checkLicense)
+                        )
+                )
+        );
+
+        oneriaRoot.then(licenseNode);
 
         // -------------------------------------------------------------------------
         // 5. MODULE: NICKNAME (Requires OP Level 2)
@@ -861,6 +908,81 @@ public class OneriaCommands {
             case "spectator", "sp", "3" -> GameType.SPECTATOR;
             default -> null;
         };
+    }
+
+    // --- LICENSE HANDLERS ---
+
+    private static int giveLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+        String profession = StringArgumentType.getString(ctx, "profession");
+
+        String displayName = NicknameManager.getDisplayName(target);
+
+        ItemStack license = new ItemStack(OneriaItems.LICENSE.get());
+
+        license.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                Component.literal("§6§lPermis de " + profession.substring(0, 1).toUpperCase() + profession.substring(1)));
+
+        java.util.List<Component> lore = new java.util.ArrayList<>();
+        lore.add(Component.literal("§7Délivré à: §f" + displayName));
+        lore.add(Component.literal("§7Date: §f" + java.time.LocalDate.now().toString()));
+        license.set(net.minecraft.core.component.DataComponents.LORE,
+                new net.minecraft.world.item.component.ItemLore(lore));
+
+        if (!target.getInventory().add(license)) {
+            target.drop(license, false);
+        }
+
+        LicenseManager.addLicense(target.getUUID(), profession);
+
+        ctx.getSource().sendSuccess(() ->
+                Component.literal("§a[Oneria] Permis de §f" + profession + "§a donné à §f" + displayName), true);
+
+        target.sendSystemMessage(Component.literal("§aVous avez reçu un §6Permis de " + profession + "§a !"));
+
+        return 1;
+    }
+
+    private static int revokeLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+        String profession = StringArgumentType.getString(ctx, "profession");
+
+        LicenseManager.removeLicense(target.getUUID(), profession);
+
+        ctx.getSource().sendSuccess(() ->
+                Component.literal("§a[Oneria] Permis de §f" + profession + "§a révoqué pour §f" + target.getName().getString()), true);
+
+        target.sendSystemMessage(Component.literal("§cVotre permis de " + profession + " a été révoqué."));
+
+        return 1;
+    }
+
+    private static int listLicenses(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+        java.util.List<String> licenses = LicenseManager.getLicenses(target.getUUID());
+
+        if (licenses.isEmpty()) {
+            ctx.getSource().sendSuccess(() ->
+                    Component.literal("§e[Oneria] §f" + target.getName().getString() + "§e n'a aucun permis."), false);
+        } else {
+            ctx.getSource().sendSuccess(() ->
+                    Component.literal("§e[Oneria] Permis de §f" + target.getName().getString() + "§e: §f" + String.join(", ", licenses)), false);
+        }
+
+        return 1;
+    }
+
+    private static int checkLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+        String profession = StringArgumentType.getString(ctx, "profession");
+
+        boolean has = LicenseManager.hasLicense(target.getUUID(), profession);
+
+        ctx.getSource().sendSuccess(() ->
+                Component.literal("§e[Oneria] §f" + target.getName().getString() +
+                        (has ? " §apossède" : " §cne possède pas") + "§e un permis de §f" + profession), false);
+
+        return 1;
     }
 
     // --- NICKNAME HANDLERS ---

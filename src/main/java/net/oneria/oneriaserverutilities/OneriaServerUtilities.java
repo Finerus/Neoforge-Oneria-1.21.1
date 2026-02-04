@@ -15,6 +15,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
+
 import java.util.EnumSet;
 
 @Mod("oneriaserverutilities")
@@ -25,6 +26,8 @@ public class OneriaServerUtilities {
 
     public OneriaServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.SERVER, OneriaConfig.SPEC);
+        OneriaItems.ITEMS.register(modEventBus);
+
         NeoForge.EVENT_BUS.register(this);
 
         // Initialize Schedule System - avec un délai
@@ -102,10 +105,9 @@ public class OneriaServerUtilities {
             }
         }
 
-        // Schedule System Tick (indépendant du blur)
         OneriaScheduleManager.tick(event.getServer());
 
-        // World Border Warning System Tick (indépendant du blur)
         WorldBorderManager.tick(event.getServer());
+
     }
 }
