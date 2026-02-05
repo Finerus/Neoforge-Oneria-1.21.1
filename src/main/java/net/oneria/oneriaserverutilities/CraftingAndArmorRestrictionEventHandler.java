@@ -43,8 +43,8 @@ public class CraftingAndArmorRestrictionEventHandler {
             return;
         }
 
-        // Vérifier toutes les 5 ticks (0.25 secondes)
-        if (serverPlayer.tickCount % 5 != 0) {
+        // Vérifier toutes les 2 ticks
+        if (serverPlayer.tickCount % 2 != 0) {
             return;
         }
 

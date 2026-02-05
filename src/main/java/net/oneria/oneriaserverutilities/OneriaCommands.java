@@ -426,6 +426,45 @@ public class OneriaCommands {
         oneriaRoot.then(blacklistNode);
 
         // -------------------------------------------------------------------------
+        // 5. MODULE: ALWAYS VISIBLE LIST (Requires OP Level 2)
+        // -------------------------------------------------------------------------
+        var alwaysVisibleNode = Commands.literal("alwaysvisible")
+                .requires(source -> source.hasPermission(2));
+
+        // Add - avec autocomplétion des joueurs connectés
+        alwaysVisibleNode.then(Commands.literal("add")
+                .then(Commands.argument("player", StringArgumentType.string())
+                        .suggests((ctx, builder) -> {
+                            // Suggérer les joueurs connectés
+                            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
+                                    builder.suggest(p.getName().getString())
+                            );
+                            return builder.buildFuture();
+                        })
+                        .executes(OneriaCommands::addToAlwaysVisible)));
+
+        // Remove - avec autocomplétion des joueurs dans la always visible list
+        alwaysVisibleNode.then(Commands.literal("remove")
+                .then(Commands.argument("player", StringArgumentType.string())
+                        .suggests((ctx, builder) -> {
+                            // Suggérer les joueurs dans la always visible list
+                            try {
+                                if (OneriaConfig.ALWAYS_VISIBLE_LIST != null) {
+                                    OneriaConfig.ALWAYS_VISIBLE_LIST.get().forEach(builder::suggest);
+                                }
+                            } catch (Exception e) {
+                                // Config pas chargée
+                            }
+                            return builder.buildFuture();
+                        })
+                        .executes(OneriaCommands::removeFromAlwaysVisible)));
+
+        alwaysVisibleNode.then(Commands.literal("list")
+                .executes(OneriaCommands::listAlwaysVisible));
+
+        oneriaRoot.then(alwaysVisibleNode);
+
+        // -------------------------------------------------------------------------
         // 7. MODULE: LICENSE (Requires OP Level 2) - AMÉLIORATION
         // -------------------------------------------------------------------------
         var licenseNode = Commands.literal("license")
@@ -515,6 +554,23 @@ public class OneriaCommands {
                                     return builder.buildFuture();
                                 })
                                 .executes(OneriaCommands::checkLicense)
+                        )
+                )
+        );
+
+        licenseNode.then(Commands.literal("giverp")
+                .then(Commands.argument("player", EntityArgument.player())
+                        .then(Commands.argument("profession", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    for (ProfessionRestrictionManager.ProfessionData profession :
+                                            ProfessionRestrictionManager.getAllProfessions()) {
+                                        builder.suggest(profession.id);
+                                    }
+                                    return builder.buildFuture();
+                                })
+                                .then(Commands.argument("days_duration", IntegerArgumentType.integer(1, 365))
+                                        .executes(OneriaCommands::giveRPLicense)
+                                )
                         )
                 )
         );
@@ -679,6 +735,7 @@ public class OneriaCommands {
                             "§6║  §eHide Nametags: §f" + safe.apply(() -> OneriaConfig.HIDE_NAMETAGS.get()) + "\n" +
                             "§6║  §eSneak Stealth: §f" + safe.apply(() -> OneriaConfig.ENABLE_SNEAK_STEALTH.get()) + "\n" +
                             "§6║  §eSneak Distance: §f" + safe.apply(() -> OneriaConfig.SNEAK_PROXIMITY_DISTANCE.get()) + " blocks\n" +
+                            "§6║  §eAlways Visible: §f" + safe.apply(() -> OneriaConfig.ALWAYS_VISIBLE_LIST.get().size()) + " players\n" +
                             "§6║\n" +
                             "§6║ §7Schedule\n" +
                             "§6║  §eEnabled: §f" + safe.apply(() -> OneriaConfig.ENABLE_SCHEDULE.get()) + "\n" +
@@ -1122,6 +1179,134 @@ public class OneriaCommands {
                 Component.literal("§e[Oneria] §f" + target.getName().getString() +
                         (has ? " §apossède" : " §cne possède pas") + "§e un permis de §f" + profession), false);
 
+        return 1;
+    }
+
+    // --- RP LICENSE HANDLER ---
+
+    private static int giveRPLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+        String professionId = StringArgumentType.getString(ctx, "profession");
+        int daysDuration = IntegerArgumentType.getInteger(ctx, "days_duration");
+
+        // Récupérer les données du métier depuis la config
+        ProfessionRestrictionManager.ProfessionData professionData =
+                ProfessionRestrictionManager.getProfessionData(professionId);
+
+        if (professionData == null) {
+            ctx.getSource().sendFailure(Component.literal("§c[Oneria] Métier inconnu: " + professionId));
+            return 0;
+        }
+
+        String displayName = NicknameManager.getDisplayName(target);
+
+        // Calculer la date d'expiration
+        java.time.LocalDate issueDate = java.time.LocalDate.now();
+        java.time.LocalDate expirationDate = issueDate.plusDays(daysDuration);
+
+        // Format: DD/MM/YYYY
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String issueDateStr = issueDate.format(formatter);
+        String expirationDateStr = expirationDate.format(formatter);
+
+        ItemStack license = new ItemStack(OneriaItems.LICENSE.get());
+
+        // Nom identique aux vrais permis - AUCUNE indication RP
+        license.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                Component.literal(professionData.colorCode + "§lPermis de " + professionData.displayName));
+
+        // Lore professionnel - ressemble à un vrai permis
+        java.util.List<Component> lore = new java.util.ArrayList<>();
+        lore.add(Component.literal("§7Délivré à: §f" + displayName));
+        lore.add(Component.literal("§7Date de délivrance: §f" + issueDateStr));
+        lore.add(Component.literal("§7Valide jusqu'au: §f" + expirationDateStr));
+
+        license.set(net.minecraft.core.component.DataComponents.LORE,
+                new net.minecraft.world.item.component.ItemLore(lore));
+
+        // Donner l'item
+        if (!target.getInventory().add(license)) {
+            target.drop(license, false);
+        }
+
+        ctx.getSource().sendSuccess(() ->
+                Component.literal("§a[Oneria] Permis temporaire de " + professionData.getFormattedName() +
+                        "§a donné à §f" + displayName + " §7(" + daysDuration + " jours, expire le " + expirationDateStr + ")"), true);
+
+        target.sendSystemMessage(Component.literal("§aVous avez reçu un " + professionData.getFormattedName() +
+                "§6§l Permis §7valable jusqu'au §f" + expirationDateStr));
+
+        return 1;
+    }
+
+    // -------------------------------------------------------------------------
+    // HANDLERS POUR ALWAYS VISIBLE LIST
+    // -------------------------------------------------------------------------
+
+    private static int addToAlwaysVisible(CommandContext<CommandSourceStack> context) {
+        String player = StringArgumentType.getString(context, "player");
+
+        try {
+            List<String> list = new ArrayList<>(OneriaConfig.ALWAYS_VISIBLE_LIST.get());
+            if (!list.contains(player)) {
+                list.add(player);
+                OneriaConfig.ALWAYS_VISIBLE_LIST.set(list);
+                OneriaConfig.SPEC.save();
+                context.getSource().sendSuccess(() ->
+                                Component.literal("§a[Oneria] " + player + " added to Always Visible list (always shown in TabList)."),
+                        true);
+            } else {
+                context.getSource().sendFailure(
+                        Component.literal("§c[Oneria] " + player + " is already in Always Visible list."));
+            }
+        } catch (Exception e) {
+            context.getSource().sendFailure(
+                    Component.literal("§c[Oneria] Error: Config not loaded."));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int removeFromAlwaysVisible(CommandContext<CommandSourceStack> context) {
+        String player = StringArgumentType.getString(context, "player");
+
+        try {
+            List<String> list = new ArrayList<>(OneriaConfig.ALWAYS_VISIBLE_LIST.get());
+            if (list.remove(player)) {
+                OneriaConfig.ALWAYS_VISIBLE_LIST.set(list);
+                OneriaConfig.SPEC.save();
+                context.getSource().sendSuccess(() ->
+                                Component.literal("§a[Oneria] " + player + " removed from Always Visible list."),
+                        true);
+            } else {
+                context.getSource().sendFailure(
+                        Component.literal("§c[Oneria] " + player + " is not in Always Visible list."));
+            }
+        } catch (Exception e) {
+            context.getSource().sendFailure(
+                    Component.literal("§c[Oneria] Error: Config not loaded."));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int listAlwaysVisible(CommandContext<CommandSourceStack> context) {
+        try {
+            List<? extends String> alwaysVisible = OneriaConfig.ALWAYS_VISIBLE_LIST.get();
+            if (alwaysVisible.isEmpty()) {
+                context.getSource().sendSuccess(() ->
+                                Component.literal("§e[Oneria] Always Visible list is empty."),
+                        false);
+            } else {
+                context.getSource().sendSuccess(() ->
+                                Component.literal("§e[Oneria] Always Visible (always shown in TabList): §f" + String.join(", ", alwaysVisible)),
+                        false);
+            }
+        } catch (Exception e) {
+            context.getSource().sendFailure(
+                    Component.literal("§c[Oneria] Error: Config not loaded."));
+            return 0;
+        }
         return 1;
     }
 
