@@ -9,44 +9,58 @@ import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.inventory.InventoryMenu;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 /**
- * Gestionnaire d'événements pour bloquer :
- * 1. La récupération d'items craftés sans le métier requis
- * 2. L'équipement d'armures sans le métier requis
- *
- * Alternative aux Mixins qui évite les problèmes d'obfuscation NeoForge
+ * VERSION OPTIMISÉE - Corrige :
+ * 1. Messages dupliqués (serveur ET client envoyaient des messages)
+ * 2. Duplication d'items en mode créatif
+ * 3. Utilise canEquip() au lieu de canCraft() pour les armures
  */
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class CraftingAndArmorRestrictionEventHandler {
 
+    // Cache pour éviter le spam de messages (1 message toutes les 2 secondes MAX)
+    private static final Map<UUID, Long> lastCraftMessage = new HashMap<>();
+    private static final Map<UUID, Long> lastArmorMessage = new HashMap<>();
+    private static final long MESSAGE_COOLDOWN = 2000; // 2 secondes
+
     /**
-     * Vérifie en continu :
-     * - Le résultat de craft dans les tables de craft
-     * - Les armures équipées dans l'inventaire du joueur
+     * Vérifie périodiquement le craft et les armures
+     * UNIQUEMENT si le joueur n'est PAS en mode créatif
      */
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.HIGH)
     public static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer serverPlayer)) {
             return;
         }
 
-        // Vérifier toutes les 5 ticks (0.25 secondes) pour minimiser l'impact sur les performances
+        // ✅ FIX: Ignorer les joueurs en mode créatif pour éviter la duplication
+        if (serverPlayer.isCreative()) {
+            return;
+        }
+
+        // Vérifier toutes les 5 ticks (0.25 secondes)
         if (serverPlayer.tickCount % 5 != 0) {
             return;
         }
 
         AbstractContainerMenu container = serverPlayer.containerMenu;
 
-        // 1. Bloquer le craft non autorisé
+        // Bloquer le craft non autorisé
         if (container instanceof CraftingMenu craftingMenu) {
             checkAndClearCraftResult(serverPlayer, craftingMenu);
         }
 
-        // 2. Bloquer les armures non autorisées
+        // Bloquer les armures non autorisées
         if (container instanceof InventoryMenu inventoryMenu) {
             checkAndClearArmorSlots(serverPlayer, inventoryMenu);
         }
@@ -57,7 +71,6 @@ public class CraftingAndArmorRestrictionEventHandler {
      */
     private static void checkAndClearCraftResult(ServerPlayer player, CraftingMenu menu) {
         try {
-            // Accéder au slot résultat (index 0)
             ItemStack result = menu.getSlot(0).getItem();
 
             if (!result.isEmpty()) {
@@ -67,8 +80,8 @@ public class CraftingAndArmorRestrictionEventHandler {
                     // Vider le slot résultat
                     menu.getSlot(0).set(ItemStack.EMPTY);
 
-                    // Message d'erreur (pas trop fréquent)
-                    if (player.tickCount % 40 == 0) { // Toutes les 2 secondes
+                    // ✅ FIX: Message avec cooldown pour éviter le spam
+                    if (canSendMessage(player.getUUID(), lastCraftMessage)) {
                         String message = ProfessionRestrictionManager.getCraftBlockedMessage(itemId);
                         player.displayClientMessage(
                                 Component.literal(message),
@@ -76,7 +89,7 @@ public class CraftingAndArmorRestrictionEventHandler {
                         );
                     }
 
-                    // Forcer la resynchronisation pour éviter les ghost items
+                    // Forcer la resynchronisation
                     player.containerMenu.broadcastFullState();
                 }
             }
@@ -87,30 +100,25 @@ public class CraftingAndArmorRestrictionEventHandler {
 
     /**
      * Vérifie les slots d'armure et retire les pièces non autorisées
-     * Slots d'armure dans InventoryMenu :
-     * - Slot 5 : Casque (head)
-     * - Slot 6 : Plastron (chest)
-     * - Slot 7 : Jambières (legs)
-     * - Slot 8 : Bottes (feet)
      */
     private static void checkAndClearArmorSlots(ServerPlayer player, InventoryMenu menu) {
         try {
             boolean foundUnauthorized = false;
 
-            // Vérifier les 4 slots d'armure
+            // Vérifier les 4 slots d'armure (5 = tête, 6 = torse, 7 = jambes, 8 = pieds)
             for (int slotIndex = 5; slotIndex <= 8; slotIndex++) {
                 ItemStack armorPiece = menu.getSlot(slotIndex).getItem();
 
                 if (!armorPiece.isEmpty() && armorPiece.getItem() instanceof ArmorItem) {
                     ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(armorPiece.getItem());
 
-                    if (!ProfessionRestrictionManager.canCraft(player, itemId)) {
-                        // Retirer la pièce d'armure non autorisée
+                    // ✅ FIX: Utiliser canEquip() au lieu de canCraft()
+                    if (!ProfessionRestrictionManager.canEquip(player, itemId)) {
+                        // Retirer l'armure
                         menu.getSlot(slotIndex).set(ItemStack.EMPTY);
 
-                        // Donner l'item au joueur dans son inventaire principal
+                        // Remettre dans l'inventaire ou drop
                         if (!player.getInventory().add(armorPiece)) {
-                            // Si l'inventaire est plein, faire tomber l'item
                             player.drop(armorPiece, false);
                         }
 
@@ -120,19 +128,57 @@ public class CraftingAndArmorRestrictionEventHandler {
             }
 
             if (foundUnauthorized) {
-                // Message d'erreur (pas trop fréquent)
-                if (player.tickCount % 40 == 0) { // Toutes les 2 secondes
+                // ✅ FIX: Message avec cooldown
+                if (canSendMessage(player.getUUID(), lastArmorMessage)) {
                     player.displayClientMessage(
                             Component.literal("§c§lVous ne pouvez pas équiper cette armure sans le métier requis."),
-                            true // actionBar
+                            true
                     );
                 }
 
-                // Forcer la resynchronisation
                 player.containerMenu.broadcastFullState();
             }
         } catch (Exception e) {
             // Ignorer les erreurs silencieusement
         }
+    }
+
+    /**
+     * Nettoie les caches quand le joueur ferme un menu
+     */
+    @SubscribeEvent
+    public static void onContainerClose(PlayerContainerEvent.Close event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            // Nettoyer les cooldowns de messages pour ce joueur
+            UUID uuid = player.getUUID();
+            lastCraftMessage.remove(uuid);
+            lastArmorMessage.remove(uuid);
+        }
+    }
+
+    /**
+     * Vérifie si on peut envoyer un message (anti-spam)
+     */
+    private static boolean canSendMessage(UUID playerUUID, Map<UUID, Long> cache) {
+        long now = System.currentTimeMillis();
+        Long lastTime = cache.get(playerUUID);
+
+        if (lastTime == null || now - lastTime > MESSAGE_COOLDOWN) {
+            cache.put(playerUUID, now);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Nettoie périodiquement les caches (appelé par OneriaServerUtilities)
+     */
+    public static void cleanupCaches() {
+        long now = System.currentTimeMillis();
+
+        // Retirer les entrées de plus de 10 secondes
+        lastCraftMessage.entrySet().removeIf(entry -> now - entry.getValue() > 10000);
+        lastArmorMessage.entrySet().removeIf(entry -> now - entry.getValue() > 10000);
     }
 }
