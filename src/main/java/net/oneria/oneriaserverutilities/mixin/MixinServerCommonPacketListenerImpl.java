@@ -95,11 +95,40 @@ public abstract class MixinServerCommonPacketListenerImpl {
                     nickname = NicknameManager.getNickname(targetPlayer.getUUID());
                 }
 
-                // NOUVEAU: Vérifier si le joueur est dans la blacklist
+                // ✅ NOUVEAU: Vérifier si le joueur est dans la always visible list
+                boolean isAlwaysVisible = false;
+                try {
+                    if (OneriaConfig.ALWAYS_VISIBLE_LIST != null) {
+                        isAlwaysVisible = OneriaConfig.ALWAYS_VISIBLE_LIST.get().contains(realName);
+                    }
+                } catch (Exception e) {
+                    // Config pas chargée
+                }
+
+                // ✅ NOUVEAU: Vérifier si le joueur est dans la blacklist
                 boolean isBlacklisted = OneriaConfig.BLACKLIST.get().contains(realName);
 
-                // CAS 1: Admin qui voit tout
-                if (isAdmin && !isBlacklisted) {
+                // ✅ NOUVEAU: Vérifier si le joueur target est en spectateur
+                boolean isTargetSpectator = targetPlayer.isSpectator();
+                boolean shouldBlurSpectators = false;
+                try {
+                    if (OneriaConfig.BLUR_SPECTATORS != null) {
+                        shouldBlurSpectators = OneriaConfig.BLUR_SPECTATORS.get();
+                    }
+                } catch (Exception e) {
+                    // Config pas chargée
+                }
+
+                // CAS 1: Always Visible - JAMAIS blur, même pour les non-admins
+                if (isAlwaysVisible) {
+                    if (hasNickname && nickname != null) {
+                        displayName = Component.literal(prefix + nickname);
+                    } else {
+                        displayName = Component.literal(prefix + realName);
+                    }
+                }
+                // CAS 2: Admin qui voit tout (sauf si alwaysVisible déjà traité)
+                else if (isAdmin && !isBlacklisted) {
                     if (hasNickname && nickname != null) {
                         // Admin voit: Prefix + Nickname + §7§o(RealName)
                         String fullDisplay = prefix + nickname + " §7§o(" + realName + ")";
@@ -109,7 +138,7 @@ public abstract class MixinServerCommonPacketListenerImpl {
                         displayName = Component.literal(prefix + realName);
                     }
                 }
-                // CAS 2: Joueur normal - vérifier la distance OU si blacklisté
+                // CAS 3: Joueur normal - vérifier la distance OU si blacklisté OU si spectateur
                 else {
                     // En mode debug, on floute même soi-même
                     double distSq = receiver.distanceToSqr(targetPlayer);
@@ -120,8 +149,11 @@ public abstract class MixinServerCommonPacketListenerImpl {
                         effectiveMaxDistSq = sneakMaxDistSq;
                     }
 
-                    // MODIFICATION: Forcer le blur si blacklisté
-                    boolean shouldBlur = isBlacklisted || debugMode || (distSq > effectiveMaxDistSq);
+                    // ✅ MODIFICATION: Forcer le blur si blacklisté OU si spectateur (et blur spectators activé)
+                    boolean shouldBlur = isBlacklisted ||
+                            debugMode ||
+                            (distSq > effectiveMaxDistSq) ||
+                            (isTargetSpectator && shouldBlurSpectators && !isAlwaysVisible);
 
                     String displayedName;
                     if (hasNickname && nickname != null) {

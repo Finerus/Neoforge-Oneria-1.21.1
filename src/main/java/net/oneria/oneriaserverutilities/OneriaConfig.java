@@ -13,6 +13,9 @@ public class OneriaConfig {
     public static final ModConfigSpec.BooleanValue ENABLE_BLUR;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> WHITELIST;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> BLACKLIST;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> ALWAYS_VISIBLE_LIST;
+    public static final ModConfigSpec.BooleanValue BLUR_SPECTATORS;
+    public static final ModConfigSpec.BooleanValue WHITELIST_EXEMPT_PROFESSIONS;
     public static final ModConfigSpec.IntValue OBFUSCATED_NAME_LENGTH;
     public static final ModConfigSpec.BooleanValue OBFUSCATE_PREFIX;
     public static final ModConfigSpec.BooleanValue ENABLE_SNEAK_STEALTH;
@@ -151,6 +154,26 @@ public class OneriaConfig {
                         "Useful for staff in stealth mode or special NPCs.",
                         "Format: A list of strings.")
                 .defineList("blacklist", Arrays.asList(), obj -> obj instanceof String);
+
+        ALWAYS_VISIBLE_LIST = BUILDER
+                .comment("ALWAYS VISIBLE: Players Always Shown in TabList",
+                        "List of usernames that are ALWAYS visible in TabList, never blurred.",
+                        "Different from whitelist - these players are visible TO EVERYONE.",
+                        "Useful for important NPCs, admins, or event coordinators.",
+                        "Format: A list of strings.")
+                .defineList("alwaysVisibleList", Arrays.asList(), obj -> obj instanceof String);
+
+        BLUR_SPECTATORS = BUILDER
+                .comment("CONFIGURATION: Blur Spectators",
+                        "If 'true', players in spectator mode are always blurred (except if in alwaysVisibleList).",
+                        "Useful to hide staff members observing in spectator mode.")
+                .define("blurSpectators", true);
+
+        WHITELIST_EXEMPT_PROFESSIONS = BUILDER
+                .comment("CONFIGURATION: Whitelist Exempt from Profession Restrictions",
+                        "If 'true', players in the whitelist bypass ALL profession restrictions.",
+                        "They can craft, break, use, and equip anything regardless of professions.")
+                .define("whitelistExemptProfessions", true);
 
         SHOW_NAMETAG_PREFIX_SUFFIX = BUILDER
                 .comment("CONFIGURATION: Show Prefix/Suffix on Nametags",

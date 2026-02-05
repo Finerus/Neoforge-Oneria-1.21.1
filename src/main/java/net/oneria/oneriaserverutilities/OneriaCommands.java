@@ -435,10 +435,28 @@ public class OneriaCommands {
                 .then(Commands.argument("player", EntityArgument.player())
                         .then(Commands.argument("profession", StringArgumentType.word())
                                 .suggests((ctx, builder) -> {
-                                    // Suggérer les métiers depuis la config
-                                    for (ProfessionRestrictionManager.ProfessionData profession :
-                                            ProfessionRestrictionManager.getAllProfessions()) {
-                                        builder.suggest(profession.id);
+                                    try {
+                                        // Récupérer le joueur target
+                                        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+
+                                        // Récupérer ses licences actuelles
+                                        List<String> currentLicenses = LicenseManager.getLicenses(target.getUUID());
+
+                                        // Suggérer seulement les métiers qu'il N'A PAS
+                                        for (ProfessionRestrictionManager.ProfessionData profession :
+                                                ProfessionRestrictionManager.getAllProfessions()) {
+
+                                            // ✅ Ne suggérer que si le joueur ne l'a PAS déjà
+                                            if (!currentLicenses.contains(profession.id)) {
+                                                builder.suggest(profession.id);
+                                            }
+                                        }
+                                    } catch (Exception e) {
+                                        // Fallback: suggérer tous les métiers si erreur
+                                        for (ProfessionRestrictionManager.ProfessionData profession :
+                                                ProfessionRestrictionManager.getAllProfessions()) {
+                                            builder.suggest(profession.id);
+                                        }
                                     }
                                     return builder.buildFuture();
                                 })

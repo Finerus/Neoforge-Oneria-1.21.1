@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 /**
  * Gestionnaire des restrictions et permissions par métier
+ * VERSION CORRIGÉE - Protection contre config non chargée
  */
 public class ProfessionRestrictionManager {
 
@@ -18,6 +19,7 @@ public class ProfessionRestrictionManager {
     private static final Map<String, ProfessionData> professionDataCache = new HashMap<>();
     private static long lastCacheUpdate = 0;
     private static final long CACHE_DURATION = 30000; // 30 secondes
+    private static boolean isInitialized = false;
 
     /**
      * Classe interne pour stocker les données d'un métier
@@ -39,14 +41,48 @@ public class ProfessionRestrictionManager {
     }
 
     /**
-     * Recharge le cache des métiers depuis la config
+     * ✅ FIX: Vérifie si un joueur est exempté des restrictions de profession
+     */
+    private static boolean isExemptFromProfessionRestrictions(ServerPlayer player) {
+        try {
+            // Vérifier si la config permet l'exemption whitelist
+            if (OneriaConfig.WHITELIST_EXEMPT_PROFESSIONS != null &&
+                    OneriaConfig.WHITELIST_EXEMPT_PROFESSIONS.get()) {
+
+                // Vérifier si le joueur est dans la whitelist
+                String playerName = player.getGameProfile().getName();
+                if (OneriaConfig.WHITELIST != null && OneriaConfig.WHITELIST.get().contains(playerName)) {
+                    return true;
+                }
+            }
+        } catch (IllegalStateException e) {
+            // Config pas chargée, on continue normalement
+            OneriaServerUtilities.LOGGER.debug("[ProfessionRestrictions] Config not loaded yet for exemption check");
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[ProfessionRestrictions] Error checking exemption: {}", e.getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * ✅ FIX: Recharge le cache des métiers depuis la config
+     * Avec protection contre config non chargée
      */
     public static void reloadCache() {
         professionDataCache.clear();
         playerProfessionsCache.clear();
+        isInitialized = false;
 
         try {
-            for (String professionEntry : ProfessionConfig.PROFESSIONS.get()) {
+            // ✅ PROTECTION: Vérifier que la config est chargée
+            if (ProfessionConfig.PROFESSIONS == null) {
+                OneriaServerUtilities.LOGGER.warn("[ProfessionRestrictions] Config not loaded yet, skipping cache reload");
+                return;
+            }
+
+            List<? extends String> professions = ProfessionConfig.PROFESSIONS.get();
+
+            for (String professionEntry : professions) {
                 String[] parts = professionEntry.split(";");
                 if (parts.length == 3) {
                     String id = parts[0].toLowerCase().trim();
@@ -58,16 +94,34 @@ public class ProfessionRestrictionManager {
             }
 
             lastCacheUpdate = System.currentTimeMillis();
+            isInitialized = true;
             OneriaServerUtilities.LOGGER.info("[ProfessionRestrictions] Loaded {} professions", professionDataCache.size());
+        } catch (IllegalStateException e) {
+            // Config pas encore construite
+            OneriaServerUtilities.LOGGER.warn("[ProfessionRestrictions] Config not built yet: {}", e.getMessage());
         } catch (Exception e) {
             OneriaServerUtilities.LOGGER.error("[ProfessionRestrictions] Error loading profession data", e);
         }
     }
 
     /**
+     * ✅ FIX: Vérifie si le système est initialisé
+     */
+    private static boolean ensureInitialized() {
+        if (!isInitialized) {
+            reloadCache();
+        }
+        return isInitialized;
+    }
+
+    /**
      * Récupère les données d'un métier
      */
     public static ProfessionData getProfessionData(String professionId) {
+        if (!ensureInitialized()) {
+            return null;
+        }
+
         if (System.currentTimeMillis() - lastCacheUpdate > CACHE_DURATION) {
             reloadCache();
         }
@@ -78,6 +132,10 @@ public class ProfessionRestrictionManager {
      * Récupère tous les métiers disponibles
      */
     public static Collection<ProfessionData> getAllProfessions() {
+        if (!ensureInitialized()) {
+            return Collections.emptyList();
+        }
+
         if (System.currentTimeMillis() - lastCacheUpdate > CACHE_DURATION) {
             reloadCache();
         }
@@ -85,59 +143,108 @@ public class ProfessionRestrictionManager {
     }
 
     /**
-     * Vérifie si un joueur peut crafter un item
+     * ✅ FIX: Vérifie si un joueur peut crafter un item
      */
     public static boolean canCraft(ServerPlayer player, ResourceLocation itemId) {
-        // Vérifier si l'item est bloqué globalement
-        if (!isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_CRAFTS.get())) {
-            return true; // Pas de restriction globale
+        // ✅ PROTECTION: Vérifier que le système est initialisé
+        if (!ensureInitialized()) {
+            OneriaServerUtilities.LOGGER.debug("[ProfessionRestrictions] System not initialized, allowing craft");
+            return true; // Permissif si pas initialisé
         }
 
-        // Vérifier si le joueur a un métier qui autorise ce craft
-        List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
-        return hasPermission(playerProfessions, itemId, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get());
+        // Check exemption whitelist
+        if (isExemptFromProfessionRestrictions(player)) {
+            return true;
+        }
+
+        try {
+            // Vérifier si l'item est bloqué globalement
+            if (!isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_CRAFTS.get())) {
+                return true; // Pas de restriction globale
+            }
+
+            // Vérifier si le joueur a un métier qui autorise ce craft
+            List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
+            return hasPermission(playerProfessions, itemId, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get());
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[ProfessionRestrictions] Error checking craft permission: {}", e.getMessage());
+            return true; // Permissif en cas d'erreur
+        }
     }
 
     /**
-     * Vérifie si un joueur peut casser un bloc
+     * ✅ FIX: Vérifie si un joueur peut casser un bloc
      */
     public static boolean canBreakBlock(ServerPlayer player, ResourceLocation blockId) {
-        // Vérifier si le bloc est incassable globalement
-        if (!isGloballyBlocked(blockId, ProfessionConfig.GLOBAL_UNBREAKABLE_BLOCKS.get())) {
-            return true; // Pas de restriction globale
+        if (!ensureInitialized()) {
+            return true;
         }
 
-        // Vérifier si le joueur a un métier qui autorise de casser ce bloc
-        List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
-        return hasPermission(playerProfessions, blockId, ProfessionConfig.PROFESSION_ALLOWED_BLOCKS.get());
+        if (isExemptFromProfessionRestrictions(player)) {
+            return true;
+        }
+
+        try {
+            if (!isGloballyBlocked(blockId, ProfessionConfig.GLOBAL_UNBREAKABLE_BLOCKS.get())) {
+                return true;
+            }
+
+            List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
+            return hasPermission(playerProfessions, blockId, ProfessionConfig.PROFESSION_ALLOWED_BLOCKS.get());
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[ProfessionRestrictions] Error checking break permission: {}", e.getMessage());
+            return true;
+        }
     }
 
     /**
-     * Vérifie si un joueur peut utiliser un item
+     * ✅ FIX: Vérifie si un joueur peut utiliser un item
      */
     public static boolean canUseItem(ServerPlayer player, ResourceLocation itemId) {
-        // Vérifier si l'item est bloqué globalement
-        if (!isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_ITEMS.get())) {
-            return true; // Pas de restriction globale
+        if (!ensureInitialized()) {
+            return true;
         }
 
-        // Vérifier si le joueur a un métier qui autorise cet item
-        List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
-        return hasPermission(playerProfessions, itemId, ProfessionConfig.PROFESSION_ALLOWED_ITEMS.get());
+        if (isExemptFromProfessionRestrictions(player)) {
+            return true;
+        }
+
+        try {
+            if (!isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_ITEMS.get())) {
+                return true;
+            }
+
+            List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
+            return hasPermission(playerProfessions, itemId, ProfessionConfig.PROFESSION_ALLOWED_ITEMS.get());
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[ProfessionRestrictions] Error checking use permission: {}", e.getMessage());
+            return true;
+        }
     }
 
     /**
-     * Vérifie si un joueur peut équiper un item (armure, outil, arme)
+     * ✅ FIX: Vérifie si un joueur peut équiper un item
      */
     public static boolean canEquip(ServerPlayer player, ResourceLocation itemId) {
-        // Vérifier si l'équipement est bloqué globalement
-        if (!isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_EQUIPMENT.get())) {
-            return true; // Pas de restriction globale
+        if (!ensureInitialized()) {
+            return true;
         }
 
-        // Vérifier si le joueur a un métier qui autorise cet équipement
-        List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
-        return hasPermission(playerProfessions, itemId, ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT.get());
+        if (isExemptFromProfessionRestrictions(player)) {
+            return true;
+        }
+
+        try {
+            if (!isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_EQUIPMENT.get())) {
+                return true;
+            }
+
+            List<String> playerProfessions = LicenseManager.getLicenses(player.getUUID());
+            return hasPermission(playerProfessions, itemId, ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT.get());
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[ProfessionRestrictions] Error checking equip permission: {}", e.getMessage());
+            return true;
+        }
     }
 
     /**
@@ -169,10 +276,8 @@ public class ProfessionRestrictionManager {
                 String professionId = parts[0].toLowerCase().trim();
                 String allowedItems = parts[1];
 
-                // Vérifier si c'est le bon métier
                 if (!professionId.equals(profession.toLowerCase())) continue;
 
-                // Vérifier si l'item est dans la liste autorisée
                 for (String allowedItem : allowedItems.split(",")) {
                     allowedItem = allowedItem.trim();
                     if (matchesPattern(resourceString, allowedItem)) {
@@ -191,12 +296,10 @@ public class ProfessionRestrictionManager {
     private static boolean matchesPattern(String resourceId, String pattern) {
         pattern = pattern.trim();
 
-        // Correspondance exacte
         if (resourceId.equals(pattern)) {
             return true;
         }
 
-        // Support des wildcards
         if (pattern.contains("*")) {
             String regex = pattern
                     .replace(".", "\\.")
@@ -211,6 +314,10 @@ public class ProfessionRestrictionManager {
      * Récupère les métiers requis pour une action
      */
     public static String getRequiredProfessions(ResourceLocation resourceId, List<? extends String> allowedList) {
+        if (!ensureInitialized()) {
+            return "§cSystème non initialisé";
+        }
+
         String resourceString = resourceId.toString();
         Set<String> requiredProfessions = new HashSet<>();
 
@@ -221,7 +328,6 @@ public class ProfessionRestrictionManager {
             String professionId = parts[0].toLowerCase().trim();
             String allowedItems = parts[1];
 
-            // Vérifier si l'item est dans la liste autorisée
             for (String allowedItem : allowedItems.split(",")) {
                 allowedItem = allowedItem.trim();
                 if (matchesPattern(resourceString, allowedItem)) {
@@ -240,40 +346,56 @@ public class ProfessionRestrictionManager {
      * Récupère le message formaté pour un craft bloqué
      */
     public static String getCraftBlockedMessage(ResourceLocation itemId) {
-        String professions = getRequiredProfessions(itemId, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get());
-        return ProfessionConfig.MSG_CRAFT_BLOCKED.get()
-                .replace("{item}", itemId.toString())
-                .replace("{profession}", professions);
+        try {
+            String professions = getRequiredProfessions(itemId, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get());
+            return ProfessionConfig.MSG_CRAFT_BLOCKED.get()
+                    .replace("{item}", itemId.toString())
+                    .replace("{profession}", professions);
+        } catch (Exception e) {
+            return "§cCraft bloqué";
+        }
     }
 
     /**
      * Récupère le message formaté pour un bloc incassable
      */
     public static String getBlockBreakBlockedMessage(ResourceLocation blockId) {
-        String professions = getRequiredProfessions(blockId, ProfessionConfig.PROFESSION_ALLOWED_BLOCKS.get());
-        return ProfessionConfig.MSG_BLOCK_BREAK_BLOCKED.get()
-                .replace("{item}", blockId.toString())
-                .replace("{profession}", professions);
+        try {
+            String professions = getRequiredProfessions(blockId, ProfessionConfig.PROFESSION_ALLOWED_BLOCKS.get());
+            return ProfessionConfig.MSG_BLOCK_BREAK_BLOCKED.get()
+                    .replace("{item}", blockId.toString())
+                    .replace("{profession}", professions);
+        } catch (Exception e) {
+            return "§cCasse bloquée";
+        }
     }
 
     /**
      * Récupère le message formaté pour un item bloqué
      */
     public static String getItemUseBlockedMessage(ResourceLocation itemId) {
-        String professions = getRequiredProfessions(itemId, ProfessionConfig.PROFESSION_ALLOWED_ITEMS.get());
-        return ProfessionConfig.MSG_ITEM_USE_BLOCKED.get()
-                .replace("{item}", itemId.toString())
-                .replace("{profession}", professions);
+        try {
+            String professions = getRequiredProfessions(itemId, ProfessionConfig.PROFESSION_ALLOWED_ITEMS.get());
+            return ProfessionConfig.MSG_ITEM_USE_BLOCKED.get()
+                    .replace("{item}", itemId.toString())
+                    .replace("{profession}", professions);
+        } catch (Exception e) {
+            return "§cUtilisation bloquée";
+        }
     }
 
     /**
      * Récupère le message formaté pour un équipement bloqué
      */
     public static String getEquipmentBlockedMessage(ResourceLocation itemId) {
-        String professions = getRequiredProfessions(itemId, ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT.get());
-        return ProfessionConfig.MSG_EQUIPMENT_BLOCKED.get()
-                .replace("{item}", itemId.toString())
-                .replace("{profession}", professions);
+        try {
+            String professions = getRequiredProfessions(itemId, ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT.get());
+            return ProfessionConfig.MSG_EQUIPMENT_BLOCKED.get()
+                    .replace("{item}", itemId.toString())
+                    .replace("{profession}", professions);
+        } catch (Exception e) {
+            return "§cÉquipement bloqué";
+        }
     }
 
     /**
@@ -290,5 +412,6 @@ public class ProfessionRestrictionManager {
         playerProfessionsCache.clear();
         professionDataCache.clear();
         lastCacheUpdate = 0;
+        isInitialized = false;
     }
 }
