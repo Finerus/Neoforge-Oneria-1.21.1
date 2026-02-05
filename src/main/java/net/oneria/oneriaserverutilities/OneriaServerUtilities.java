@@ -15,7 +15,6 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
-
 import java.util.EnumSet;
 
 @Mod("oneriaserverutilities")
@@ -25,16 +24,20 @@ public class OneriaServerUtilities {
     private int tickCounter = 0;
 
     public OneriaServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
+        // Enregistrer les deux configurations
         modContainer.registerConfig(ModConfig.Type.SERVER, OneriaConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.SERVER, ProfessionConfig.SPEC, "oneria-professions.toml");
+
         OneriaItems.ITEMS.register(modEventBus);
 
         NeoForge.EVENT_BUS.register(this);
 
-        // Initialize Schedule System - avec un délai
+        // Initialize systems when config loads
         modEventBus.addListener((net.neoforged.fml.event.config.ModConfigEvent.Loading event) -> {
             if (event.getConfig().getType() == ModConfig.Type.SERVER) {
                 OneriaScheduleManager.reload();
-                LOGGER.info("Schedule system initialized after config load");
+                ProfessionRestrictionManager.reloadCache();
+                LOGGER.info("Schedule system and profession restrictions initialized after config load");
             }
         });
     }
@@ -105,9 +108,12 @@ public class OneriaServerUtilities {
             }
         }
 
+        // Nettoyer les caches toutes les 20 secondes (400 ticks)
+        if (tickCounter % 400 == 0) {
+            ProfessionRestrictionEventHandler.cleanupCaches();
+        }
+
         OneriaScheduleManager.tick(event.getServer());
-
         WorldBorderManager.tick(event.getServer());
-
     }
 }

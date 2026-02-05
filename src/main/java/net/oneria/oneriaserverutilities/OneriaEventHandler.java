@@ -79,6 +79,7 @@ public class OneriaEventHandler {
 
             String timeInfo = OneriaScheduleManager.getTimeUntilNextEvent();
             player.sendSystemMessage(Component.literal("§7" + timeInfo));
+            ProfessionRestrictionManager.invalidatePlayerCache(player.getUUID());
         }
     }
 

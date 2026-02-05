@@ -8,6 +8,7 @@
     "ClientboundPlayerInfoUpdatePacketAccessor",
     "MixinEntity",
     "MixinPlayerList",
+    "MixinResultSlot",
     "MixinServerCommonPacketListenerImpl",
     "MixinServerGamePacketListenerImpl",
     "MixinServerPlayer"

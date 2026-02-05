@@ -124,4 +124,16 @@ public class LicenseManager {
         playerLicenses.clear();
         ensureInitialized();
     }
+
+    /**
+     * Retourne toutes les licences de tous les joueurs
+     */
+    public static Map<UUID, List<String>> getAllLicenses() {
+        ensureInitialized();
+        Map<UUID, List<String>> result = new HashMap<>();
+        for (Map.Entry<UUID, List<String>> entry : playerLicenses.entrySet()) {
+            result.put(entry.getKey(), new ArrayList<>(entry.getValue()));
+        }
+        return result;
+    }
 }

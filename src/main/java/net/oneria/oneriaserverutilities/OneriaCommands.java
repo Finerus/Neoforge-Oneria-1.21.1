@@ -226,7 +226,7 @@ public class OneriaCommands {
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> updateConfigBool(ctx, OneriaConfig.SHOW_NAMETAG_PREFIX_SUFFIX, "Show Nametag Prefix/Suffix"))));
 
-// Join/Leave messages settings
+        // Join/Leave messages settings
         setNode.then(Commands.literal("enableCustomJoinLeave")
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE, "Custom Join/Leave Messages"))));
@@ -330,13 +330,13 @@ public class OneriaCommands {
                 )
         );
 
-        // Platforms (CORRECTION ICI : utilisation du SuggestionProvider)
+        // Platforms
         staffNode.then(Commands.literal("platform")
                 .executes(OneriaCommands::platformSelf)
                 .then(Commands.argument("target", EntityArgument.player())
                         .executes(OneriaCommands::platformTarget)
                         .then(Commands.argument("platform_id", StringArgumentType.word())
-                                .suggests(PLATFORM_SUGGESTIONS)  // ← FIX : Plus de crash !
+                                .suggests(PLATFORM_SUGGESTIONS)
                                 .executes(OneriaCommands::platformTargetSpecific)
                         )
                 )
@@ -360,17 +360,31 @@ public class OneriaCommands {
         oneriaRoot.then(staffNode);
 
         // -------------------------------------------------------------------------
-        // 3. MODULE: WHITELIST (Requires OP Level 2)
+        // 3. MODULE: WHITELIST (Requires OP Level 2) - AMÉLIORATION
         // -------------------------------------------------------------------------
         var whitelistNode = Commands.literal("whitelist")
                 .requires(source -> source.hasPermission(2));
 
+        // Add - avec autocomplétion des joueurs connectés
         whitelistNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
+                        .suggests((ctx, builder) -> {
+                            // Suggérer les joueurs connectés
+                            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
+                                    builder.suggest(p.getName().getString())
+                            );
+                            return builder.buildFuture();
+                        })
                         .executes(OneriaCommands::addToWhitelist)));
 
+        // Remove - avec autocomplétion des joueurs dans la whitelist
         whitelistNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
+                        .suggests((ctx, builder) -> {
+                            // Suggérer les joueurs dans la whitelist
+                            OneriaConfig.WHITELIST.get().forEach(builder::suggest);
+                            return builder.buildFuture();
+                        })
                         .executes(OneriaCommands::removeFromWhitelist)));
 
         whitelistNode.then(Commands.literal("list")
@@ -379,17 +393,31 @@ public class OneriaCommands {
         oneriaRoot.then(whitelistNode);
 
         // -------------------------------------------------------------------------
-        // 4. MODULE: BLACKLIST (Requires OP Level 2)
+        // 4. MODULE: BLACKLIST (Requires OP Level 2) - AMÉLIORATION
         // -------------------------------------------------------------------------
         var blacklistNode = Commands.literal("blacklist")
                 .requires(source -> source.hasPermission(2));
 
+        // Add - avec autocomplétion des joueurs connectés
         blacklistNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
+                        .suggests((ctx, builder) -> {
+                            // Suggérer les joueurs connectés
+                            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
+                                    builder.suggest(p.getName().getString())
+                            );
+                            return builder.buildFuture();
+                        })
                         .executes(OneriaCommands::addToBlacklist)));
 
+        // Remove - avec autocomplétion des joueurs dans la blacklist
         blacklistNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
+                        .suggests((ctx, builder) -> {
+                            // Suggérer les joueurs dans la blacklist
+                            OneriaConfig.BLACKLIST.get().forEach(builder::suggest);
+                            return builder.buildFuture();
+                        })
                         .executes(OneriaCommands::removeFromBlacklist)));
 
         blacklistNode.then(Commands.literal("list")
@@ -398,7 +426,7 @@ public class OneriaCommands {
         oneriaRoot.then(blacklistNode);
 
         // -------------------------------------------------------------------------
-        // 7. MODULE: LICENSE (Requires OP Level 2)
+        // 7. MODULE: LICENSE (Requires OP Level 2) - AMÉLIORATION
         // -------------------------------------------------------------------------
         var licenseNode = Commands.literal("license")
                 .requires(source -> source.hasPermission(2));
@@ -407,10 +435,11 @@ public class OneriaCommands {
                 .then(Commands.argument("player", EntityArgument.player())
                         .then(Commands.argument("profession", StringArgumentType.word())
                                 .suggests((ctx, builder) -> {
-                                    builder.suggest("chasseur").suggest("pecheur")
-                                            .suggest("mineur").suggest("bucheron")
-                                            .suggest("forgeron").suggest("alchimiste")
-                                            .suggest("marchand").suggest("garde");
+                                    // Suggérer les métiers depuis la config
+                                    for (ProfessionRestrictionManager.ProfessionData profession :
+                                            ProfessionRestrictionManager.getAllProfessions()) {
+                                        builder.suggest(profession.id);
+                                    }
                                     return builder.buildFuture();
                                 })
                                 .executes(OneriaCommands::giveLicense)
@@ -418,23 +447,55 @@ public class OneriaCommands {
                 )
         );
 
+        // Revoke - avec autocomplétion des licences du joueur
         licenseNode.then(Commands.literal("revoke")
                 .then(Commands.argument("player", EntityArgument.player())
                         .then(Commands.argument("profession", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    try {
+                                        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+                                        List<String> licenses = LicenseManager.getLicenses(target.getUUID());
+                                        licenses.forEach(builder::suggest);
+                                    } catch (Exception e) {
+                                        // Fallback to common professions
+                                        builder.suggest("chasseur").suggest("pecheur")
+                                                .suggest("mineur").suggest("bucheron")
+                                                .suggest("forgeron").suggest("alchimiste")
+                                                .suggest("marchand").suggest("garde");
+                                    }
+                                    return builder.buildFuture();
+                                })
                                 .executes(OneriaCommands::revokeLicense)
                         )
                 )
         );
 
+        // List - maintenant avec argument optionnel pour joueur spécifique ou tous
         licenseNode.then(Commands.literal("list")
+                .executes(OneriaCommands::listAllLicenses) // Sans argument = tous les joueurs
                 .then(Commands.argument("player", EntityArgument.player())
-                        .executes(OneriaCommands::listLicenses)
+                        .executes(OneriaCommands::listLicenses) // Avec argument = joueur spécifique
                 )
         );
 
+        // Check - avec autocomplétion des licences du joueur
         licenseNode.then(Commands.literal("check")
                 .then(Commands.argument("player", EntityArgument.player())
                         .then(Commands.argument("profession", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    try {
+                                        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+                                        List<String> licenses = LicenseManager.getLicenses(target.getUUID());
+                                        licenses.forEach(builder::suggest);
+                                    } catch (Exception e) {
+                                        // Fallback to common professions
+                                        builder.suggest("chasseur").suggest("pecheur")
+                                                .suggest("mineur").suggest("bucheron")
+                                                .suggest("forgeron").suggest("alchimiste")
+                                                .suggest("marchand").suggest("garde");
+                                    }
+                                    return builder.buildFuture();
+                                })
                                 .executes(OneriaCommands::checkLicense)
                         )
                 )
@@ -498,7 +559,7 @@ public class OneriaCommands {
                 .then(Commands.argument("target", EntityArgument.player())
                         .executes(OneriaCommands::platformTarget)
                         .then(Commands.argument("platform_id", StringArgumentType.word())
-                                .suggests(PLATFORM_SUGGESTIONS)  // ← FIX : Plus de crash !
+                                .suggests(PLATFORM_SUGGESTIONS)
                                 .executes(OneriaCommands::platformTargetSpecific)
                         )
                 ));
@@ -862,7 +923,7 @@ public class OneriaCommands {
         OneriaConfig.PLATFORMS.set(platforms);
         OneriaConfig.SPEC.save();
 
-        final boolean wasUpdated = updated; // Pour la lambda
+        final boolean wasUpdated = updated;
         ctx.getSource().sendSuccess(() ->
                         Component.literal("§a[Oneria] Platform '" + platformName + "' " +
                                 (wasUpdated ? "updated" : "created") + " at " + dimension + " " + x + " " + y + " " + z),
@@ -910,19 +971,28 @@ public class OneriaCommands {
         };
     }
 
-    // --- LICENSE HANDLERS ---
+    // --- LICENSE HANDLERS - AMÉLIORÉS ---
 
     private static int giveLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
-        String profession = StringArgumentType.getString(ctx, "profession");
+        String professionId = StringArgumentType.getString(ctx, "profession");
+
+        // Récupérer les données du métier depuis la config
+        ProfessionRestrictionManager.ProfessionData professionData =
+                ProfessionRestrictionManager.getProfessionData(professionId);
+
+        if (professionData == null) {
+            ctx.getSource().sendFailure(Component.literal("§c[Oneria] Métier inconnu: " + professionId));
+            return 0;
+        }
 
         String displayName = NicknameManager.getDisplayName(target);
 
         ItemStack license = new ItemStack(OneriaItems.LICENSE.get());
 
+        // Utiliser la couleur et le nom du métier depuis la config
         license.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                Component.literal("§6§lPermis de " + profession.substring(0, 1).toUpperCase() + profession.substring(1)));
-
+                Component.literal(professionData.colorCode + "§lPermis de " + professionData.displayName));
         java.util.List<Component> lore = new java.util.ArrayList<>();
         lore.add(Component.literal("§7Délivré à: §f" + displayName));
         lore.add(Component.literal("§7Date: §f" + java.time.LocalDate.now().toString()));
@@ -933,12 +1003,17 @@ public class OneriaCommands {
             target.drop(license, false);
         }
 
-        LicenseManager.addLicense(target.getUUID(), profession);
+        LicenseManager.addLicense(target.getUUID(), professionId);
 
         ctx.getSource().sendSuccess(() ->
-                Component.literal("§a[Oneria] Permis de §f" + profession + "§a donné à §f" + displayName), true);
+                Component.literal("§a[Oneria] Permis de " + professionData.getFormattedName() +
+                        "§a donné à §f" + displayName), true);
 
-        target.sendSystemMessage(Component.literal("§aVous avez reçu un §6Permis de " + profession + "§a !"));
+        target.sendSystemMessage(Component.literal("§aVous avez reçu un " + professionData.getFormattedName() +
+                "§6§l Permis§a !"));
+
+        // Invalider le cache des restrictions pour ce joueur
+        ProfessionRestrictionManager.invalidatePlayerCache(target.getUUID());
 
         return 1;
     }
@@ -952,11 +1027,15 @@ public class OneriaCommands {
         ctx.getSource().sendSuccess(() ->
                 Component.literal("§a[Oneria] Permis de §f" + profession + "§a révoqué pour §f" + target.getName().getString()), true);
 
+        // Invalider le cache des restrictions pour ce joueur
+        ProfessionRestrictionManager.invalidatePlayerCache(target.getUUID());
+
         target.sendSystemMessage(Component.literal("§cVotre permis de " + profession + " a été révoqué."));
 
         return 1;
     }
 
+    // NOUVEAU: Liste les licences pour UN joueur spécifique
     private static int listLicenses(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
         java.util.List<String> licenses = LicenseManager.getLicenses(target.getUUID());
@@ -969,6 +1048,40 @@ public class OneriaCommands {
                     Component.literal("§e[Oneria] Permis de §f" + target.getName().getString() + "§e: §f" + String.join(", ", licenses)), false);
         }
 
+        return 1;
+    }
+
+    // NOUVEAU: Liste TOUTES les licences de TOUS les joueurs
+    private static int listAllLicenses(CommandContext<CommandSourceStack> ctx) {
+        var allLicenses = LicenseManager.getAllLicenses();
+
+        if (allLicenses.isEmpty()) {
+            ctx.getSource().sendSuccess(() ->
+                    Component.literal("§e[Oneria] Aucune licence enregistrée."), false);
+            return 1;
+        }
+
+        StringBuilder result = new StringBuilder("§6╔═══════════════════════════════════╗\n");
+        result.append("§6║ §e§lLICENSES - TOUS LES JOUEURS §6║\n");
+        result.append("§6╠═══════════════════════════════════╣\n");
+
+        for (var entry : allLicenses.entrySet()) {
+            java.util.UUID uuid = entry.getKey();
+            List<String> licenses = entry.getValue();
+
+            // Trouver le nom du joueur
+            ServerPlayer player = ctx.getSource().getServer().getPlayerList().getPlayer(uuid);
+            String playerName = player != null ? player.getName().getString() : uuid.toString();
+
+            result.append("§6║ §f").append(playerName).append("§7:\n");
+            for (String license : licenses) {
+                result.append("§6║   §e- ").append(license).append("\n");
+            }
+        }
+
+        result.append("§6╚═══════════════════════════════════╝");
+
+        ctx.getSource().sendSuccess(() -> Component.literal(result.toString()), false);
         return 1;
     }
 
