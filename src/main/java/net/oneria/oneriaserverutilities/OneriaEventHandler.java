@@ -39,6 +39,23 @@ public class OneriaEventHandler {
             player.setCustomNameVisible(true);
         }
 
+        ProfessionSyncHelper.syncToPlayer(player);
+
+        // Execute after a short delay
+        new Thread(() -> {
+            try {
+                Thread.sleep(2000);
+                player.getServer().execute(() -> {
+                    checkScheduleOnJoin(player);
+                    sendWelcomeMessage(player);
+
+                    RevokedLicenseManager.removeAllRevokedLicenses(player);
+                });
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }).start();
+
         // Execute after a short delay
         new Thread(() -> {
             try {
@@ -60,8 +77,10 @@ public class OneriaEventHandler {
         OneriaServerUtilities.LOGGER.info("Player {} logged out", player.getName().getString());
 
         OneriaPermissions.invalidateCache(player.getUUID());
-
         WorldBorderManager.clearCache(player.getUUID());
+
+        // NOUVEAU : Nettoyer les licences révoquées en attente
+        RevokedLicenseManager.cleanup(player.getUUID());
     }
 
     private static void checkScheduleOnJoin(ServerPlayer player) {

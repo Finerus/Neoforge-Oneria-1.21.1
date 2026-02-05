@@ -6,6 +6,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.DirectionalPayloadHandler;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.oneria.oneriaserverutilities.client.ClientNametagConfig;
+import net.oneria.oneriaserverutilities.client.ClientProfessionRestrictions;
 
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class NetworkHandler {
@@ -22,12 +23,30 @@ public class NetworkHandler {
                         null
                 )
         );
+
+        // Packet pour synchroniser les restrictions de métiers
+        registrar.playToClient(
+                SyncProfessionRestrictionsPacket.TYPE,
+                SyncProfessionRestrictionsPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(
+                        NetworkHandler::handleSyncProfessionRestrictions,
+                        null
+                )
+        );
     }
 
     private static void handleHideNametags(HideNametagsPacket packet, net.neoforged.neoforge.network.handling.IPayloadContext context) {
         context.enqueueWork(() -> {
             ClientNametagConfig.setHideNametags(packet.hideNametags());
             OneriaServerUtilities.LOGGER.info("Received nametag config from server - Hide: {}", packet.hideNametags());
+        });
+    }
+
+    private static void handleSyncProfessionRestrictions(SyncProfessionRestrictionsPacket packet, net.neoforged.neoforge.network.handling.IPayloadContext context) {
+        context.enqueueWork(() -> {
+            ClientProfessionRestrictions.updateRestrictions(packet.blockedCrafts(), packet.blockedEquipment());
+            OneriaServerUtilities.LOGGER.info("Synced profession restrictions from server - {} crafts, {} equipment blocked",
+                    packet.blockedCrafts().size(), packet.blockedEquipment().size());
         });
     }
 }

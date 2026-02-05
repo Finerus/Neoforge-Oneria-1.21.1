@@ -1022,15 +1022,24 @@ public class OneriaCommands {
         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
         String profession = StringArgumentType.getString(ctx, "profession");
 
+        // Retirer la licence de la base de données
         LicenseManager.removeLicense(target.getUUID(), profession);
 
-        ctx.getSource().sendSuccess(() ->
-                Component.literal("§a[Oneria] Permis de §f" + profession + "§a révoqué pour §f" + target.getName().getString()), true);
+        // Marquer pour suppression de l'inventaire
+        RevokedLicenseManager.markForRemoval(target.getUUID(), profession);
 
         // Invalider le cache des restrictions pour ce joueur
         ProfessionRestrictionManager.invalidatePlayerCache(target.getUUID());
 
-        target.sendSystemMessage(Component.literal("§cVotre permis de " + profession + " a été révoqué."));
+        // Supprimer immédiatement les licences de l'inventaire si le joueur est en ligne
+        RevokedLicenseManager.removeAllRevokedLicenses(target);
+
+        ProfessionRestrictionManager.ProfessionData profData =
+                ProfessionRestrictionManager.getProfessionData(profession);
+        String displayName = profData != null ? profData.displayName : profession;
+
+        ctx.getSource().sendSuccess(() ->
+                Component.literal("§a[Oneria] Permis de §f" + displayName + "§a révoqué pour §f" + target.getName().getString()), true);
 
         return 1;
     }
