@@ -48,21 +48,6 @@ public class OneriaEventHandler {
                 player.getServer().execute(() -> {
                     checkScheduleOnJoin(player);
                     sendWelcomeMessage(player);
-
-                    RevokedLicenseManager.removeAllRevokedLicenses(player);
-                });
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }).start();
-
-        // Execute after a short delay
-        new Thread(() -> {
-            try {
-                Thread.sleep(2000);
-                player.getServer().execute(() -> {
-                    checkScheduleOnJoin(player);
-                    sendWelcomeMessage(player);
                 });
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();

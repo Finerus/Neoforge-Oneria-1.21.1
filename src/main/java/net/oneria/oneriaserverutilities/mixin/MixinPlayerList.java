@@ -37,42 +37,45 @@ public class MixinPlayerList {
         String messageText = component.getString();
 
         try {
-            if (OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE != null &&
-                    OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
+            if (OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE == null ||
+                    !OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
+                return; // Système désactivé, laisser vanilla
+            }
 
-                // Détecter message de connexion
-                if (messageText.contains("joined the game") ||
-                        messageText.contains("a rejoint la partie")) {
+            // Détecter message de connexion
+            if (messageText.contains("joined the game") ||
+                    messageText.contains("a rejoint la partie")) {
 
-                    ci.cancel(); // Cancel le message vanilla
+                ci.cancel(); // Cancel le message vanilla
 
-                    String joinMsg = OneriaConfig.JOIN_MESSAGE.get();
-                    if (!joinMsg.equalsIgnoreCase("none")) {
-                        // Extraire le nom du joueur du message vanilla
-                        String playerName = extractPlayerName(messageText, true);
-                        sendCustomJoinMessage(playerName);
-                    }
-
-                    OneriaServerUtilities.LOGGER.debug("[Join] Cancelled vanilla message and sent custom");
+                String joinMsg = OneriaConfig.JOIN_MESSAGE.get();
+                if (!joinMsg.equalsIgnoreCase("none")) {
+                    // Extraire le nom du joueur du message vanilla
+                    String playerName = extractPlayerName(messageText, true);
+                    sendCustomJoinMessage(playerName);
                 }
-                // Détecter message de déconnexion
-                else if (messageText.contains("left the game") ||
-                        messageText.contains("a quitté la partie")) {
 
-                    ci.cancel(); // Cancel le message vanilla
+                OneriaServerUtilities.LOGGER.debug("[Join] Cancelled vanilla, sent custom for {}",
+                        extractPlayerName(messageText, true));
+            }
+            // Détecter message de déconnexion
+            else if (messageText.contains("left the game") ||
+                    messageText.contains("a quitté la partie")) {
 
-                    String leaveMsg = OneriaConfig.LEAVE_MESSAGE.get();
-                    if (!leaveMsg.equalsIgnoreCase("none")) {
-                        // Extraire le nom du joueur du message vanilla
-                        String playerName = extractPlayerName(messageText, false);
-                        sendCustomLeaveMessage(playerName);
-                    }
+                ci.cancel(); // Cancel le message vanilla
 
-                    OneriaServerUtilities.LOGGER.debug("[Leave] Cancelled vanilla message and sent custom");
+                String leaveMsg = OneriaConfig.LEAVE_MESSAGE.get();
+                if (!leaveMsg.equalsIgnoreCase("none")) {
+                    // Extraire le nom du joueur du message vanilla
+                    String playerName = extractPlayerName(messageText, false);
+                    sendCustomLeaveMessage(playerName);
                 }
+
+                OneriaServerUtilities.LOGGER.debug("[Leave] Cancelled vanilla, sent custom for {}",
+                        extractPlayerName(messageText, false));
             }
         } catch (Exception e) {
-            OneriaServerUtilities.LOGGER.debug("Config not loaded for join/leave messages");
+            OneriaServerUtilities.LOGGER.error("[JoinLeave] Error handling message: {}", e.getMessage());
         }
     }
 
@@ -118,9 +121,12 @@ public class MixinPlayerList {
 
             // Envoyer le message custom
             oneria$isSendingCustomMessage = true;
-            PlayerList playerList = (PlayerList)(Object)this;
-            playerList.broadcastSystemMessage(message, false);
-            oneria$isSendingCustomMessage = false;
+            try {
+                PlayerList playerList = (PlayerList)(Object)this;
+                playerList.broadcastSystemMessage(message, false);
+            } finally {
+                oneria$isSendingCustomMessage = false;
+            }
 
             OneriaServerUtilities.LOGGER.debug("[Join] Sent custom message for {}", playerName);
         } catch (Exception e) {
@@ -149,9 +155,12 @@ public class MixinPlayerList {
 
             // Envoyer le message custom
             oneria$isSendingCustomMessage = true;
-            PlayerList playerList = (PlayerList)(Object)this;
-            playerList.broadcastSystemMessage(message, false);
-            oneria$isSendingCustomMessage = false;
+            try {
+                PlayerList playerList = (PlayerList)(Object)this;
+                playerList.broadcastSystemMessage(message, false);
+            } finally {
+                oneria$isSendingCustomMessage = false;
+            }
 
             OneriaServerUtilities.LOGGER.debug("[Leave] Sent custom message for {}", playerName);
         } catch (Exception e) {
