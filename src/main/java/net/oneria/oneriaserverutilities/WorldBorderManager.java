@@ -5,7 +5,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import toni.immersivemessages.api.ImmersiveMessage;
+import net.minecraft.network.chat.Component;
 
 import java.util.*;
 
@@ -103,10 +103,7 @@ public class WorldBorderManager {
 
     private static void sendZoneMessage(ServerPlayer player, String message) {
         try {
-            ImmersiveMessage.builder(5f, message)
-                    .fadeIn(0.5f)
-                    .fadeOut(0.5f)
-                    .sendServer(player);
+            sendImmersiveOrFallback(player, message, 5f);
         } catch (Exception e) {
             OneriaServerUtilities.LOGGER.error("[WorldBorder] Error sending zone message", e);
         }
@@ -118,10 +115,7 @@ public class WorldBorderManager {
                     .replace("{distance}", String.format("%.0f", distance))
                     .replace("{player}", player.getName().getString());
 
-            ImmersiveMessage.builder(6f, message)
-                    .fadeIn(0.5f)
-                    .fadeOut(0.5f)
-                    .sendServer(player);
+            sendImmersiveOrFallback(player, message, 6f);
 
             player.playNotifySound(
                     SoundEvents.NOTE_BLOCK_BASS.value(),
@@ -130,7 +124,33 @@ public class WorldBorderManager {
                     0.5f
             );
         } catch (Exception e) {
-            OneriaServerUtilities.LOGGER.error("[WorldBorder] Error sending warning", e);
+            OneriaServerUtilities.LOGGER.error("[WorldBorder] Error sending border warning", e);
+        }
+    }
+
+    private static void sendImmersiveOrFallback(ServerPlayer player, String message, float duration) {
+        String mode = "ACTION_BAR";
+        try {
+            mode = OneriaConfig.ZONE_MESSAGE_MODE.get().toUpperCase();
+        } catch (Exception ignored) {}
+
+        Component formatted = ColorHelper.parseColors(message);
+
+        switch (mode) {
+            case "IMMERSIVE" -> {
+                try {
+                    toni.immersivemessages.api.ImmersiveMessage.builder(duration, message)
+                            .fadeIn(0.5f)
+                            .fadeOut(0.5f)
+                            .sendServer(player);
+                } catch (Exception e) {
+                    // Fallback si le mod client n'est pas présent
+                    player.displayClientMessage(formatted, true);
+                    OneriaServerUtilities.LOGGER.warn("[WorldBorder] ImmersiveMessageAPI unavailable, falling back to action bar");
+                }
+            }
+            case "CHAT" -> player.sendSystemMessage(formatted);
+            default -> player.displayClientMessage(formatted, true); // ACTION_BAR
         }
     }
 

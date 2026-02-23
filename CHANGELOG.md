@@ -1,6 +1,21 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [2.1.1] - 2026-02-23
+
+**Added**
+
+* **Zone Message Mode Config:** New configuration option for zone and world border message display:
+  - `IMMERSIVE` - ImmersiveMessageAPI overlay (requires client mod).
+  - `CHAT` - Standard chat message.
+  - `ACTION_BAR` - Action bar, vanilla, no client mod needed (default).
+  - Command: `/oneria config set zoneMessageMode <IMMERSIVE|CHAT|ACTION_BAR>`.
+  - Automatic fallback to action bar if ImmersiveMessageAPI is unavailable client-side.
+
+**Migration Notes**
+
+* Default mode is `ACTION_BAR` — no behavior change unless explicitly set to `IMMERSIVE` or `CHAT`.
+
 ## [2.1.0] - 2026-02-23
 
 **Added**

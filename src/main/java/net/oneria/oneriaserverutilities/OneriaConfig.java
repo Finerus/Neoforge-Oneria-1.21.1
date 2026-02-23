@@ -82,6 +82,7 @@ public class OneriaConfig {
     public static final ModConfigSpec.IntValue WORLD_BORDER_DISTANCE;
     public static final ModConfigSpec.ConfigValue<String> WORLD_BORDER_MESSAGE;
     public static final ModConfigSpec.IntValue WORLD_BORDER_CHECK_INTERVAL;
+    public static final ModConfigSpec.ConfigValue<String> ZONE_MESSAGE_MODE;
 
     static {
         // ===============================================================================
@@ -375,6 +376,13 @@ public class OneriaConfig {
                         "Format: name;centerX;centerZ;radius;messageEnter;messageExit",
                         "Example: Village;100;200;150;§aBienvenue au Village!;§7Vous quittez le Village.")
                 .defineList("namedZones", Arrays.asList(), obj -> obj instanceof String);
+
+        ZONE_MESSAGE_MODE = BUILDER
+                .comment("Display mode for zone and world border messages.",
+                        "IMMERSIVE = ImmersiveMessageAPI overlay (requires client mod).",
+                        "CHAT = Standard chat message.",
+                        "ACTION_BAR = Action bar (vanilla, no client mod needed).")
+                .define("zoneMessageMode", "ACTION_BAR");
 
         BUILDER.pop();
 

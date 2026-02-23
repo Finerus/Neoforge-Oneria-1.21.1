@@ -289,6 +289,24 @@ public class OneriaCommands {
                 .then(Commands.argument("value", IntegerArgumentType.integer(20, 200))
                         .executes(ctx -> updateConfigInt(ctx, OneriaConfig.WORLD_BORDER_CHECK_INTERVAL, "World Border Check Interval"))));
 
+        setNode.then(Commands.literal("zoneMessageMode")
+                .then(Commands.argument("mode", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            builder.suggest("IMMERSIVE").suggest("CHAT").suggest("ACTION_BAR");
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> {
+                            String mode = StringArgumentType.getString(ctx, "mode").toUpperCase();
+                            if (!mode.equals("IMMERSIVE") && !mode.equals("CHAT") && !mode.equals("ACTION_BAR")) {
+                                ctx.getSource().sendFailure(Component.literal("§cModes valides : IMMERSIVE, CHAT, ACTION_BAR"));
+                                return 0;
+                            }
+                            OneriaConfig.ZONE_MESSAGE_MODE.set(mode);
+                            OneriaConfig.SPEC.save();
+                            ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Zone Message Mode set to: " + mode), true);
+                            return 1;
+                        })));
+
         configNode.then(setNode);
         oneriaRoot.then(configNode);
 
