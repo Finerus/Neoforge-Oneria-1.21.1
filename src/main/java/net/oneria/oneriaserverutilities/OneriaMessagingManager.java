@@ -18,48 +18,59 @@ public class OneriaMessagingManager {
     /**
      * Envoie un message privé entre deux joueurs avec format Oneria
      */
-    public static boolean sendMessage(ServerPlayer sender, ServerPlayer recipient, String message) {
-        String senderDisplay = NicknameManager.getDisplayName(sender);
-        String recipientDisplay = NicknameManager.getDisplayName(recipient);
+    public static int sendMessage(ServerPlayer sender, ServerPlayer target, String message) {
+        UUID senderUuid = sender.getUUID();
+        UUID targetUuid = target.getUUID();
 
-        // Message pour le destinataire : "[SenderNick] vous écrit : message"
-        MutableComponent senderClickable = Component.literal("§6" + senderDisplay + "§r")
+        lastMessaged.put(targetUuid, senderUuid);
+        lastMessaged.put(senderUuid, targetUuid);
+
+        String senderNick = NicknameManager.getNickname(senderUuid);
+        String targetNick = NicknameManager.getNickname(targetUuid);
+        String senderDisplay = (senderNick != null) ? senderNick : sender.getName().getString();
+        String targetDisplay = (targetNick != null) ? targetNick : target.getName().getString();
+
+        MutableComponent senderName = Component.literal(targetDisplay)
                 .withStyle(style -> style
+                        .withBold(true)
+                        .withColor(0x999999)
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Component.literal("§7Cliquer pour répondre")))
+                                Component.literal("Cliquer pour répondre")))
+                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
+                                "/msg " + target.getName().getString() + " ")));
+
+        MutableComponent targetName = Component.literal(senderDisplay)
+                .withStyle(style -> style
+                        .withBold(true)
+                        .withColor(0x999999)
+                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                Component.literal("Cliquer pour répondre")))
                         .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                                 "/msg " + sender.getName().getString() + " ")));
 
-        MutableComponent toRecipient = Component.literal("§8[MP] ")
-                .append(senderClickable)
-                .append(Component.literal("§7 vous écrit : §f" + message));
+        MutableComponent toSender = Component.literal("§7[MP] Vous écrivez à ")
+                .append(senderName)
+                .append(Component.literal("§7 : " + message));
 
-        // Message pour l'expéditeur : "Vous écrivez à [RecipientNick] : message"
-        MutableComponent recipientClickable = Component.literal("§6" + recipientDisplay + "§r")
-                .withStyle(style -> style
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
-                                Component.literal("§7Cliquer pour répondre")))
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
-                                "/msg " + recipient.getName().getString() + " ")));
+        MutableComponent toTarget = Component.literal("§7[MP] ")
+                .append(targetName)
+                .append(Component.literal("§7 vous écrit : " + message));
 
-        MutableComponent toSender = Component.literal("§8[MP] §7Vous écrivez à ")
-                .append(recipientClickable)
-                .append(Component.literal("§7 : §f" + message));
-
-        recipient.sendSystemMessage(toRecipient);
         sender.sendSystemMessage(toSender);
+        target.sendSystemMessage(toTarget);
 
-        lastMessaged.put(sender.getUUID(), recipient.getUUID());
-        lastMessaged.put(recipient.getUUID(), sender.getUUID());
+        try {
+            if (OneriaConfig.LOG_PRIVATE_MESSAGES.get()) {
+                OneriaServerUtilities.LOGGER.info("[MP] {} -> {}: {}",
+                        sender.getName().getString(),
+                        target.getName().getString(),
+                        message);
+            }
+        } catch (Exception ignored) {}
 
-        OneriaServerUtilities.LOGGER.info("[MSG] {} -> {}: {}",
-                sender.getName().getString(), recipient.getName().getString(), message);
-        return true;
+        return 1;
     }
 
-    /**
-     * Répond au dernier interlocuteur via /r
-     */
     public static int reply(ServerPlayer sender, String message, MinecraftServer server) {
         UUID lastId = lastMessaged.get(sender.getUUID());
         if (lastId == null) {
@@ -71,7 +82,7 @@ public class OneriaMessagingManager {
             sender.sendSystemMessage(Component.literal("§c[MP] Ce joueur n'est plus connecté."));
             return 0;
         }
-        return sendMessage(sender, target, message) ? 1 : 0;
+        return sendMessage(sender, target, message);
     }
 
     public static void clearCache(UUID playerId) {

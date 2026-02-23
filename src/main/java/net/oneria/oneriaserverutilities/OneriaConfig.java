@@ -71,6 +71,7 @@ public class OneriaConfig {
     public static final ModConfigSpec.ConfigValue<String> TIMESTAMP_FORMAT;
     public static final ModConfigSpec.BooleanValue MARKDOWN_ENABLED;
     public static final ModConfigSpec.BooleanValue ENABLE_COLORS_COMMAND;
+    public static final ModConfigSpec.BooleanValue LOG_PRIVATE_MESSAGES;
 
     // === JOIN/LEAVE MESSAGES ===
     public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_JOIN_LEAVE;
@@ -324,6 +325,11 @@ public class OneriaConfig {
         ENABLE_COLORS_COMMAND = BUILDER
                 .comment("Enable /colors command to show available colors")
                 .define("enableColorsCommand", true);
+
+        LOG_PRIVATE_MESSAGES = BUILDER
+                .comment("If 'true', logs private messages (/msg) to the server console.",
+                        "Useful for moderation purposes.")
+                .define("logPrivateMessages", false);
 
         BUILDER.pop();
 
