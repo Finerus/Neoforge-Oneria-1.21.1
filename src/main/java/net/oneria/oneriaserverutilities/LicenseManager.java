@@ -3,6 +3,8 @@ package net.oneria.oneriaserverutilities;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerPlayer;
 
 import java.io.File;
 import java.io.FileReader;
@@ -52,10 +54,12 @@ public class LicenseManager {
                 playerLicenses.clear();
                 for (Map.Entry<String, List<String>> entry : data.entrySet()) {
                     try {
-                        UUID uuid = UUID.fromString(entry.getKey());
+                        String key = entry.getKey();
+                        String uuidStr = key.contains(" ") ? key.substring(0, key.indexOf(' ')) : key;
+                        UUID uuid = UUID.fromString(uuidStr);
                         playerLicenses.put(uuid, new ArrayList<>(entry.getValue()));
                     } catch (IllegalArgumentException e) {
-                        OneriaServerUtilities.LOGGER.warn("[LicenseManager] Invalid UUID: {}", entry.getKey());
+                        OneriaServerUtilities.LOGGER.warn("[LicenseManager] Invalid UUID in key: {}", entry.getKey());
                     }
                 }
                 OneriaServerUtilities.LOGGER.info("[LicenseManager] Loaded {} player licenses", playerLicenses.size());
@@ -71,19 +75,29 @@ public class LicenseManager {
 
         try {
             File parent = licenseFile.getParentFile();
-            if (parent != null && !parent.exists()) {
-                parent.mkdirs();
-            }
+            if (parent != null && !parent.exists()) parent.mkdirs();
 
             Map<String, List<String>> data = new HashMap<>();
+            MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+
             for (Map.Entry<UUID, List<String>> entry : playerLicenses.entrySet()) {
-                data.put(entry.getKey().toString(), entry.getValue());
+                UUID uuid = entry.getKey();
+                String mcName = "Unknown";
+                if (server != null) {
+                    ServerPlayer online = server.getPlayerList().getPlayer(uuid);
+                    if (online != null) {
+                        mcName = online.getName().getString();
+                    } else if (server.getProfileCache() != null) {
+                        mcName = server.getProfileCache().get(uuid)
+                                .map(p -> p.getName()).orElse("Unknown");
+                    }
+                }
+                data.put(uuid.toString() + " (" + mcName + ")", entry.getValue());
             }
 
             try (FileWriter writer = new FileWriter(licenseFile)) {
                 GSON.toJson(data, writer);
             }
-
             OneriaServerUtilities.LOGGER.debug("[LicenseManager] Saved licenses for {} players", playerLicenses.size());
         } catch (Exception e) {
             OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to save licenses", e);

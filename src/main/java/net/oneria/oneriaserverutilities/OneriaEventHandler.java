@@ -64,6 +64,8 @@ public class OneriaEventHandler {
         OneriaPermissions.invalidateCache(player.getUUID());
         WorldBorderManager.clearCache(player.getUUID());
 
+        OneriaMessagingManager.clearCache(player.getUUID());
+
         // NOUVEAU : Nettoyer les licences révoquées en attente
         RevokedLicenseManager.cleanup(player.getUUID());
     }

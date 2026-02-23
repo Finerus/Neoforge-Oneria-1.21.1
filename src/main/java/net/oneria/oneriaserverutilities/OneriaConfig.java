@@ -7,6 +7,7 @@ import java.util.List;
 public class OneriaConfig {
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec SPEC;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> NAMED_ZONES;
 
     // === OBFUSCATION CONFIGURATION ===
     public static final ModConfigSpec.IntValue PROXIMITY_DISTANCE;
@@ -368,6 +369,12 @@ public class OneriaConfig {
                 .comment("Check interval in ticks (20 ticks = 1 second).",
                         "Higher values = less frequent checks = better performance.")
                 .defineInRange("worldBorderCheckInterval", 40, 20, 200);
+
+        NAMED_ZONES = BUILDER
+                .comment("Named zones that trigger a message when entered/exited.",
+                        "Format: name;centerX;centerZ;radius;messageEnter;messageExit",
+                        "Example: Village;100;200;150;§aBienvenue au Village!;§7Vous quittez le Village.")
+                .defineList("namedZones", Arrays.asList(), obj -> obj instanceof String);
 
         BUILDER.pop();
 

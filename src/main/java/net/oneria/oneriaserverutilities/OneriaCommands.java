@@ -30,6 +30,12 @@ import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.minecraft.world.item.ItemStack;
 import java.util.ArrayList;
+import net.minecraft.server.MinecraftServer;
+import java.util.Map;
+import java.util.UUID;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.HoverEvent;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -111,11 +117,11 @@ public class OneriaCommands {
                         .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_SCHEDULE, "Schedule System"))));
 
         setNode.then(Commands.literal("openingTime")
-                .then(Commands.argument("time", StringArgumentType.word())
+                .then(Commands.argument("time", StringArgumentType.greedyString())
                         .executes(OneriaCommands::setOpeningTime)));
 
         setNode.then(Commands.literal("closingTime")
-                .then(Commands.argument("time", StringArgumentType.word())
+                .then(Commands.argument("time", StringArgumentType.greedyString())
                         .executes(OneriaCommands::setClosingTime)));
 
         setNode.then(Commands.literal("kickNonStaff")
@@ -590,6 +596,19 @@ public class OneriaCommands {
                 .executes(OneriaCommands::resetNickname)
         );
 
+        // MODULE: WHOIS (Staff only)
+        var whoisNode = Commands.literal("whois")
+                .requires(source -> source.hasPermission(2));
+        whoisNode.then(Commands.argument("nickname", StringArgumentType.greedyString())
+                .executes(OneriaCommands::whoisCommand));
+        oneriaRoot.then(whoisNode);
+
+        // Also register as standalone /whois
+        dispatcher.register(Commands.literal("whois")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("nickname", StringArgumentType.greedyString())
+                        .executes(OneriaCommands::whoisCommand)));
+
         nickNode.then(Commands.literal("list")
                 .executes(OneriaCommands::listNicknames)
         );
@@ -601,6 +620,54 @@ public class OneriaCommands {
         // -------------------------------------------------------------------------
         oneriaRoot.then(Commands.literal("schedule")
                 .executes(OneriaCommands::showSchedule));
+
+
+        // -------------------------------------------------------------------------
+        // MODULE: MESSAGERIE PRIVÉE — remplace /msg /tell /w /whisper + /r
+        // -------------------------------------------------------------------------
+        // Supprimer les commandes vanilla avant de les remplacer
+        for (String alias : new String[]{"msg", "tell", "w", "whisper"}) {
+            dispatcher.getRoot().getChildren().removeIf(node -> node.getName().equals(alias));
+            dispatcher.register(Commands.literal(alias)
+                    .then(Commands.argument("target", EntityArgument.player())
+                            .then(Commands.argument("message", StringArgumentType.greedyString())
+                                    .executes(ctx -> {
+                                        ServerPlayer sender = ctx.getSource().getPlayerOrException();
+                                        ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                                        String msg = StringArgumentType.getString(ctx, "message");
+                                        OneriaMessagingManager.sendMessage(sender, target, msg);
+                                        return 1;
+                                    }))));
+        }
+
+        for (String alias : new String[]{"msg", "tell", "w", "whisper"}) {
+            dispatcher.register(Commands.literal(alias)
+                    .then(Commands.argument("target", EntityArgument.player())
+                            .then(Commands.argument("message", StringArgumentType.greedyString())
+                                    .executes(ctx -> {
+                                        ServerPlayer sender = ctx.getSource().getPlayerOrException();
+                                        ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
+                                        String msg = StringArgumentType.getString(ctx, "message");
+                                        OneriaMessagingManager.sendMessage(sender, target, msg);
+                                        return 1;
+                                    }))));
+        }
+
+        dispatcher.register(Commands.literal("r")
+                .then(Commands.argument("message", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            ServerPlayer sender = ctx.getSource().getPlayerOrException();
+                            String msg = StringArgumentType.getString(ctx, "message");
+                            return OneriaMessagingManager.reply(sender, msg, ctx.getSource().getServer());
+                        })));
+
+        // -------------------------------------------------------------------------
+        // MODULE: WHOIS (OP Level 2)
+        // -------------------------------------------------------------------------
+        dispatcher.register(Commands.literal("whois")
+                .requires(source -> source.hasPermission(2))
+                .then(Commands.argument("nickname", StringArgumentType.greedyString())
+                        .executes(OneriaCommands::whoisCommand)));
 
         // Register root
         dispatcher.register(oneriaRoot);
@@ -1404,6 +1471,72 @@ public class OneriaCommands {
         list.append("§6╚═══════════════════════════════════╝");
 
         context.getSource().sendSuccess(() -> Component.literal(list.toString()), false);
+        return 1;
+    }
+
+    private static int whoisCommand(CommandContext<CommandSourceStack> ctx) {
+        String searchNick = StringArgumentType.getString(ctx, "nickname");
+        MinecraftServer server = ctx.getSource().getServer();
+
+        Map<UUID, String> allNicknames = NicknameManager.getAllNicknames();
+        List<MutableComponent> results = new ArrayList<>();
+
+        for (Map.Entry<UUID, String> entry : allNicknames.entrySet()) {
+            if (entry.getValue() == null) continue;
+
+            String cleanNick = entry.getValue()
+                    .replaceAll("§[0-9a-fk-orA-FK-OR]", "")
+                    .replaceAll("&[0-9a-fk-orA-FK-OR]", "");
+
+            if (!cleanNick.equalsIgnoreCase(searchNick)) continue;
+
+            UUID uuid = entry.getKey();
+            String mcName = "Hors-ligne";
+
+            try {
+                ServerPlayer online = server.getPlayerList().getPlayer(uuid);
+                if (online != null) {
+                    mcName = online.getName().getString();
+                } else {
+                    try {
+                        var cache = server.getProfileCache();
+                        if (cache != null) {
+                            var profile = cache.get(uuid);
+                            if (profile != null && profile.isPresent()) {
+                                mcName = profile.get().getName();
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+            } catch (Exception ignored) {}
+
+            final String finalMcName = mcName;
+            final String finalNick = entry.getValue();
+            final UUID finalUuid = uuid;
+
+            MutableComponent uuidComponent = Component.literal("§8" + finalUuid)
+                    .withStyle(style -> style
+                            .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                    Component.literal("§7Cliquer pour ouvrir NameMC")))
+                            .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL,
+                                    "https://namemc.com/profile/" + finalUuid)));
+
+            MutableComponent line = Component.literal("§7MC: §f" + finalMcName + " §8| §7UUID: ")
+                    .append(uuidComponent)
+                    .append(Component.literal(" §8| §7Nick: §r" + finalNick));
+
+            results.add(line);
+        }
+
+        if (results.isEmpty()) {
+            ctx.getSource().sendFailure(Component.literal("§c[Whois] Aucun joueur avec le nickname : §f" + searchNick));
+            return 0;
+        }
+
+        ctx.getSource().sendSuccess(() -> Component.literal("§6[Whois] §7Résultats pour \"§f" + searchNick + "§7\" :"), false);
+        for (MutableComponent r : results) {
+            ctx.getSource().sendSuccess(() -> r, false);
+        }
         return 1;
     }
 

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.MinecraftServer;
 
 import java.io.File;
 import java.io.FileReader;
@@ -71,10 +72,13 @@ public class NicknameManager {
                 nicknames.clear();
                 for (Map.Entry<String, String> entry : data.entrySet()) {
                     try {
-                        UUID uuid = UUID.fromString(entry.getKey());
+                        String key = entry.getKey();
+                        // Rétrocompatible : "UUID (McName)" ou juste "UUID"
+                        String uuidStr = key.contains(" ") ? key.substring(0, key.indexOf(' ')) : key;
+                        UUID uuid = UUID.fromString(uuidStr);
                         nicknames.put(uuid, entry.getValue());
                     } catch (IllegalArgumentException e) {
-                        OneriaServerUtilities.LOGGER.warn("[NicknameManager] Invalid UUID: {}", entry.getKey());
+                        OneriaServerUtilities.LOGGER.warn("[NicknameManager] Invalid UUID in key: {}", entry.getKey());
                     }
                 }
                 OneriaServerUtilities.LOGGER.info("[NicknameManager] Loaded {} nicknames", nicknames.size());
@@ -92,23 +96,30 @@ public class NicknameManager {
         if (nicknameFile == null) return;
 
         try {
-            // S'assurer que le dossier parent existe
             File parent = nicknameFile.getParentFile();
-            if (parent != null && !parent.exists()) {
-                parent.mkdirs();
-            }
+            if (parent != null && !parent.exists()) parent.mkdirs();
 
-            // Convertir les UUID en String pour JSON
             Map<String, String> data = new HashMap<>();
+            MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+
             for (Map.Entry<UUID, String> entry : nicknames.entrySet()) {
-                data.put(entry.getKey().toString(), entry.getValue());
+                UUID uuid = entry.getKey();
+                String mcName = "Unknown";
+                if (server != null) {
+                    ServerPlayer online = server.getPlayerList().getPlayer(uuid);
+                    if (online != null) {
+                        mcName = online.getName().getString();
+                    } else if (server.getProfileCache() != null) {
+                        mcName = server.getProfileCache().get(uuid)
+                                .map(p -> p.getName()).orElse("Unknown");
+                    }
+                }
+                data.put(uuid.toString() + " (" + mcName + ")", entry.getValue());
             }
 
-            // Écrire dans le fichier
             try (FileWriter writer = new FileWriter(nicknameFile)) {
                 GSON.toJson(data, writer);
             }
-
             OneriaServerUtilities.LOGGER.debug("[NicknameManager] Saved {} nicknames", nicknames.size());
         } catch (Exception e) {
             OneriaServerUtilities.LOGGER.error("[NicknameManager] Failed to save nicknames", e);
@@ -203,6 +214,11 @@ public class NicknameManager {
     public static int count() {
         ensureInitialized();
         return nicknames.size();
+    }
+
+    public static Map<UUID, String> getAllNicknames() {
+        ensureInitialized();
+        return new HashMap<>(nicknames);
     }
 
     /**

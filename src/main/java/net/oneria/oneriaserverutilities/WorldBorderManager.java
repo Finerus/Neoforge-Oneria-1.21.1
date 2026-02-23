@@ -1,56 +1,33 @@
 package net.oneria.oneriaserverutilities;
 
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import toni.immersivemessages.api.ImmersiveMessage;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class WorldBorderManager {
 
-    // Track si le joueur a déjà été averti (reset quand il revient dans la zone safe)
     private static final Map<UUID, Boolean> hasBeenWarned = new HashMap<>();
+    private static final Map<UUID, Set<String>> playerZoneState = new HashMap<>();
     private static boolean systemInitialized = false;
 
-    /**
-     * Check all players for world border proximity
-     * Called from server tick
-     */
     public static void tick(MinecraftServer server) {
-        // PROTECTION: Vérifier que la config est chargée
         try {
-            if (OneriaConfig.ENABLE_WORLD_BORDER_WARNING == null) {
-                return;
-            }
-
-            if (!OneriaConfig.ENABLE_WORLD_BORDER_WARNING.get()) {
-                return;
-            }
-
-            // Log une seule fois l'initialisation
+            if (OneriaConfig.ENABLE_WORLD_BORDER_WARNING == null) return;
+            if (!OneriaConfig.ENABLE_WORLD_BORDER_WARNING.get()) return;
             if (!systemInitialized) {
                 systemInitialized = true;
-                OneriaServerUtilities.LOGGER.info("[WorldBorder] System initialized - Distance: {} blocks",
-                        OneriaConfig.WORLD_BORDER_DISTANCE.get());
+                OneriaServerUtilities.LOGGER.info("[WorldBorder] System initialized");
             }
-        } catch (Exception e) {
-            // Config pas encore chargée, on skip silencieusement
-            return;
-        }
+        } catch (Exception e) { return; }
 
-        // Check only at configured interval
         try {
-            if (server.getTickCount() % OneriaConfig.WORLD_BORDER_CHECK_INTERVAL.get() != 0) {
-                return;
-            }
-        } catch (Exception e) {
-            return;
-        }
+            if (server.getTickCount() % OneriaConfig.WORLD_BORDER_CHECK_INTERVAL.get() != 0) return;
+        } catch (Exception e) { return; }
 
         double maxDist = OneriaConfig.WORLD_BORDER_DISTANCE.get();
         double maxDistSq = maxDist * maxDist;
@@ -58,19 +35,15 @@ public class WorldBorderManager {
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             try {
                 checkPlayerDistance(player, maxDistSq, maxDist);
+                checkNamedZones(player);
             } catch (Exception e) {
                 OneriaServerUtilities.LOGGER.error("[WorldBorder] Error checking player {}", player.getName().getString(), e);
             }
         }
     }
 
-    /**
-     * Check if a player has exceeded the border distance
-     */
     private static void checkPlayerDistance(ServerPlayer player, double maxDistSq, double maxDist) {
         BlockPos spawn = player.serverLevel().getSharedSpawnPos();
-
-        // Calculer la distance depuis le spawn (en 2D, sans Y)
         double dx = player.getX() - spawn.getX();
         double dz = player.getZ() - spawn.getZ();
         double distSq = dx * dx + dz * dz;
@@ -81,57 +54,94 @@ public class WorldBorderManager {
         Boolean alreadyWarned = hasBeenWarned.getOrDefault(playerId, false);
 
         if (isOutsideBorder && !alreadyWarned) {
-            // Le joueur vient de dépasser la limite pour la première fois
             OneriaServerUtilities.LOGGER.info("[WorldBorder] Player {} exceeded border at {}/{} blocks",
                     player.getName().getString(), String.format("%.1f", actualDist), String.format("%.0f", maxDist));
             sendBorderWarning(player, actualDist);
             hasBeenWarned.put(playerId, true);
         } else if (!isOutsideBorder && alreadyWarned) {
-            // Le joueur est revenu dans la zone safe, on reset le warning
-            OneriaServerUtilities.LOGGER.info("[WorldBorder] Player {} returned to safe zone",
-                    player.getName().getString());
             hasBeenWarned.put(playerId, false);
         }
     }
 
-    /**
-     * Send border warning message to player (ONE TIME ONLY)
-     */
+    private static void checkNamedZones(ServerPlayer player) {
+        List<? extends String> zones;
+        try {
+            zones = OneriaConfig.NAMED_ZONES.get();
+        } catch (Exception e) { return; }
+
+        UUID playerId = player.getUUID();
+        Set<String> currentZones = playerZoneState.computeIfAbsent(playerId, k -> new HashSet<>());
+
+        for (String zoneDef : zones) {
+            String[] parts = zoneDef.split(";");
+            if (parts.length < 5) continue;
+            try {
+                String zoneName = parts[0].trim();
+                double cx = Double.parseDouble(parts[1].trim());
+                double cz = Double.parseDouble(parts[2].trim());
+                double radius = Double.parseDouble(parts[3].trim());
+                String msgEnter = parts[4].trim();
+                String msgExit = parts.length >= 6 ? parts[5].trim() : "";
+
+                double dx = player.getX() - cx;
+                double dz = player.getZ() - cz;
+                boolean inZone = (dx * dx + dz * dz) <= (radius * radius);
+                boolean wasInZone = currentZones.contains(zoneName);
+
+                if (inZone && !wasInZone) {
+                    currentZones.add(zoneName);
+                    sendZoneMessage(player, msgEnter);
+                } else if (!inZone && wasInZone) {
+                    currentZones.remove(zoneName);
+                    if (!msgExit.isEmpty()) sendZoneMessage(player, msgExit);
+                }
+            } catch (Exception e) {
+                OneriaServerUtilities.LOGGER.warn("[WorldBorder] Invalid zone definition: {}", zoneDef);
+            }
+        }
+    }
+
+    private static void sendZoneMessage(ServerPlayer player, String message) {
+        try {
+            ImmersiveMessage.builder(5f, message)
+                    .fadeIn(0.5f)
+                    .fadeOut(0.5f)
+                    .sendServer(player);
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[WorldBorder] Error sending zone message", e);
+        }
+    }
+
     private static void sendBorderWarning(ServerPlayer player, double distance) {
         try {
             String message = OneriaConfig.WORLD_BORDER_MESSAGE.get()
                     .replace("{distance}", String.format("%.0f", distance))
                     .replace("{player}", player.getName().getString());
 
-            Component formatted = ColorHelper.parseColors(message);
-            player.sendSystemMessage(formatted);
+            ImmersiveMessage.builder(6f, message)
+                    .fadeIn(0.5f)
+                    .fadeOut(0.5f)
+                    .sendServer(player);
 
-            // Play warning sound
             player.playNotifySound(
                     SoundEvents.NOTE_BLOCK_BASS.value(),
                     SoundSource.MASTER,
                     1.0f,
                     0.5f
             );
-
-            OneriaServerUtilities.LOGGER.info("[WorldBorder] Warning sent to {}", player.getName().getString());
         } catch (Exception e) {
-            OneriaServerUtilities.LOGGER.error("[WorldBorder] Error sending warning to player", e);
+            OneriaServerUtilities.LOGGER.error("[WorldBorder] Error sending warning", e);
         }
     }
 
-    /**
-     * Clear warning cache for a player (on logout)
-     */
     public static void clearCache(UUID playerId) {
         hasBeenWarned.remove(playerId);
+        playerZoneState.remove(playerId);
     }
 
-    /**
-     * Clear all warning cache
-     */
     public static void clearAllCache() {
         hasBeenWarned.clear();
+        playerZoneState.clear();
         systemInitialized = false;
     }
 }

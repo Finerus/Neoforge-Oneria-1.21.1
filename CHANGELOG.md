@@ -1,6 +1,97 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-02-23
+
+**Added**
+
+* **Private Messaging System:** Custom `/msg` implementation replacing vanilla messaging:
+  - `/msg <player> <message>` - Send a private message with Oneria formatting.
+  - `/tell`, `/w`, `/whisper` - Aliases for `/msg`.
+  - `/r <message>` - Reply to the last person who messaged you.
+  - Sender sees: `[MP] Vous écrivez à [RecipientNick] : message`.
+  - Recipient sees: `[MP] [SenderNick] vous écrit : message`.
+  - Clickable nicknames — hover to see prompt, click to auto-fill `/msg <player> `.
+  - Last interlocutor tracked per player, reset on logout.
+  - Vanilla `/msg`, `/tell`, `/w`, `/whisper` fully replaced via `dispatcher.getRoot().getChildren().removeIf()`.
+
+* **Whois Command:** Identity lookup tool for staff:
+  - `/whois <nickname>` - Find the real MC username and UUID behind a nickname.
+  - Case-insensitive search, strips color codes for comparison.
+  - Clickable UUID — opens NameMC profile in browser on hover/click.
+  - Works on offline players via profile cache.
+  - Requires OP Level 2.
+  - Also accessible as `/oneria whois <nickname>`.
+
+* **Named Zone System:** Admin-configurable zones with entry/exit messages:
+  - Zones defined in config: `name;centerX;centerZ;radius;messageEnter;messageExit`.
+  - Entry/exit messages sent via ImmersiveMessageAPI (stylized overlay).
+  - Multiple simultaneous zones supported.
+  - Per-player zone state tracking — no message spam.
+  - Commands: `/oneria config set addZone <definition>`, `removeZone <name>`, `listZones`.
+  - New config option: `namedZones` in `[World Border Warning]` section.
+
+* **ImmersiveMessageAPI Integration:** Stylized overlay messages for immersion:
+  - World border warnings now display as stylized overlay.
+  - Zone entry/exit messages use the same overlay system.
+  - Fade-in and fade-out animations (0.5s each).
+  - ⚠️ Requires ImmersiveMessages + TxniLib installed client-side to display — server won't crash without it.
+
+**Improved**
+
+* **Data Readability:** Nickname and license JSON files now include MC username for admin readability:
+  - Keys stored as `UUID (McUsername)` instead of bare UUID.
+  - Fully retrocompatible — old UUID-only keys still load correctly.
+  - Applies to both `nicknames.json` and `licenses.json`.
+
+* **Schedule Time Parsing:** More robust handling of `openingTime`/`closingTime`:
+  - New `normalizeTime()` method handles TOML-corrupted time values.
+  - Supports `HH:MM`, `HH:MM:SS`, and integer (total minutes) formats.
+  - `/oneria config set openingTime/closingTime` now uses `greedyString()` — no quotes needed: `/oneria config set openingTime 02:00`.
+
+**Fixed**
+
+* **Whois Null Safety:** Added null checks to prevent crashes with third-party nickname mods (e.g. Better Forge Chat Reborn).
+* **Vanilla Command Override:** Vanilla `/msg`, `/tell`, `/w`, `/whisper` now properly removed before re-registration.
+
+**Technical**
+
+* **New Classes:**
+  - `OneriaMessagingManager` - Private messaging with last-interlocutor tracking and click-to-reply.
+
+* **Enhanced Classes:**
+  - `WorldBorderManager` - Named zone system, per-player state tracking, ImmersiveMessageAPI integration.
+  - `OneriaCommands` - Added `/whois`, `/msg`, `/tell`, `/w`, `/whisper`, `/r`, zone management commands.
+  - `OneriaConfig` - Added `NAMED_ZONES` config entry.
+  - `OneriaScheduleManager` - Added `normalizeTime()` for robust time parsing.
+  - `NicknameManager` - `saveToFile()`/`loadFromFile()` updated with UUID+McName key format.
+  - `LicenseManager` - `saveToFile()`/`loadFromFile()` updated with UUID+McName key format.
+  - `OneriaEventHandler` - Added `OneriaMessagingManager.clearCache()` on player logout.
+
+* **Dependencies:**
+  - Added ImmersiveMessages `neoforge-1.21.1:1.0.18` (optional client-side).
+  - Added TxniLib `neoforge-1.21.1:1.0.23` (optional client-side).
+
+**Configuration**
+
+* **New Options:**
+  - `namedZones` (List) - Named zone definitions with entry/exit messages (default: empty).
+    - Location: `[World Border Warning]` section.
+    - Format: `name;centerX;centerZ;radius;messageEnter;messageExit`.
+
+**Migration Notes**
+
+* No breaking changes — fully backward compatible with 2.0.1.
+* Existing `nicknames.json` and `licenses.json` with bare UUID keys will be migrated automatically on next save.
+* ImmersiveMessages is optional — without it, zone/border messages won't display but the server won't crash.
+* Vanilla `/msg` and `/tell` are fully replaced — players must use the new system.
+
+**Known Limitations**
+
+* ImmersiveMessages requires client-side installation for messages to display.
+* `/r` only tracks the last interlocutor of the current session — resets on server restart.
+* Named zones use 2D distance (X/Z only) — altitude is ignored.
+
 # [2.0.1] - 2026-02-05
 
 ### Added
