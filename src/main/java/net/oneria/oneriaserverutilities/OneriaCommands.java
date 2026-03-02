@@ -13,42 +13,42 @@ import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffect;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.GameType;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.minecraft.world.item.ItemStack;
-import java.util.ArrayList;
-import net.minecraft.server.MinecraftServer;
-import java.util.Map;
-import java.util.UUID;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.HoverEvent;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @EventBusSubscriber(modid = OneriaServerUtilities.MODID)
 public class OneriaCommands {
 
     private static final SuggestionProvider<CommandSourceStack> PLATFORM_SUGGESTIONS = (ctx, builder) -> {
         try {
-            if (OneriaConfig.PLATFORMS != null && OneriaConfig.PLATFORMS.get() != null) {
-                for (String platform : OneriaConfig.PLATFORMS.get()) {
+            if (ModerationConfig.PLATFORMS != null && ModerationConfig.PLATFORMS.get() != null) {
+                for (String platform : ModerationConfig.PLATFORMS.get()) {
                     String[] parts = platform.split(";");
                     if (parts.length > 0) {
                         builder.suggest(parts[0]);
@@ -114,7 +114,7 @@ public class OneriaCommands {
         // Schedule settings
         setNode.then(Commands.literal("enableSchedule")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_SCHEDULE, "Schedule System"))));
+                        .executes(ctx -> updateConfigBool(ctx, ScheduleConfig.ENABLE_SCHEDULE, "Schedule System"))));
 
         setNode.then(Commands.literal("openingTime")
                 .then(Commands.argument("time", StringArgumentType.greedyString())
@@ -126,34 +126,34 @@ public class OneriaCommands {
 
         setNode.then(Commands.literal("kickNonStaff")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.KICK_NON_STAFF, "Kick Non-Staff"))));
+                        .executes(ctx -> updateConfigBool(ctx, ScheduleConfig.KICK_NON_STAFF, "Kick Non-Staff"))));
 
         // Welcome settings
         setNode.then(Commands.literal("enableWelcome")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_WELCOME, "Welcome Message"))));
+                        .executes(ctx -> updateConfigBool(ctx, ScheduleConfig.ENABLE_WELCOME, "Welcome Message"))));
 
         // Platform settings
         setNode.then(Commands.literal("enablePlatforms")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_PLATFORMS, "Platforms System"))));
+                        .executes(ctx -> updateConfigBool(ctx, ModerationConfig.ENABLE_PLATFORMS, "Platforms System"))));
 
         // Silent commands settings
         setNode.then(Commands.literal("enableSilentCommands")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_SILENT_COMMANDS, "Silent Commands"))));
+                        .executes(ctx -> updateConfigBool(ctx, ModerationConfig.ENABLE_SILENT_COMMANDS, "Silent Commands"))));
 
         setNode.then(Commands.literal("logToStaff")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.LOG_TO_STAFF, "Log to Staff"))));
+                        .executes(ctx -> updateConfigBool(ctx, ModerationConfig.LOG_TO_STAFF, "Log to Staff"))));
 
         setNode.then(Commands.literal("logToConsole")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.LOG_TO_CONSOLE, "Log to Console"))));
+                        .executes(ctx -> updateConfigBool(ctx, ModerationConfig.LOG_TO_CONSOLE, "Log to Console"))));
 
         setNode.then(Commands.literal("notifyTarget")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.NOTIFY_TARGET, "Notify Target"))));
+                        .executes(ctx -> updateConfigBool(ctx, ModerationConfig.NOTIFY_TARGET, "Notify Target"))));
 
         // Permission settings
         setNode.then(Commands.literal("opLevelBypass")
@@ -167,15 +167,15 @@ public class OneriaCommands {
         // Chat settings
         setNode.then(Commands.literal("enableChatFormat")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_CHAT_FORMAT, "Chat Format"))));
+                        .executes(ctx -> updateConfigBool(ctx, ChatConfig.ENABLE_CHAT_FORMAT, "Chat Format"))));
 
         setNode.then(Commands.literal("enableTimestamp")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_TIMESTAMP, "Timestamp"))));
+                        .executes(ctx -> updateConfigBool(ctx, ChatConfig.ENABLE_TIMESTAMP, "Timestamp"))));
 
         setNode.then(Commands.literal("markdownEnabled")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.MARKDOWN_ENABLED, "Markdown"))));
+                        .executes(ctx -> updateConfigBool(ctx, ChatConfig.MARKDOWN_ENABLED, "Markdown"))));
 
         setNode.then(Commands.literal("chatMessageColor")
                 .then(Commands.argument("color", StringArgumentType.word())
@@ -190,7 +190,7 @@ public class OneriaCommands {
                         })
                         .executes(ctx -> {
                             String color = StringArgumentType.getString(ctx, "color");
-                            OneriaConfig.CHAT_MESSAGE_COLOR.set(color);
+                            ChatConfig.CHAT_MESSAGE_COLOR.set(color);
                             OneriaConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
                                             Component.literal("§a[Oneria] Chat Message Color set to: " + color),
@@ -203,7 +203,7 @@ public class OneriaCommands {
                 .then(Commands.argument("format", StringArgumentType.greedyString())
                         .executes(ctx -> {
                             String format = StringArgumentType.getString(ctx, "format");
-                            OneriaConfig.TIMESTAMP_FORMAT.set(format);
+                            ChatConfig.TIMESTAMP_FORMAT.set(format);
                             OneriaConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
                                             Component.literal("§a[Oneria] Timestamp Format set to: " + format),
@@ -214,7 +214,7 @@ public class OneriaCommands {
 
         setNode.then(Commands.literal("enableColorsCommand")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_COLORS_COMMAND, "Colors Command"))));
+                        .executes(ctx -> updateConfigBool(ctx, ChatConfig.ENABLE_COLORS_COMMAND, "Colors Command"))));
 
         setNode.then(Commands.literal("enableSneakStealth")
                 .then(Commands.argument("value", BoolArgumentType.bool())
@@ -235,13 +235,13 @@ public class OneriaCommands {
         // Join/Leave messages settings
         setNode.then(Commands.literal("enableCustomJoinLeave")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE, "Custom Join/Leave Messages"))));
+                        .executes(ctx -> updateConfigBool(ctx, ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE, "Custom Join/Leave Messages"))));
 
         setNode.then(Commands.literal("joinMessage")
                 .then(Commands.argument("message", StringArgumentType.greedyString())
                         .executes(ctx -> {
                             String msg = StringArgumentType.getString(ctx, "message");
-                            OneriaConfig.JOIN_MESSAGE.set(msg);
+                            ChatConfig.JOIN_MESSAGE.set(msg);
                             OneriaConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
                                             Component.literal("§a[Oneria] Join Message set to: " + msg),
@@ -254,7 +254,7 @@ public class OneriaCommands {
                 .then(Commands.argument("message", StringArgumentType.greedyString())
                         .executes(ctx -> {
                             String msg = StringArgumentType.getString(ctx, "message");
-                            OneriaConfig.LEAVE_MESSAGE.set(msg);
+                            ChatConfig.LEAVE_MESSAGE.set(msg);
                             OneriaConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
                                             Component.literal("§a[Oneria] Leave Message set to: " + msg),
@@ -384,7 +384,7 @@ public class OneriaCommands {
         oneriaRoot.then(staffNode);
 
         // -------------------------------------------------------------------------
-        // 3. MODULE: WHITELIST (Requires OP Level 2) - AMÉLIORATION
+        // 3. MODULE: WHITELIST (Requires OP Level 2)
         // -------------------------------------------------------------------------
         var whitelistNode = Commands.literal("whitelist")
                 .requires(source -> source.hasPermission(2));
@@ -393,7 +393,6 @@ public class OneriaCommands {
         whitelistNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            // Suggérer les joueurs connectés
                             ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
                                     builder.suggest(p.getName().getString())
                             );
@@ -405,7 +404,6 @@ public class OneriaCommands {
         whitelistNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            // Suggérer les joueurs dans la whitelist
                             OneriaConfig.WHITELIST.get().forEach(builder::suggest);
                             return builder.buildFuture();
                         })
@@ -417,7 +415,7 @@ public class OneriaCommands {
         oneriaRoot.then(whitelistNode);
 
         // -------------------------------------------------------------------------
-        // 4. MODULE: BLACKLIST (Requires OP Level 2) - AMÉLIORATION
+        // 4. MODULE: BLACKLIST (Requires OP Level 2)
         // -------------------------------------------------------------------------
         var blacklistNode = Commands.literal("blacklist")
                 .requires(source -> source.hasPermission(2));
@@ -426,7 +424,6 @@ public class OneriaCommands {
         blacklistNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            // Suggérer les joueurs connectés
                             ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
                                     builder.suggest(p.getName().getString())
                             );
@@ -438,7 +435,6 @@ public class OneriaCommands {
         blacklistNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            // Suggérer les joueurs dans la blacklist
                             OneriaConfig.BLACKLIST.get().forEach(builder::suggest);
                             return builder.buildFuture();
                         })
@@ -459,7 +455,6 @@ public class OneriaCommands {
         alwaysVisibleNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            // Suggérer les joueurs connectés
                             ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
                                     builder.suggest(p.getName().getString())
                             );
@@ -471,7 +466,6 @@ public class OneriaCommands {
         alwaysVisibleNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            // Suggérer les joueurs dans la always visible list
                             try {
                                 if (OneriaConfig.ALWAYS_VISIBLE_LIST != null) {
                                     OneriaConfig.ALWAYS_VISIBLE_LIST.get().forEach(builder::suggest);
@@ -489,7 +483,7 @@ public class OneriaCommands {
         oneriaRoot.then(alwaysVisibleNode);
 
         // -------------------------------------------------------------------------
-        // 7. MODULE: LICENSE (Requires OP Level 2) - AMÉLIORATION
+        // 6. MODULE: LICENSE (Requires OP Level 2)
         // -------------------------------------------------------------------------
         var licenseNode = Commands.literal("license")
                 .requires(source -> source.hasPermission(2));
@@ -508,8 +502,6 @@ public class OneriaCommands {
                                         // Suggérer seulement les métiers qu'il N'A PAS
                                         for (ProfessionRestrictionManager.ProfessionData profession :
                                                 ProfessionRestrictionManager.getAllProfessions()) {
-
-                                            // ✅ Ne suggérer que si le joueur ne l'a PAS déjà
                                             if (!currentLicenses.contains(profession.id)) {
                                                 builder.suggest(profession.id);
                                             }
@@ -551,7 +543,7 @@ public class OneriaCommands {
                 )
         );
 
-        // List - maintenant avec argument optionnel pour joueur spécifique ou tous
+        // List - avec argument optionnel pour joueur spécifique ou tous
         licenseNode.then(Commands.literal("list")
                 .executes(OneriaCommands::listAllLicenses) // Sans argument = tous les joueurs
                 .then(Commands.argument("player", EntityArgument.player())
@@ -602,7 +594,7 @@ public class OneriaCommands {
         oneriaRoot.then(licenseNode);
 
         // -------------------------------------------------------------------------
-        // 5. MODULE: NICKNAME (Requires OP Level 2)
+        // 7. MODULE: NICKNAME (Requires OP Level 2)
         // -------------------------------------------------------------------------
         var nickNode = Commands.literal("nick")
                 .requires(source -> source.hasPermission(2));
@@ -614,7 +606,15 @@ public class OneriaCommands {
                 .executes(OneriaCommands::resetNickname)
         );
 
-        // MODULE: WHOIS (Staff only)
+        nickNode.then(Commands.literal("list")
+                .executes(OneriaCommands::listNicknames)
+        );
+
+        oneriaRoot.then(nickNode);
+
+        // -------------------------------------------------------------------------
+        // 8. MODULE: WHOIS (Requires OP Level 2)
+        // -------------------------------------------------------------------------
         var whoisNode = Commands.literal("whois")
                 .requires(source -> source.hasPermission(2));
         whoisNode.then(Commands.argument("nickname", StringArgumentType.greedyString())
@@ -627,18 +627,11 @@ public class OneriaCommands {
                 .then(Commands.argument("nickname", StringArgumentType.greedyString())
                         .executes(OneriaCommands::whoisCommand)));
 
-        nickNode.then(Commands.literal("list")
-                .executes(OneriaCommands::listNicknames)
-        );
-
-        oneriaRoot.then(nickNode);
-
         // -------------------------------------------------------------------------
-        // 6. MODULE: SCHEDULE (Public)
+        // 9. MODULE: SCHEDULE (Public)
         // -------------------------------------------------------------------------
         oneriaRoot.then(Commands.literal("schedule")
                 .executes(OneriaCommands::showSchedule));
-
 
         // -------------------------------------------------------------------------
         // MODULE: MESSAGERIE PRIVÉE — remplace /msg /tell /w /whisper + /r
@@ -671,24 +664,18 @@ public class OneriaCommands {
                             return OneriaMessagingManager.reply(sender, msg, ctx.getSource().getServer());
                         })));
 
-        // -------------------------------------------------------------------------
-        // MODULE: WHOIS (OP Level 2)
-        // -------------------------------------------------------------------------
-        dispatcher.register(Commands.literal("whois")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.argument("nickname", StringArgumentType.greedyString())
-                        .executes(OneriaCommands::whoisCommand)));
-
+        // =========================================================================
         // Register root
+        // =========================================================================
         dispatcher.register(oneriaRoot);
 
         // =========================================================================
-        // COLORS COMMAND - CORRECTION
+        // COLORS COMMAND
         // =========================================================================
         dispatcher.register(Commands.literal("colors")
                 .executes(ctx -> {
-                    if (OneriaConfig.ENABLE_COLORS_COMMAND != null &&
-                            !OneriaConfig.ENABLE_COLORS_COMMAND.get()) {
+                    if (ChatConfig.ENABLE_COLORS_COMMAND != null &&
+                            !ChatConfig.ENABLE_COLORS_COMMAND.get()) {
                         ctx.getSource().sendFailure(Component.literal("§cColors command is disabled."));
                         return 0;
                     }
@@ -726,12 +713,11 @@ public class OneriaCommands {
         OneriaScheduleManager.reload();
         OneriaPermissions.clearCache();
         NicknameManager.reload();
-
         ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Configuration, nicknames and nametags reloaded!"), true);
         return 1;
     }
 
-    private static int updateConfigInt(CommandContext<CommandSourceStack> ctx, net.neoforged.neoforge.common.ModConfigSpec.IntValue config, String name) {
+    private static int updateConfigInt(CommandContext<CommandSourceStack> ctx, ModConfigSpec.IntValue config, String name) {
         int val = IntegerArgumentType.getInteger(ctx, "value");
         config.set(val);
         OneriaConfig.SPEC.save();
@@ -739,7 +725,7 @@ public class OneriaCommands {
         return 1;
     }
 
-    private static int updateConfigBool(CommandContext<CommandSourceStack> ctx, net.neoforged.neoforge.common.ModConfigSpec.BooleanValue config, String name) {
+    private static int updateConfigBool(CommandContext<CommandSourceStack> ctx, ModConfigSpec.BooleanValue config, String name) {
         boolean val = BoolArgumentType.getBool(ctx, "value");
         config.set(val);
         OneriaConfig.SPEC.save();
@@ -761,7 +747,7 @@ public class OneriaCommands {
             ctx.getSource().sendFailure(Component.literal("§cInvalid format! Use HH:MM (e.g., 19:00)"));
             return 0;
         }
-        OneriaConfig.OPENING_TIME.set(time);
+        ScheduleConfig.OPENING_TIME.set(time);
         OneriaConfig.SPEC.save();
         OneriaScheduleManager.reload();
         ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Opening time set to: " + time), true);
@@ -774,7 +760,7 @@ public class OneriaCommands {
             ctx.getSource().sendFailure(Component.literal("§cInvalid format! Use HH:MM (e.g., 23:59)"));
             return 0;
         }
-        OneriaConfig.CLOSING_TIME.set(time);
+        ScheduleConfig.CLOSING_TIME.set(time);
         OneriaConfig.SPEC.save();
         OneriaScheduleManager.reload();
         ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Closing time set to: " + time), true);
@@ -815,28 +801,28 @@ public class OneriaCommands {
                             "§6║  §eAlways Visible: §f" + safe.apply(() -> OneriaConfig.ALWAYS_VISIBLE_LIST.get().size()) + " players\n" +
                             "§6║\n" +
                             "§6║ §7Schedule\n" +
-                            "§6║  §eEnabled: §f" + safe.apply(() -> OneriaConfig.ENABLE_SCHEDULE.get()) + "\n" +
+                            "§6║  §eEnabled: §f" + safe.apply(() -> ScheduleConfig.ENABLE_SCHEDULE.get()) + "\n" +
                             "§6║  §eStatus: " + scheduleStatus + "\n" +
-                            "§6║  §eOpening: §f" + safe.apply(() -> OneriaConfig.OPENING_TIME.get()) + "\n" +
-                            "§6║  §eClosing: §f" + safe.apply(() -> OneriaConfig.CLOSING_TIME.get()) + "\n" +
+                            "§6║  §eOpening: §f" + safe.apply(() -> ScheduleConfig.OPENING_TIME.get()) + "\n" +
+                            "§6║  §eClosing: §f" + safe.apply(() -> ScheduleConfig.CLOSING_TIME.get()) + "\n" +
                             "§6║\n" +
                             "§6║ §7Chat System\n" +
-                            "§6║  §eChat Format: §f" + safe.apply(() -> OneriaConfig.ENABLE_CHAT_FORMAT.get()) + "\n" +
-                            "§6║  §eTimestamp: §f" + safe.apply(() -> OneriaConfig.ENABLE_TIMESTAMP.get()) + "\n" +
-                            "§6║  §eMarkdown: §f" + safe.apply(() -> OneriaConfig.MARKDOWN_ENABLED.get()) + "\n" +
-                            "§6║  §eMessage Color: §f" + safe.apply(() -> OneriaConfig.CHAT_MESSAGE_COLOR.get()) + "\n" +
+                            "§6║  §eChat Format: §f" + safe.apply(() -> ChatConfig.ENABLE_CHAT_FORMAT.get()) + "\n" +
+                            "§6║  §eTimestamp: §f" + safe.apply(() -> ChatConfig.ENABLE_TIMESTAMP.get()) + "\n" +
+                            "§6║  §eMarkdown: §f" + safe.apply(() -> ChatConfig.MARKDOWN_ENABLED.get()) + "\n" +
+                            "§6║  §eMessage Color: §f" + safe.apply(() -> ChatConfig.CHAT_MESSAGE_COLOR.get()) + "\n" +
                             "§6║\n" +
                             "§6║ §7Join/Leave Messages\n" +
-                            "§6║  §eEnabled: §f" + safe.apply(() -> OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) + "\n" +
+                            "§6║  §eEnabled: §f" + safe.apply(() -> ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) + "\n" +
                             "§6║\n" +
                             "§6║ §7World Border\n" +
                             "§6║  §eEnabled: §f" + safe.apply(() -> OneriaConfig.ENABLE_WORLD_BORDER_WARNING.get()) + "\n" +
                             "§6║  §eDistance: §f" + safe.apply(() -> OneriaConfig.WORLD_BORDER_DISTANCE.get()) + " blocks\n" +
                             "§6║\n" +
                             "§6║ §7Moderation\n" +
-                            "§6║  §eSilent Commands: §f" + safe.apply(() -> OneriaConfig.ENABLE_SILENT_COMMANDS.get()) + "\n" +
-                            "§6║  §ePlatforms: §f" + safe.apply(() -> OneriaConfig.ENABLE_PLATFORMS.get()) + "\n" +
-                            "§6║  §eWelcome Message: §f" + safe.apply(() -> OneriaConfig.ENABLE_WELCOME.get()) + "\n" +
+                            "§6║  §eSilent Commands: §f" + safe.apply(() -> ModerationConfig.ENABLE_SILENT_COMMANDS.get()) + "\n" +
+                            "§6║  §ePlatforms: §f" + safe.apply(() -> ModerationConfig.ENABLE_PLATFORMS.get()) + "\n" +
+                            "§6║  §eWelcome Message: §f" + safe.apply(() -> ScheduleConfig.ENABLE_WELCOME.get()) + "\n" +
                             "§6╚═══════════════════════════════════╝";
 
             context.getSource().sendSuccess(() -> Component.literal(statusMessage), false);
@@ -848,80 +834,88 @@ public class OneriaCommands {
         }
     }
 
-    // --- WHITELIST HANDLERS ---
+    // --- WHITELIST / BLACKLIST / ALWAYS VISIBLE HANDLERS ---
+    // Factorisés via modifyList() pour éviter la duplication
 
-    private static int addToWhitelist(CommandContext<CommandSourceStack> context) {
-        String player = StringArgumentType.getString(context, "player");
-        List<String> list = new ArrayList<>(OneriaConfig.WHITELIST.get());
-        if (!list.contains(player)) {
+    private static int modifyList(
+            CommandContext<CommandSourceStack> ctx,
+            ModConfigSpec.ConfigValue<List<? extends String>> config,
+            String listName,
+            boolean add
+    ) {
+        String player = StringArgumentType.getString(ctx, "player");
+        List<String> list = new ArrayList<>(config.get());
+
+        if (add) {
+            if (list.contains(player)) {
+                ctx.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is already in " + listName + "."));
+                return 0;
+            }
             list.add(player);
-            OneriaConfig.WHITELIST.set(list);
-            OneriaConfig.SPEC.save();
-            context.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " added to whitelist."), true);
+            ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " added to " + listName + "."), true);
         } else {
-            context.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is already in whitelist."));
+            if (!list.remove(player)) {
+                ctx.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is not in " + listName + "."));
+                return 0;
+            }
+            ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " removed from " + listName + "."), true);
         }
+
+        config.set(list);
+        OneriaConfig.SPEC.save();
         return 1;
     }
 
-    private static int removeFromWhitelist(CommandContext<CommandSourceStack> context) {
-        String player = StringArgumentType.getString(context, "player");
-        List<String> list = new ArrayList<>(OneriaConfig.WHITELIST.get());
-        if (list.remove(player)) {
-            OneriaConfig.WHITELIST.set(list);
-            OneriaConfig.SPEC.save();
-            context.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " removed from whitelist."), true);
-        } else {
-            context.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is not in whitelist."));
-        }
-        return 1;
+    private static int addToWhitelist(CommandContext<CommandSourceStack> ctx) {
+        return modifyList(ctx, OneriaConfig.WHITELIST, "whitelist", true);
     }
 
-    private static int listWhitelist(CommandContext<CommandSourceStack> context) {
+    private static int removeFromWhitelist(CommandContext<CommandSourceStack> ctx) {
+        return modifyList(ctx, OneriaConfig.WHITELIST, "whitelist", false);
+    }
+
+    private static int listWhitelist(CommandContext<CommandSourceStack> ctx) {
         List<? extends String> whitelist = OneriaConfig.WHITELIST.get();
         if (whitelist.isEmpty()) {
-            context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist is empty."), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist is empty."), false);
         } else {
-            context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist: §f" + String.join(", ", whitelist)), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist: §f" + String.join(", ", whitelist)), false);
         }
         return 1;
     }
 
-    // --- BLACKLIST HANDLERS ---
-
-    private static int addToBlacklist(CommandContext<CommandSourceStack> context) {
-        String player = StringArgumentType.getString(context, "player");
-        List<String> list = new ArrayList<>(OneriaConfig.BLACKLIST.get());
-        if (!list.contains(player)) {
-            list.add(player);
-            OneriaConfig.BLACKLIST.set(list);
-            OneriaConfig.SPEC.save();
-            context.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " added to blacklist (always hidden)."), true);
-        } else {
-            context.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is already in blacklist."));
-        }
-        return 1;
+    private static int addToBlacklist(CommandContext<CommandSourceStack> ctx) {
+        return modifyList(ctx, OneriaConfig.BLACKLIST, "blacklist", true);
     }
 
-    private static int removeFromBlacklist(CommandContext<CommandSourceStack> context) {
-        String player = StringArgumentType.getString(context, "player");
-        List<String> list = new ArrayList<>(OneriaConfig.BLACKLIST.get());
-        if (list.remove(player)) {
-            OneriaConfig.BLACKLIST.set(list);
-            OneriaConfig.SPEC.save();
-            context.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " removed from blacklist."), true);
-        } else {
-            context.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is not in blacklist."));
-        }
-        return 1;
+    private static int removeFromBlacklist(CommandContext<CommandSourceStack> ctx) {
+        return modifyList(ctx, OneriaConfig.BLACKLIST, "blacklist", false);
     }
 
-    private static int listBlacklist(CommandContext<CommandSourceStack> context) {
+    private static int listBlacklist(CommandContext<CommandSourceStack> ctx) {
         List<? extends String> blacklist = OneriaConfig.BLACKLIST.get();
         if (blacklist.isEmpty()) {
-            context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist is empty."), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist is empty."), false);
         } else {
-            context.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist (always hidden): §f" + String.join(", ", blacklist)), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist (always hidden): §f" + String.join(", ", blacklist)), false);
+        }
+        return 1;
+    }
+
+    private static int addToAlwaysVisible(CommandContext<CommandSourceStack> ctx) {
+        return modifyList(ctx, OneriaConfig.ALWAYS_VISIBLE_LIST, "Always Visible list", true);
+    }
+
+    private static int removeFromAlwaysVisible(CommandContext<CommandSourceStack> ctx) {
+        return modifyList(ctx, OneriaConfig.ALWAYS_VISIBLE_LIST, "Always Visible list", false);
+    }
+
+    private static int listAlwaysVisible(CommandContext<CommandSourceStack> ctx) {
+        List<? extends String> alwaysVisible = OneriaConfig.ALWAYS_VISIBLE_LIST.get();
+        if (alwaysVisible.isEmpty()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Always Visible list is empty."), false);
+        } else {
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Always Visible (always shown in TabList): §f" + String.join(", ", alwaysVisible)), false);
         }
         return 1;
     }
@@ -937,7 +931,7 @@ public class OneriaCommands {
     }
 
     private static int setGamemode(CommandContext<CommandSourceStack> ctx, ServerPlayer target, String modeName) {
-        if (!OneriaConfig.ENABLE_SILENT_COMMANDS.get()) {
+        if (!ModerationConfig.ENABLE_SILENT_COMMANDS.get()) {
             ctx.getSource().sendFailure(Component.literal("§cSilent commands are disabled."));
             return 0;
         }
@@ -953,14 +947,14 @@ public class OneriaCommands {
         String sourceName = ctx.getSource().getPlayer() != null ? ctx.getSource().getPlayer().getName().getString() : "Console";
         logToStaff(ctx.getSource(), sourceName + " set " + target.getName().getString() + " to " + modeName);
 
-        if (OneriaConfig.NOTIFY_TARGET.get() && target != ctx.getSource().getEntity()) {
+        if (ModerationConfig.NOTIFY_TARGET.get() && target != ctx.getSource().getEntity()) {
             target.sendSystemMessage(Component.literal("§7[Staff] Your gamemode has been changed to " + modeName));
         }
         return 1;
     }
 
     private static int silentTeleport(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        if (!OneriaConfig.ENABLE_SILENT_COMMANDS.get()) {
+        if (!ModerationConfig.ENABLE_SILENT_COMMANDS.get()) {
             ctx.getSource().sendFailure(Component.literal("§cSilent commands are disabled."));
             return 0;
         }
@@ -974,7 +968,7 @@ public class OneriaCommands {
     }
 
     private static int silentEffect(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        if (!OneriaConfig.ENABLE_SILENT_COMMANDS.get()) {
+        if (!ModerationConfig.ENABLE_SILENT_COMMANDS.get()) {
             ctx.getSource().sendFailure(Component.literal("§cSilent commands are disabled."));
             return 0;
         }
@@ -991,7 +985,7 @@ public class OneriaCommands {
             String sourceName = ctx.getSource().getPlayer() != null ? ctx.getSource().getPlayer().getName().getString() : "Console";
             logToStaff(ctx.getSource(), sourceName + " gave effect " + effectId + " to " + target.getName().getString());
 
-            if (OneriaConfig.NOTIFY_TARGET.get()) {
+            if (ModerationConfig.NOTIFY_TARGET.get()) {
                 target.sendSystemMessage(Component.literal("§7[Staff] An effect has been applied to you."));
             }
         } else {
@@ -1016,12 +1010,12 @@ public class OneriaCommands {
     }
 
     private static int teleportToPlatform(CommandSourceStack source, ServerPlayer executor, ServerPlayer target, String platformId) {
-        if (!OneriaConfig.ENABLE_PLATFORMS.get()) {
+        if (!ModerationConfig.ENABLE_PLATFORMS.get()) {
             source.sendFailure(Component.literal("§cPlatforms system is disabled."));
             return 0;
         }
 
-        for (String pData : OneriaConfig.PLATFORMS.get()) {
+        for (String pData : ModerationConfig.PLATFORMS.get()) {
             String[] parts = pData.split(";");
             if (parts.length >= 6 && parts[0].equals(platformId)) {
                 ResourceKey<Level> dim = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, ResourceLocation.parse(parts[2]));
@@ -1057,7 +1051,7 @@ public class OneriaCommands {
 
         String platformEntry = platformName + ";" + platformName + ";" + dimension + ";" + x + ";" + y + ";" + z;
 
-        List<String> platforms = new ArrayList<>(OneriaConfig.PLATFORMS.get());
+        List<String> platforms = new ArrayList<>(ModerationConfig.PLATFORMS.get());
 
         boolean updated = false;
         for (int i = 0; i < platforms.size(); i++) {
@@ -1072,7 +1066,7 @@ public class OneriaCommands {
             platforms.add(platformEntry);
         }
 
-        OneriaConfig.PLATFORMS.set(platforms);
+        ModerationConfig.PLATFORMS.set(platforms);
         OneriaConfig.SPEC.save();
 
         final boolean wasUpdated = updated;
@@ -1094,8 +1088,8 @@ public class OneriaCommands {
                 "§8§m----------------------------------\n" +
                         " §6§lSERVER SCHEDULE\n" +
                         " §7Current Status: " + (isOpen ? "§a§lOPEN" : "§c§lCLOSED") + "\n" +
-                        " §7Opening: §e" + OneriaConfig.OPENING_TIME.get() + "\n" +
-                        " §7Closing: §e" + OneriaConfig.CLOSING_TIME.get() + "\n\n" +
+                        " §7Opening: §e" + ScheduleConfig.OPENING_TIME.get() + "\n" +
+                        " §7Closing: §e" + ScheduleConfig.CLOSING_TIME.get() + "\n\n" +
                         " §f" + timeInfo + "\n" +
                         "§8§m----------------------------------"
         ), false);
@@ -1105,12 +1099,12 @@ public class OneriaCommands {
     // --- UTILS ---
 
     private static void logToStaff(CommandSourceStack source, String msg) {
-        if (!OneriaConfig.LOG_TO_STAFF.get()) return;
+        if (!ModerationConfig.LOG_TO_STAFF.get()) return;
         Component txt = Component.literal("§7§o[StaffLog] " + msg);
         source.getServer().getPlayerList().getPlayers().forEach(p -> {
             if (OneriaPermissions.isStaff(p)) p.sendSystemMessage(txt);
         });
-        if (OneriaConfig.LOG_TO_CONSOLE.get()) OneriaServerUtilities.LOGGER.info("[StaffLog] " + msg);
+        if (ModerationConfig.LOG_TO_CONSOLE.get()) OneriaServerUtilities.LOGGER.info("[StaffLog] " + msg);
     }
 
     private static GameType parseGameMode(String mode) {
@@ -1123,7 +1117,12 @@ public class OneriaCommands {
         };
     }
 
-    // --- LICENSE HANDLERS - AMÉLIORÉS ---
+    // --- LICENSE HANDLERS ---
+
+// ============================================================
+// Remplace giveLicense(), revokeLicense() et giveRPLicense()
+// dans OneriaCommands.java
+// ============================================================
 
     private static int giveLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
@@ -1142,7 +1141,6 @@ public class OneriaCommands {
 
         ItemStack license = new ItemStack(OneriaItems.LICENSE.get());
 
-        // Utiliser la couleur et le nom du métier depuis la config
         license.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
                 Component.literal(professionData.colorCode + "§lPermis de " + professionData.displayName));
         java.util.List<Component> lore = new java.util.ArrayList<>();
@@ -1156,6 +1154,10 @@ public class OneriaCommands {
         }
 
         LicenseManager.addLicense(target.getUUID(), professionId);
+
+        // Audit log
+        ServerPlayer staff = ctx.getSource().getPlayer();
+        LicenseManager.logAction("GIVE", staff, target, professionId, null);
 
         ctx.getSource().sendSuccess(() ->
                 Component.literal("§a[Oneria] Permis de " + professionData.getFormattedName() +
@@ -1186,6 +1188,10 @@ public class OneriaCommands {
         // Supprimer immédiatement les licences de l'inventaire si le joueur est en ligne
         RevokedLicenseManager.removeAllRevokedLicenses(target);
 
+        // Audit log
+        ServerPlayer staff = ctx.getSource().getPlayer();
+        LicenseManager.logAction("REVOKE", staff, target, profession, null);
+
         ProfessionRestrictionManager.ProfessionData profData =
                 ProfessionRestrictionManager.getProfessionData(profession);
         String displayName = profData != null ? profData.displayName : profession;
@@ -1196,7 +1202,67 @@ public class OneriaCommands {
         return 1;
     }
 
-    // NOUVEAU: Liste les licences pour UN joueur spécifique
+    private static int giveRPLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+        String professionId = StringArgumentType.getString(ctx, "profession");
+        int daysDuration = IntegerArgumentType.getInteger(ctx, "days_duration");
+
+        ProfessionRestrictionManager.ProfessionData professionData =
+                ProfessionRestrictionManager.getProfessionData(professionId);
+
+        if (professionData == null) {
+            ctx.getSource().sendFailure(Component.literal("§c[Oneria] Métier inconnu: " + professionId));
+            return 0;
+        }
+
+        String displayName = NicknameManager.getDisplayName(target);
+
+        java.time.LocalDate issueDate = java.time.LocalDate.now();
+        java.time.LocalDate expirationDate = issueDate.plusDays(daysDuration);
+
+        // Format: DD/MM/YYYY
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
+        String issueDateStr = issueDate.format(formatter);
+        String expirationDateStr = expirationDate.format(formatter);
+
+        ItemStack license = new ItemStack(OneriaItems.LICENSE.get());
+
+        // Nom identique aux vrais permis - AUCUNE indication RP
+        license.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
+                Component.literal(professionData.colorCode + "§lPermis de " + professionData.displayName));
+
+        // Lore professionnel - ressemble à un vrai permis
+        java.util.List<Component> lore = new java.util.ArrayList<>();
+        lore.add(Component.literal("§7Délivré à: §f" + displayName));
+        lore.add(Component.literal("§7Date de délivrance: §f" + issueDateStr));
+        lore.add(Component.literal("§7Valide jusqu'au: §f" + expirationDateStr));
+
+        license.set(net.minecraft.core.component.DataComponents.LORE,
+                new net.minecraft.world.item.component.ItemLore(lore));
+
+        if (!target.getInventory().add(license)) {
+            target.drop(license, false);
+        }
+
+        // Enregistrer dans licenses-temp.json
+        ServerPlayer staff = ctx.getSource().getPlayer();
+        LicenseManager.addTempLicense(staff, target, professionId, daysDuration, issueDateStr, expirationDateStr);
+
+        // Audit log
+        String extra = daysDuration + " jours, expire le " + expirationDateStr;
+        LicenseManager.logAction("GIVE_RP", staff, target, professionId, extra);
+
+        ctx.getSource().sendSuccess(() ->
+                Component.literal("§a[Oneria] Permis temporaire de " + professionData.getFormattedName() +
+                        "§a donné à §f" + displayName + " §7(" + daysDuration + " jours, expire le " + expirationDateStr + ")"), true);
+
+        target.sendSystemMessage(Component.literal("§aVous avez reçu un " + professionData.getFormattedName() +
+                "§6§l Permis §7valable jusqu'au §f" + expirationDateStr));
+
+        return 1;
+    }
+
+
     private static int listLicenses(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
         java.util.List<String> licenses = LicenseManager.getLicenses(target.getUUID());
@@ -1212,7 +1278,6 @@ public class OneriaCommands {
         return 1;
     }
 
-    // NOUVEAU: Liste TOUTES les licences de TOUS les joueurs
     private static int listAllLicenses(CommandContext<CommandSourceStack> ctx) {
         var allLicenses = LicenseManager.getAllLicenses();
 
@@ -1230,7 +1295,6 @@ public class OneriaCommands {
             java.util.UUID uuid = entry.getKey();
             List<String> licenses = entry.getValue();
 
-            // Trouver le nom du joueur
             ServerPlayer player = ctx.getSource().getServer().getPlayerList().getPlayer(uuid);
             String playerName = player != null ? player.getName().getString() : uuid.toString();
 
@@ -1256,134 +1320,6 @@ public class OneriaCommands {
                 Component.literal("§e[Oneria] §f" + target.getName().getString() +
                         (has ? " §apossède" : " §cne possède pas") + "§e un permis de §f" + profession), false);
 
-        return 1;
-    }
-
-    // --- RP LICENSE HANDLER ---
-
-    private static int giveRPLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
-        String professionId = StringArgumentType.getString(ctx, "profession");
-        int daysDuration = IntegerArgumentType.getInteger(ctx, "days_duration");
-
-        // Récupérer les données du métier depuis la config
-        ProfessionRestrictionManager.ProfessionData professionData =
-                ProfessionRestrictionManager.getProfessionData(professionId);
-
-        if (professionData == null) {
-            ctx.getSource().sendFailure(Component.literal("§c[Oneria] Métier inconnu: " + professionId));
-            return 0;
-        }
-
-        String displayName = NicknameManager.getDisplayName(target);
-
-        // Calculer la date d'expiration
-        java.time.LocalDate issueDate = java.time.LocalDate.now();
-        java.time.LocalDate expirationDate = issueDate.plusDays(daysDuration);
-
-        // Format: DD/MM/YYYY
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy");
-        String issueDateStr = issueDate.format(formatter);
-        String expirationDateStr = expirationDate.format(formatter);
-
-        ItemStack license = new ItemStack(OneriaItems.LICENSE.get());
-
-        // Nom identique aux vrais permis - AUCUNE indication RP
-        license.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                Component.literal(professionData.colorCode + "§lPermis de " + professionData.displayName));
-
-        // Lore professionnel - ressemble à un vrai permis
-        java.util.List<Component> lore = new java.util.ArrayList<>();
-        lore.add(Component.literal("§7Délivré à: §f" + displayName));
-        lore.add(Component.literal("§7Date de délivrance: §f" + issueDateStr));
-        lore.add(Component.literal("§7Valide jusqu'au: §f" + expirationDateStr));
-
-        license.set(net.minecraft.core.component.DataComponents.LORE,
-                new net.minecraft.world.item.component.ItemLore(lore));
-
-        // Donner l'item
-        if (!target.getInventory().add(license)) {
-            target.drop(license, false);
-        }
-
-        ctx.getSource().sendSuccess(() ->
-                Component.literal("§a[Oneria] Permis temporaire de " + professionData.getFormattedName() +
-                        "§a donné à §f" + displayName + " §7(" + daysDuration + " jours, expire le " + expirationDateStr + ")"), true);
-
-        target.sendSystemMessage(Component.literal("§aVous avez reçu un " + professionData.getFormattedName() +
-                "§6§l Permis §7valable jusqu'au §f" + expirationDateStr));
-
-        return 1;
-    }
-
-    // -------------------------------------------------------------------------
-    // HANDLERS POUR ALWAYS VISIBLE LIST
-    // -------------------------------------------------------------------------
-
-    private static int addToAlwaysVisible(CommandContext<CommandSourceStack> context) {
-        String player = StringArgumentType.getString(context, "player");
-
-        try {
-            List<String> list = new ArrayList<>(OneriaConfig.ALWAYS_VISIBLE_LIST.get());
-            if (!list.contains(player)) {
-                list.add(player);
-                OneriaConfig.ALWAYS_VISIBLE_LIST.set(list);
-                OneriaConfig.SPEC.save();
-                context.getSource().sendSuccess(() ->
-                                Component.literal("§a[Oneria] " + player + " added to Always Visible list (always shown in TabList)."),
-                        true);
-            } else {
-                context.getSource().sendFailure(
-                        Component.literal("§c[Oneria] " + player + " is already in Always Visible list."));
-            }
-        } catch (Exception e) {
-            context.getSource().sendFailure(
-                    Component.literal("§c[Oneria] Error: Config not loaded."));
-            return 0;
-        }
-        return 1;
-    }
-
-    private static int removeFromAlwaysVisible(CommandContext<CommandSourceStack> context) {
-        String player = StringArgumentType.getString(context, "player");
-
-        try {
-            List<String> list = new ArrayList<>(OneriaConfig.ALWAYS_VISIBLE_LIST.get());
-            if (list.remove(player)) {
-                OneriaConfig.ALWAYS_VISIBLE_LIST.set(list);
-                OneriaConfig.SPEC.save();
-                context.getSource().sendSuccess(() ->
-                                Component.literal("§a[Oneria] " + player + " removed from Always Visible list."),
-                        true);
-            } else {
-                context.getSource().sendFailure(
-                        Component.literal("§c[Oneria] " + player + " is not in Always Visible list."));
-            }
-        } catch (Exception e) {
-            context.getSource().sendFailure(
-                    Component.literal("§c[Oneria] Error: Config not loaded."));
-            return 0;
-        }
-        return 1;
-    }
-
-    private static int listAlwaysVisible(CommandContext<CommandSourceStack> context) {
-        try {
-            List<? extends String> alwaysVisible = OneriaConfig.ALWAYS_VISIBLE_LIST.get();
-            if (alwaysVisible.isEmpty()) {
-                context.getSource().sendSuccess(() ->
-                                Component.literal("§e[Oneria] Always Visible list is empty."),
-                        false);
-            } else {
-                context.getSource().sendSuccess(() ->
-                                Component.literal("§e[Oneria] Always Visible (always shown in TabList): §f" + String.join(", ", alwaysVisible)),
-                        false);
-            }
-        } catch (Exception e) {
-            context.getSource().sendFailure(
-                    Component.literal("§c[Oneria] Error: Config not loaded."));
-            return 0;
-        }
         return 1;
     }
 

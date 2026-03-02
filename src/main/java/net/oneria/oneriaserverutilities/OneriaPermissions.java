@@ -5,14 +5,14 @@ import net.luckperms.api.LuckPermsProvider;
 import net.luckperms.api.model.user.User;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class OneriaPermissions {
 
     // Cache to avoid checking every time
-    private static final Map<UUID, CacheEntry> staffCache = new HashMap<>();
+    private static final Map<UUID, CacheEntry> staffCache = new ConcurrentHashMap<>();
     private static final long CACHE_DURATION = 30000; // 30 seconds
 
     private static class CacheEntry {

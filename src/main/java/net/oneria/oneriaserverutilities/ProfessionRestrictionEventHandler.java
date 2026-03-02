@@ -18,9 +18,9 @@ import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Gestionnaire d'événements pour les restrictions de métiers
@@ -30,15 +30,15 @@ import java.util.UUID;
 public class ProfessionRestrictionEventHandler {
 
     // Cache pour éviter le spam de messages (cooldown de 3 secondes)
-    private static final Map<UUID, Long> lastMessageTime = new HashMap<>();
+    private static final Map<UUID, Long> lastMessageTime = new ConcurrentHashMap<>();
     private static final long MESSAGE_COOLDOWN = 3000; // 3 secondes
 
     // Cache pour l'action bar d'équipement (cooldown de 1 seconde)
-    private static final Map<UUID, Long> lastEquipmentWarning = new HashMap<>();
+    private static final Map<UUID, Long> lastEquipmentWarning = new ConcurrentHashMap<>();
     private static final long EQUIPMENT_WARNING_COOLDOWN = 1000; // 1 seconde
 
     // Cache pour les attaques (cooldown de 2 secondes)
-    private static final Map<UUID, Long> lastAttackWarning = new HashMap<>();
+    private static final Map<UUID, Long> lastAttackWarning = new ConcurrentHashMap<>();
     private static final long ATTACK_WARNING_COOLDOWN = 2000; // 2 secondes
 
     /**

@@ -10,14 +10,85 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.lang.reflect.Type;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class LicenseManager {
-    private static final Map<UUID, List<String>> playerLicenses = new HashMap<>();
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static File licenseFile = null;
 
-    private static void ensureInitialized() {
+    // =========================================================================
+    // STRUCTURES
+    // =========================================================================
+
+    public static class AuditEntry {
+        public String timestamp;
+        public String action;       // "GIVE", "REVOKE", "GIVE_RP"
+        public String staffName;
+        public String staffUUID;
+        public String targetName;
+        public String targetUUID;
+        public String profession;
+        public String extra;        // Pour GIVE_RP: "30 jours, expire le 01/04/2025"
+
+        public AuditEntry(String action, String staffName, String staffUUID,
+                          String targetName, String targetUUID,
+                          String profession, String extra) {
+            this.timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+            this.action = action;
+            this.staffName = staffName;
+            this.staffUUID = staffUUID;
+            this.targetName = targetName;
+            this.targetUUID = targetUUID;
+            this.profession = profession;
+            this.extra = extra;
+        }
+    }
+
+    public static class TempLicenseEntry {
+        public String issuedAt;
+        public String expiresAt;
+        public String staffName;
+        public String staffUUID;
+        public String targetName;
+        public String targetUUID;
+        public String profession;
+        public int durationDays;
+
+        public TempLicenseEntry(String staffName, String staffUUID,
+                                String targetName, String targetUUID,
+                                String profession, int durationDays,
+                                String issuedAt, String expiresAt) {
+            this.issuedAt = issuedAt;
+            this.expiresAt = expiresAt;
+            this.staffName = staffName;
+            this.staffUUID = staffUUID;
+            this.targetName = targetName;
+            this.targetUUID = targetUUID;
+            this.profession = profession;
+            this.durationDays = durationDays;
+        }
+    }
+
+    // =========================================================================
+    // STATE
+    // =========================================================================
+
+    private static final Map<UUID, List<String>> playerLicenses = new ConcurrentHashMap<>();
+    private static final List<AuditEntry> auditLog = Collections.synchronizedList(new ArrayList<>());
+    private static final List<TempLicenseEntry> tempLicenses = Collections.synchronizedList(new ArrayList<>());
+
+    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+
+    private static File licenseFile = null;
+    private static File auditFile   = null;
+    private static File tempFile    = null;
+
+    // =========================================================================
+    // INITIALISATION
+    // =========================================================================
+
+    private static synchronized void ensureInitialized() {
         if (licenseFile != null) return;
 
         try {
@@ -32,16 +103,22 @@ public class LicenseManager {
             }
 
             licenseFile = new File(dataFolder, "licenses.json");
+            auditFile   = new File(dataFolder, "license-audit.json");
+            tempFile    = new File(dataFolder, "licenses-temp.json");
 
-            if (licenseFile.exists()) {
-                loadFromFile();
-            }
+            if (licenseFile.exists()) loadFromFile();
+            if (auditFile.exists())   loadAuditFromFile();
+            if (tempFile.exists())    loadTempFromFile();
 
-            OneriaServerUtilities.LOGGER.info("[LicenseManager] Initialized - File: {}", licenseFile.getAbsolutePath());
+            OneriaServerUtilities.LOGGER.info("[LicenseManager] Initialized - Folder: {}", dataFolder.getAbsolutePath());
         } catch (Exception e) {
             OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to initialize", e);
         }
     }
+
+    // =========================================================================
+    // LOAD
+    // =========================================================================
 
     private static void loadFromFile() {
         if (licenseFile == null || !licenseFile.exists()) return;
@@ -69,40 +146,123 @@ public class LicenseManager {
         }
     }
 
+    private static void loadAuditFromFile() {
+        try (FileReader reader = new FileReader(auditFile)) {
+            Type type = new TypeToken<List<AuditEntry>>(){}.getType();
+            List<AuditEntry> data = GSON.fromJson(reader, type);
+            if (data != null) {
+                auditLog.clear();
+                auditLog.addAll(data);
+                OneriaServerUtilities.LOGGER.info("[LicenseManager] Loaded {} audit entries", auditLog.size());
+            }
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to load audit log", e);
+        }
+    }
+
+    private static void loadTempFromFile() {
+        try (FileReader reader = new FileReader(tempFile)) {
+            Type type = new TypeToken<List<TempLicenseEntry>>(){}.getType();
+            List<TempLicenseEntry> data = GSON.fromJson(reader, type);
+            if (data != null) {
+                tempLicenses.clear();
+                tempLicenses.addAll(data);
+                OneriaServerUtilities.LOGGER.info("[LicenseManager] Loaded {} temp licenses", tempLicenses.size());
+            }
+        } catch (Exception e) {
+            OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to load temp licenses", e);
+        }
+    }
+
+    // =========================================================================
+    // SAVE (async)
+    // =========================================================================
+
     private static void saveToFile() {
         ensureInitialized();
         if (licenseFile == null) return;
 
-        try {
-            File parent = licenseFile.getParentFile();
-            if (parent != null && !parent.exists()) parent.mkdirs();
+        Map<UUID, List<String>> snapshot = new HashMap<>(playerLicenses);
+        File targetFile = licenseFile;
 
-            Map<String, List<String>> data = new HashMap<>();
-            MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                File parent = targetFile.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
 
-            for (Map.Entry<UUID, List<String>> entry : playerLicenses.entrySet()) {
-                UUID uuid = entry.getKey();
-                String mcName = "Unknown";
-                if (server != null) {
-                    ServerPlayer online = server.getPlayerList().getPlayer(uuid);
-                    if (online != null) {
-                        mcName = online.getName().getString();
-                    } else if (server.getProfileCache() != null) {
-                        mcName = server.getProfileCache().get(uuid)
-                                .map(p -> p.getName()).orElse("Unknown");
+                Map<String, List<String>> data = new HashMap<>();
+                MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+
+                for (Map.Entry<UUID, List<String>> entry : snapshot.entrySet()) {
+                    UUID uuid = entry.getKey();
+                    String mcName = "Unknown";
+                    if (server != null) {
+                        ServerPlayer online = server.getPlayerList().getPlayer(uuid);
+                        if (online != null) {
+                            mcName = online.getName().getString();
+                        } else if (server.getProfileCache() != null) {
+                            mcName = server.getProfileCache().get(uuid)
+                                    .map(p -> p.getName()).orElse("Unknown");
+                        }
                     }
+                    data.put(uuid.toString() + " (" + mcName + ")", entry.getValue());
                 }
-                data.put(uuid.toString() + " (" + mcName + ")", entry.getValue());
-            }
 
-            try (FileWriter writer = new FileWriter(licenseFile)) {
-                GSON.toJson(data, writer);
+                try (FileWriter writer = new FileWriter(targetFile)) {
+                    GSON.toJson(data, writer);
+                }
+                OneriaServerUtilities.LOGGER.debug("[LicenseManager] Saved licenses for {} players", snapshot.size());
+            } catch (Exception e) {
+                OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to save licenses", e);
             }
-            OneriaServerUtilities.LOGGER.debug("[LicenseManager] Saved licenses for {} players", playerLicenses.size());
-        } catch (Exception e) {
-            OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to save licenses", e);
-        }
+        });
     }
+
+    private static void saveAuditToFile() {
+        if (auditFile == null) return;
+
+        List<AuditEntry> snapshot = new ArrayList<>(auditLog);
+        File targetFile = auditFile;
+
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                File parent = targetFile.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+
+                try (FileWriter writer = new FileWriter(targetFile)) {
+                    GSON.toJson(snapshot, writer);
+                }
+                OneriaServerUtilities.LOGGER.debug("[LicenseManager] Saved {} audit entries", snapshot.size());
+            } catch (Exception e) {
+                OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to save audit log", e);
+            }
+        });
+    }
+
+    private static void saveTempToFile() {
+        if (tempFile == null) return;
+
+        List<TempLicenseEntry> snapshot = new ArrayList<>(tempLicenses);
+        File targetFile = tempFile;
+
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                File parent = targetFile.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
+
+                try (FileWriter writer = new FileWriter(targetFile)) {
+                    GSON.toJson(snapshot, writer);
+                }
+                OneriaServerUtilities.LOGGER.debug("[LicenseManager] Saved {} temp licenses", snapshot.size());
+            } catch (Exception e) {
+                OneriaServerUtilities.LOGGER.error("[LicenseManager] Failed to save temp licenses", e);
+            }
+        });
+    }
+
+    // =========================================================================
+    // PUBLIC API — LICENSES
+    // =========================================================================
 
     public static void addLicense(UUID playerUUID, String profession) {
         ensureInitialized();
@@ -133,15 +293,6 @@ public class LicenseManager {
         return licenses != null && licenses.contains(profession);
     }
 
-    public static void reload() {
-        licenseFile = null;
-        playerLicenses.clear();
-        ensureInitialized();
-    }
-
-    /**
-     * Retourne toutes les licences de tous les joueurs
-     */
     public static Map<UUID, List<String>> getAllLicenses() {
         ensureInitialized();
         Map<UUID, List<String>> result = new HashMap<>();
@@ -149,5 +300,86 @@ public class LicenseManager {
             result.put(entry.getKey(), new ArrayList<>(entry.getValue()));
         }
         return result;
+    }
+
+    public static void reload() {
+        licenseFile = null;
+        auditFile   = null;
+        tempFile    = null;
+        playerLicenses.clear();
+        auditLog.clear();
+        tempLicenses.clear();
+        ensureInitialized();
+    }
+
+    // =========================================================================
+    // PUBLIC API — AUDIT LOG
+    // =========================================================================
+
+    /**
+     * Enregistre une action dans l'audit log.
+     * @param action     "GIVE", "REVOKE" ou "GIVE_RP"
+     * @param staff      Le joueur staff qui effectue l'action (null si console)
+     * @param target     Le joueur qui reçoit/perd le permis
+     * @param profession L'ID du métier
+     * @param extra      Infos supplémentaires (ex: durée pour GIVE_RP), null sinon
+     */
+    public static void logAction(String action, ServerPlayer staff, ServerPlayer target,
+                                 String profession, String extra) {
+        ensureInitialized();
+
+        String staffName = staff != null ? staff.getName().getString() : "Console";
+        String staffUUID = staff != null ? staff.getUUID().toString() : "console";
+
+        AuditEntry entry = new AuditEntry(
+                action,
+                staffName, staffUUID,
+                target.getName().getString(), target.getUUID().toString(),
+                profession,
+                extra
+        );
+
+        auditLog.add(entry);
+        saveAuditToFile();
+
+        OneriaServerUtilities.LOGGER.info("[LicenseAudit] {} | {} -> {} | {} | {}",
+                action, staffName, target.getName().getString(), profession,
+                extra != null ? extra : "");
+    }
+
+    public static List<AuditEntry> getAuditLog() {
+        ensureInitialized();
+        return new ArrayList<>(auditLog);
+    }
+
+    // =========================================================================
+    // PUBLIC API — TEMP LICENSES
+    // =========================================================================
+
+    /**
+     * Enregistre un permis temporaire dans licenses-temp.json.
+     */
+    public static void addTempLicense(ServerPlayer staff, ServerPlayer target,
+                                      String profession, int durationDays,
+                                      String issuedAt, String expiresAt) {
+        ensureInitialized();
+
+        String staffName = staff != null ? staff.getName().getString() : "Console";
+        String staffUUID = staff != null ? staff.getUUID().toString() : "console";
+
+        TempLicenseEntry entry = new TempLicenseEntry(
+                staffName, staffUUID,
+                target.getName().getString(), target.getUUID().toString(),
+                profession, durationDays,
+                issuedAt, expiresAt
+        );
+
+        tempLicenses.add(entry);
+        saveTempToFile();
+    }
+
+    public static List<TempLicenseEntry> getAllTempLicenses() {
+        ensureInitialized();
+        return new ArrayList<>(tempLicenses);
     }
 }

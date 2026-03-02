@@ -24,9 +24,15 @@ public class OneriaServerUtilities {
     private int tickCounter = 0;
 
     public OneriaServerUtilities(IEventBus modEventBus, ModContainer modContainer) {
-        // Enregistrer les deux configurations
-        modContainer.registerConfig(ModConfig.Type.SERVER, OneriaConfig.SPEC);
-        modContainer.registerConfig(ModConfig.Type.SERVER, ProfessionConfig.SPEC, "oneria-professions.toml");
+        // Migrer l'ancienne config si nécessaire (doit être fait AVANT registerConfig)
+        ConfigMigrator.migrateIfNeeded();
+
+        // Enregistrer les configs dans le dossier oneria/
+        modContainer.registerConfig(ModConfig.Type.SERVER, OneriaConfig.SPEC,       "oneria/oneria-core.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ChatConfig.SPEC,         "oneria/oneria-chat.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ScheduleConfig.SPEC,     "oneria/oneria-schedule.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ModerationConfig.SPEC,   "oneria/oneria-moderation.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ProfessionConfig.SPEC,   "oneria/oneria-professions.toml");
 
         OneriaItems.ITEMS.register(modEventBus);
 
@@ -92,8 +98,8 @@ public class OneriaServerUtilities {
             return;
         }
 
-        // Do not update every tick to save bandwidth (here every 10 ticks = 0.5s)
-        if (tickCounter++ % 10 == 0) {
+        // Do not update every tick to save bandwidth (here every 40 ticks = 2s)
+        if (tickCounter++ % 40 == 0) {
             var server = event.getServer();
 
             // Blur system - seulement si activé

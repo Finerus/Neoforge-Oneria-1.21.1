@@ -1,0 +1,103 @@
+["Obfuscation Settings"]
+	#CONFIGURATION: Proximity Distance
+	#The distance (in blocks) required to see another player's name clearly.
+	#If the player is further away, the name will be replaced by '???'.
+	#Default value: 8 blocks.
+	# Default: 8
+	# Range: 1 ~ 128
+	proximityDistance = 8
+	#CONFIGURATION: Blur Effect
+	#Enables or disables the name blurring system.
+	#Setting this to 'false' completely disables the client-side visual effect.
+	enableBlur = true
+	#CONFIGURATION: Hidden Name Length
+	#Number of characters used to replace the name (e.g., 5 results in '?????').
+	# Default: 5
+	# Range: 1 ~ 16
+	obfuscatedNameLength = 5
+	#CONFIGURATION: Hide Ranks/Prefixes
+	#If 'true', prefixes (ranks, titles) will also be hidden in the TabList.
+	#Recommended for strict RP.
+	obfuscatePrefix = true
+	#CONFIGURATION: Sneak Stealth Mode
+	#If 'true', players who are sneaking become harder to detect.
+	#Their name will only be visible at a much closer distance.
+	enableSneakStealth = true
+	#CONFIGURATION: Sneak Detection Distance
+	#The distance (in blocks) at which sneaking players can be detected.
+	#Only applies when enableSneakStealth is true.
+	#Default value: 2 blocks.
+	# Default: 2
+	# Range: 1 ~ 32
+	sneakProximityDistance = 2
+	#CONFIGURATION: Admin View
+	#If 'true', operators and staff always see all names clearly.
+	opsSeeAll = true
+	#DEBUG: Self-Blur
+	#If 'true', applies the blur to yourself for testing purposes.
+	#Never leave enabled in production.
+	debugSelfBlur = false
+	#CONFIGURATION: Hide Nametags
+	#If 'true', hides all player nametags above their heads.
+	#Uses scoreboard teams to hide names server-side.
+	hideNametags = false
+	#CONFIGURATION: Show Prefix/Suffix on Nametags
+	#If 'true', displays LuckPerms prefix/suffix above player heads.
+	showNametagPrefixSuffix = true
+	#WHITELIST: Immune Players
+	#List of usernames that always see everything clearly, even without OP.
+	#These players are never obfuscated for others either.
+	whitelist = []
+	#BLACKLIST: Always Hidden Players
+	#List of usernames that are always obfuscated, regardless of proximity.
+	blacklist = []
+	#ALWAYS VISIBLE: Always Shown in TabList
+	#List of usernames that are always shown clearly in the TabList.
+	alwaysVisibleList = []
+	#CONFIGURATION: Blur Spectators
+	#If 'true', spectators are also subject to name blurring.
+	blurSpectators = false
+	#CONFIGURATION: Whitelist Exempts Profession Restrictions
+	#If 'true', players in the whitelist are also exempt from profession restrictions.
+	whitelistExemptProfessions = false
+
+["Permissions System"]
+	#List of LuckPerms tags/groups considered as 'staff'.
+	#Used to determine who receives staff notifications.
+	staffTags = ["admin", "moderateur", "modo", "staff", "builder"]
+	#Minimum OP level required to bypass all restrictions.
+	#Set to 0 to disable OP bypass entirely.
+	# Default: 2
+	# Range: 0 ~ 4
+	opLevelBypass = 2
+	#If 'true', uses LuckPerms groups to determine staff status.
+	#If 'false', uses OP level only.
+	useLuckPermsGroups = true
+	#LuckPerms groups considered as staff.
+	#Only used if useLuckPermsGroups is true.
+	luckPermsStaffGroups = ["admin", "moderateur", "staff"]
+
+["World Border Warning"]
+	#Enable warning when players reach world border distance.
+	enableWorldBorderWarning = true
+	#Distance from spawn (in blocks) before warning is triggered.
+	# Default: 2000
+	# Range: 100 ~ 100000
+	worldBorderDistance = 2000
+	#Message displayed when player reaches border.
+	#Variables: {distance}, {player}
+	worldBorderMessage = "§c§l⚠ WARNING §r§7You've reached the limit of the world! (§c{distance} blocks§7)"
+	#Check interval in ticks (20 ticks = 1 second).
+	#Higher values = less frequent checks = better performance.
+	# Default: 40
+	# Range: 20 ~ 200
+	worldBorderCheckInterval = 40
+	#Named zones that trigger a message when entered/exited.
+	#Format: name;centerX;centerZ;radius;messageEnter;messageExit
+	#Example: Village;100;200;150;§aBienvenue au Village!;§7Vous quittez le Village.
+	namedZones = []
+	#Display mode for zone and world border messages.
+	#IMMERSIVE = ImmersiveMessageAPI overlay (requires client mod).
+	#CHAT = Standard chat message.
+	#ACTION_BAR = Action bar (vanilla, no client mod needed).
+	zoneMessageMode = "ACTION_BAR"

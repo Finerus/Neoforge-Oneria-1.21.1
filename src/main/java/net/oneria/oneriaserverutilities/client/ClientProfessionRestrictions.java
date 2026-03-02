@@ -1,5 +1,8 @@
 package net.oneria.oneriaserverutilities.client;
 
+import net.oneria.oneriaserverutilities.OneriaPatternUtils;
+import net.oneria.oneriaserverutilities.OneriaServerUtilities;
+
 import java.util.HashSet;
 import java.util.Set;
 
@@ -23,40 +26,21 @@ public class ClientProfessionRestrictions {
         blockedEquipment.clear();
         blockedEquipment.addAll(equipment);
 
-        System.out.println("[ClientRestrictions] Updated: " + crafts.size() + " crafts, " + equipment.size() + " equipment");
+        OneriaServerUtilities.LOGGER.debug("[ClientRestrictions] Updated: {} crafts, {} equipment",
+                crafts.size(), equipment.size());
     }
 
     /**
      * Vérifie si un craft est bloqué
      */
     public static boolean isCraftBlocked(String itemId) {
-        return blockedCrafts.stream().anyMatch(pattern -> matchesPattern(itemId, pattern));
+        return blockedCrafts.stream().anyMatch(pattern -> OneriaPatternUtils.matchesPattern(itemId, pattern));
     }
 
     /**
      * Vérifie si un équipement est bloqué
      */
     public static boolean isEquipmentBlocked(String itemId) {
-        return blockedEquipment.stream().anyMatch(pattern -> matchesPattern(itemId, pattern));
-    }
-
-    /**
-     * Vérifie si un itemId correspond à un pattern (avec support wildcards)
-     */
-    private static boolean matchesPattern(String itemId, String pattern) {
-        // Correspondance exacte
-        if (itemId.equals(pattern)) {
-            return true;
-        }
-
-        // Support wildcards (minecraft:*_sword)
-        if (pattern.contains("*")) {
-            String regex = pattern
-                    .replace(".", "\\.")
-                    .replace("*", ".*");
-            return itemId.matches(regex);
-        }
-
-        return false;
+        return blockedEquipment.stream().anyMatch(pattern -> OneriaPatternUtils.matchesPattern(itemId, pattern));
     }
 }

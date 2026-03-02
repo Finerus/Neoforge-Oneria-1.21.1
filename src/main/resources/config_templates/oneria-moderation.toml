@@ -1,0 +1,17 @@
+["Silent Commands"]
+	#Enable /oneria staff gm/tp/effect commands.
+	enableSilentCommands = true
+	#Notify other staff members when a silent command is used.
+	logToStaff = true
+	#Log silent commands to the server console.
+	logToConsole = true
+	#If 'true', the target receives a message (useful for debug, otherwise leave false).
+	notifyTarget = false
+
+["Teleportation Platforms"]
+	#Enable the /oneria staff platform command.
+	enablePlatforms = true
+	#List of TP platforms.
+	#Format: id;DisplayName;dimension;x;y;z
+	#Example: spawn;The Spawn;minecraft:overworld;0;100;0
+	platforms = ["platform1;Platform 1;oneria:quartier;7217;18;-1321"]

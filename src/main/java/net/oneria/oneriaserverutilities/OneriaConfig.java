@@ -1,13 +1,13 @@
 package net.oneria.oneriaserverutilities;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
+
 import java.util.Arrays;
 import java.util.List;
 
 public class OneriaConfig {
     public static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
     public static final ModConfigSpec SPEC;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> NAMED_ZONES;
 
     // === OBFUSCATION CONFIGURATION ===
     public static final ModConfigSpec.IntValue PROXIMITY_DISTANCE;
@@ -32,57 +32,12 @@ public class OneriaConfig {
     public static final ModConfigSpec.BooleanValue USE_LUCKPERMS_GROUPS;
     public static final ModConfigSpec.ConfigValue<List<? extends String>> LUCKPERMS_STAFF_GROUPS;
 
-    // === SCHEDULE SYSTEM ===
-    public static final ModConfigSpec.BooleanValue ENABLE_SCHEDULE;
-    public static final ModConfigSpec.ConfigValue<String> OPENING_TIME;
-    public static final ModConfigSpec.ConfigValue<String> CLOSING_TIME;
-    public static final ModConfigSpec.ConfigValue<List<? extends Integer>> WARNING_TIMES;
-    public static final ModConfigSpec.BooleanValue KICK_NON_STAFF;
-
-    // === MESSAGES ===
-    public static final ModConfigSpec.ConfigValue<String> MSG_SERVER_CLOSED;
-    public static final ModConfigSpec.ConfigValue<String> MSG_SERVER_OPENED;
-    public static final ModConfigSpec.ConfigValue<String> MSG_WARNING;
-    public static final ModConfigSpec.ConfigValue<String> MSG_CLOSING_IMMINENT;
-
-    // === WELCOME ===
-    public static final ModConfigSpec.BooleanValue ENABLE_WELCOME;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> WELCOME_LINES;
-    public static final ModConfigSpec.ConfigValue<String> WELCOME_SOUND;
-    public static final ModConfigSpec.DoubleValue WELCOME_SOUND_VOLUME;
-    public static final ModConfigSpec.DoubleValue WELCOME_SOUND_PITCH;
-
-    // === PLATFORMS ===
-    public static final ModConfigSpec.BooleanValue ENABLE_PLATFORMS;
-    public static final ModConfigSpec.ConfigValue<List<? extends String>> PLATFORMS;
-
-    // === MODERATION (Silent Commands) ===
-    public static final ModConfigSpec.BooleanValue ENABLE_SILENT_COMMANDS;
-    public static final ModConfigSpec.BooleanValue LOG_TO_STAFF;
-    public static final ModConfigSpec.BooleanValue LOG_TO_CONSOLE;
-    public static final ModConfigSpec.BooleanValue NOTIFY_TARGET;
-
-    // === CHAT SYSTEM ===
-    public static final ModConfigSpec.BooleanValue ENABLE_CHAT_FORMAT;
-    public static final ModConfigSpec.ConfigValue<String> PLAYER_NAME_FORMAT;
-    public static final ModConfigSpec.ConfigValue<String> CHAT_MESSAGE_FORMAT;
-    public static final ModConfigSpec.ConfigValue<String> CHAT_MESSAGE_COLOR;
-    public static final ModConfigSpec.BooleanValue ENABLE_TIMESTAMP;
-    public static final ModConfigSpec.ConfigValue<String> TIMESTAMP_FORMAT;
-    public static final ModConfigSpec.BooleanValue MARKDOWN_ENABLED;
-    public static final ModConfigSpec.BooleanValue ENABLE_COLORS_COMMAND;
-    public static final ModConfigSpec.BooleanValue LOG_PRIVATE_MESSAGES;
-
-    // === JOIN/LEAVE MESSAGES ===
-    public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_JOIN_LEAVE;
-    public static final ModConfigSpec.ConfigValue<String> JOIN_MESSAGE;
-    public static final ModConfigSpec.ConfigValue<String> LEAVE_MESSAGE;
-
-    // === WORLD BORDER WARNING ===
+    // === WORLD BORDER & ZONES ===
     public static final ModConfigSpec.BooleanValue ENABLE_WORLD_BORDER_WARNING;
     public static final ModConfigSpec.IntValue WORLD_BORDER_DISTANCE;
     public static final ModConfigSpec.ConfigValue<String> WORLD_BORDER_MESSAGE;
     public static final ModConfigSpec.IntValue WORLD_BORDER_CHECK_INTERVAL;
+    public static final ModConfigSpec.ConfigValue<List<? extends String>> NAMED_ZONES;
     public static final ModConfigSpec.ConfigValue<String> ZONE_MESSAGE_MODE;
 
     static {
@@ -145,44 +100,36 @@ public class OneriaConfig {
                         "Uses scoreboard teams to hide names server-side.")
                 .define("hideNametags", false);
 
+        SHOW_NAMETAG_PREFIX_SUFFIX = BUILDER
+                .comment("CONFIGURATION: Show Prefix/Suffix on Nametags",
+                        "If 'true', displays LuckPerms prefix/suffix above player heads.")
+                .define("showNametagPrefixSuffix", true);
+
         WHITELIST = BUILDER
                 .comment("WHITELIST: Immune Players",
                         "List of usernames that always see everything clearly, even without OP.",
-                        "Format: A list of strings.")
-                .defineList("whitelist", Arrays.asList("AdminPlayer", "Moderator"), obj -> obj instanceof String);
+                        "These players are never obfuscated for others either.")
+                .defineList("whitelist", List.of(), obj -> obj instanceof String);
 
         BLACKLIST = BUILDER
                 .comment("BLACKLIST: Always Hidden Players",
-                        "List of usernames that are ALWAYS hidden, even at close range.",
-                        "Useful for staff in stealth mode or special NPCs.",
-                        "Format: A list of strings.")
-                .defineList("blacklist", Arrays.asList(), obj -> obj instanceof String);
+                        "List of usernames that are always obfuscated, regardless of proximity.")
+                .defineList("blacklist", List.of(), obj -> obj instanceof String);
 
         ALWAYS_VISIBLE_LIST = BUILDER
-                .comment("ALWAYS VISIBLE: Players Always Shown in TabList",
-                        "List of usernames that are ALWAYS visible in TabList, never blurred.",
-                        "Different from whitelist - these players are visible TO EVERYONE.",
-                        "Useful for important NPCs, admins, or event coordinators.",
-                        "Format: A list of strings.")
-                .defineList("alwaysVisibleList", Arrays.asList(), obj -> obj instanceof String);
+                .comment("ALWAYS VISIBLE: Always Shown in TabList",
+                        "List of usernames that are always shown clearly in the TabList.")
+                .defineList("alwaysVisibleList", List.of(), obj -> obj instanceof String);
 
         BLUR_SPECTATORS = BUILDER
                 .comment("CONFIGURATION: Blur Spectators",
-                        "If 'true', players in spectator mode are always blurred (except if in alwaysVisibleList).",
-                        "Useful to hide staff members observing in spectator mode.")
-                .define("blurSpectators", true);
+                        "If 'true', spectators are also subject to name blurring.")
+                .define("blurSpectators", false);
 
         WHITELIST_EXEMPT_PROFESSIONS = BUILDER
-                .comment("CONFIGURATION: Whitelist Exempt from Profession Restrictions",
-                        "If 'true', players in the whitelist bypass ALL profession restrictions.",
-                        "They can craft, break, use, and equip anything regardless of professions.")
-                .define("whitelistExemptProfessions", true);
-
-        SHOW_NAMETAG_PREFIX_SUFFIX = BUILDER
-                .comment("CONFIGURATION: Show Prefix/Suffix on Nametags",
-                        "If 'true', displays LuckPerms prefix/suffix with nicknames above heads.",
-                        "If 'false', shows only the nickname.")
-                .define("showNametagPrefixSuffix", false);
+                .comment("CONFIGURATION: Whitelist Exempts Profession Restrictions",
+                        "If 'true', players in the whitelist are also exempt from profession restrictions.")
+                .define("whitelistExemptProfessions", false);
 
         BUILDER.pop();
 
@@ -192,170 +139,29 @@ public class OneriaConfig {
         BUILDER.push("Permissions System");
 
         STAFF_TAGS = BUILDER
-                .comment("List of tags (scoreboard tags) considered as Staff.",
-                        "Example: /tag add PlayerName admin")
-                .defineList("staffTags", Arrays.asList("admin", "modo", "staff", "builder"), obj -> obj instanceof String);
+                .comment("List of LuckPerms tags/groups considered as 'staff'.",
+                        "Used to determine who receives staff notifications.")
+                .defineList("staffTags", Arrays.asList("admin", "moderateur", "modo", "staff", "builder"), obj -> obj instanceof String);
 
         OP_LEVEL_BYPASS = BUILDER
-                .comment("Minimum OP level to be considered Staff (0 = disabled, 4 = server admin).")
+                .comment("Minimum OP level required to bypass all restrictions.",
+                        "Set to 0 to disable OP bypass entirely.")
                 .defineInRange("opLevelBypass", 2, 0, 4);
 
         USE_LUCKPERMS_GROUPS = BUILDER
-                .comment("Enable LuckPerms integration to detect staff via their groups.")
+                .comment("If 'true', uses LuckPerms groups to determine staff status.",
+                        "If 'false', uses OP level only.")
                 .define("useLuckPermsGroups", true);
 
         LUCKPERMS_STAFF_GROUPS = BUILDER
-                .comment("List of LuckPerms groups considered as Staff.")
-                .defineList("luckPermsStaffGroups", Arrays.asList("admin", "moderator", "mod"), obj -> obj instanceof String);
+                .comment("LuckPerms groups considered as staff.",
+                        "Only used if useLuckPermsGroups is true.")
+                .defineList("luckPermsStaffGroups", Arrays.asList("admin", "moderateur", "staff"), obj -> obj instanceof String);
 
         BUILDER.pop();
 
         // ===============================================================================
-        // CATEGORY: SCHEDULE SYSTEM
-        // ===============================================================================
-        BUILDER.push("Schedule System");
-
-        ENABLE_SCHEDULE = BUILDER.comment("Enable automatic opening/closing system.").define("enableSchedule", true);
-        OPENING_TIME = BUILDER.comment("Opening time (Format HH:MM).").define("openingTime", "19:00");
-        CLOSING_TIME = BUILDER.comment("Closing time (Format HH:MM).").define("closingTime", "23:59");
-        WARNING_TIMES = BUILDER.comment("Minutes before closing to send a warning.").defineList("warningTimes", Arrays.asList(45, 30, 10, 1), obj -> obj instanceof Integer);
-        KICK_NON_STAFF = BUILDER.comment("If 'true', kicks non-staff players at closing time.").define("kickNonStaff", true);
-
-        BUILDER.pop();
-
-        // ===============================================================================
-        // CATEGORY: MESSAGES
-        // ===============================================================================
-        BUILDER.push("Messages");
-
-        MSG_SERVER_CLOSED = BUILDER.comment("Message displayed upon kick (Supports § color codes).").define("serverClosedMessage", "§c§l[SERVER CLOSED]");
-        MSG_SERVER_OPENED = BUILDER.comment("Message sent to staff upon opening.").define("serverOpenedMessage", "§a§l[SERVER OPENED]");
-        MSG_WARNING = BUILDER.comment("Warning message ({minutes} is automatically replaced).").define("warningMessage", "§e⚠ Warning! Closing in {minutes} min.");
-        MSG_CLOSING_IMMINENT = BUILDER.comment("Final message 1 min before closing.").define("closingImminentMessage", "§c⚠ CLOSING IMMINENT!");
-
-        BUILDER.pop();
-
-        // ===============================================================================
-        // CATEGORY: WELCOME
-        // ===============================================================================
-        BUILDER.push("Welcome Message");
-
-        ENABLE_WELCOME = BUILDER.comment("Display welcome message on connection.").define("enableWelcome", true);
-        WELCOME_LINES = BUILDER.comment("Message lines. Variables: {player}, {nickname}.").defineList("welcomeLines", Arrays.asList("Welcome {nickname}"), obj -> obj instanceof String);
-        WELCOME_SOUND = BUILDER.comment("Sound played on connection (leave empty for none).").define("welcomeSound", "minecraft:entity.player.levelup");
-        WELCOME_SOUND_VOLUME = BUILDER.defineInRange("welcomeSoundVolume", 0.5, 0.0, 1.0);
-        WELCOME_SOUND_PITCH = BUILDER.defineInRange("welcomeSoundPitch", 1.0, 0.5, 2.0);
-
-        BUILDER.pop();
-
-        // ===============================================================================
-        // CATEGORY: PLATFORMS (Staff TP)
-        // ===============================================================================
-        BUILDER.push("Teleportation Platforms");
-
-        ENABLE_PLATFORMS = BUILDER.comment("Enable the /oneria staff platform command.").define("enablePlatforms", true);
-        PLATFORMS = BUILDER
-                .comment("List of TP platforms.",
-                        "Format: id;DisplayName;dimension;x;y;z",
-                        "Example: spawn;The Spawn;minecraft:overworld;0;100;0")
-                .defineList("platforms", Arrays.asList("platform1;Platform 1;oneria:quartier;7217;18;-1321"), obj -> obj instanceof String);
-
-        BUILDER.pop();
-
-        // ===============================================================================
-        // CATEGORY: MODERATION (Silent Commands)
-        // ===============================================================================
-        BUILDER.push("Silent Commands");
-
-        ENABLE_SILENT_COMMANDS = BUILDER.comment("Enable /oneria staff gm/tp/effect commands.").define("enableSilentCommands", true);
-        LOG_TO_STAFF = BUILDER.comment("Notify other staff members when a silent command is used.").define("logToStaff", true);
-        LOG_TO_CONSOLE = BUILDER.comment("Log silent commands to the server console.").define("logToConsole", true);
-        NOTIFY_TARGET = BUILDER.comment("If 'true', the target receives a message (useful for debug, otherwise leave false).").define("notifyTarget", false);
-
-        BUILDER.pop();
-
-        // ===============================================================================
-        // CATEGORY: CHAT SYSTEM
-        // ===============================================================================
-        BUILDER.push("Chat System");
-
-        ENABLE_CHAT_FORMAT = BUILDER
-                .comment("Enable custom chat formatting system")
-                .define("enableChatFormat", true);
-
-        PLAYER_NAME_FORMAT = BUILDER
-                .comment("Player name format in chat",
-                        "Variables: $prefix, $name, $suffix",
-                        "$prefix = LuckPerms prefix",
-                        "$name = player name or nickname",
-                        "$suffix = LuckPerms suffix")
-                .define("playerNameFormat", "$prefix $name $suffix");
-
-        CHAT_MESSAGE_FORMAT = BUILDER
-                .comment("Chat message format",
-                        "Variables: $time, $name, $msg",
-                        "$time = timestamp (if enabled)",
-                        "$name = formatted player name",
-                        "$msg = player's message",
-                        "You can use color codes with §")
-                .define("chatMessageFormat", "[$time] $name: $msg");
-
-        CHAT_MESSAGE_COLOR = BUILDER
-                .comment("Global color for chat messages",
-                        "Choose: AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE, BLACK, GOLD,",
-                        "GRAY, BLUE, GREEN, DARK_GRAY, DARK_AQUA, DARK_RED,",
-                        "DARK_PURPLE, DARK_GREEN, DARK_BLUE")
-                .define("chatMessageColor", "WHITE");
-
-        ENABLE_TIMESTAMP = BUILDER
-                .comment("Show timestamp in chat messages")
-                .define("enableTimestamp", true);
-
-        TIMESTAMP_FORMAT = BUILDER
-                .comment("Timestamp format (Java SimpleDateFormat)",
-                        "Examples: HH:mm, HH:mm:ss, hh:mm a",
-                        "Read more: https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html")
-                .define("timestampFormat", "HH:mm");
-
-        MARKDOWN_ENABLED = BUILDER
-                .comment("Enable markdown styling in chat",
-                        "**bold**, *italic*, __underline__, ~~strikethrough~~")
-                .define("markdownEnabled", true);
-
-        ENABLE_COLORS_COMMAND = BUILDER
-                .comment("Enable /colors command to show available colors")
-                .define("enableColorsCommand", true);
-
-        LOG_PRIVATE_MESSAGES = BUILDER
-                .comment("If 'true', logs private messages (/msg) to the server console.",
-                        "Useful for moderation purposes.")
-                .define("logPrivateMessages", false);
-
-        BUILDER.pop();
-
-        // ===============================================================================
-        // CATEGORY: JOIN/LEAVE MESSAGES
-        // ===============================================================================
-        BUILDER.push("Join and Leave Messages");
-
-        ENABLE_CUSTOM_JOIN_LEAVE = BUILDER
-                .comment("Enable custom join/leave messages.")
-                .define("enableCustomJoinLeave", true);
-
-        JOIN_MESSAGE = BUILDER
-                .comment("Join message. Variables: {player}, {nickname}",
-                        "Use 'none' to disable join messages completely.")
-                .define("joinMessage", "§e{player} §7joined the game");
-
-        LEAVE_MESSAGE = BUILDER
-                .comment("Leave message. Variables: {player}, {nickname}",
-                        "Use 'none' to disable leave messages completely.")
-                .define("leaveMessage", "§e{player} §7left the game");
-
-        BUILDER.pop();
-
-        // ===============================================================================
-        // CATEGORY: WORLD BORDER WARNING
+        // CATEGORY: WORLD BORDER & ZONES
         // ===============================================================================
         BUILDER.push("World Border Warning");
 

@@ -21,7 +21,7 @@ public class OneriaChatFormatter {
      * Formate un message de chat complet
      */
     public static Component formatChatMessage(ServerPlayer sender, String message) {
-        if (!OneriaConfig.ENABLE_CHAT_FORMAT.get()) {
+        if (!ChatConfig.ENABLE_CHAT_FORMAT.get()) {
             return Component.literal("<" + sender.getName().getString() + "> " + message);
         }
 
@@ -30,9 +30,9 @@ public class OneriaChatFormatter {
 
         // 2. Obtenir le timestamp
         String timestamp = "";
-        if (OneriaConfig.ENABLE_TIMESTAMP.get()) {
+        if (ChatConfig.ENABLE_TIMESTAMP.get()) {
             try {
-                SimpleDateFormat sdf = new SimpleDateFormat(OneriaConfig.TIMESTAMP_FORMAT.get());
+                SimpleDateFormat sdf = new SimpleDateFormat(ChatConfig.TIMESTAMP_FORMAT.get());
                 timestamp = sdf.format(new Date());
             } catch (Exception e) {
                 timestamp = "";
@@ -41,16 +41,16 @@ public class OneriaChatFormatter {
 
         // 3. Appliquer le markdown et la couleur du message
         String formattedBody = message;
-        if (OneriaConfig.MARKDOWN_ENABLED.get()) {
+        if (ChatConfig.MARKDOWN_ENABLED.get()) {
             formattedBody = applyMarkdown(message);
         }
 
         // On récupère la couleur du message et on l'applique au corps du message
-        String messageColor = getColorCode(OneriaConfig.CHAT_MESSAGE_COLOR.get());
+        String messageColor = getColorCode(ChatConfig.CHAT_MESSAGE_COLOR.get());
         String finalMessageBody = messageColor + formattedBody;
 
         // 4. Construire le format final
-        String chatFormat = OneriaConfig.CHAT_MESSAGE_FORMAT.get();
+        String chatFormat = ChatConfig.CHAT_MESSAGE_FORMAT.get();
         chatFormat = chatFormat.replace("$time", timestamp);
         chatFormat = chatFormat.replace("$name", playerName);
         chatFormat = chatFormat.replace("$msg", finalMessageBody);
@@ -63,7 +63,7 @@ public class OneriaChatFormatter {
      * Formate le nom d'un joueur et assure la réinitialisation du formatage après
      */
     private static String formatPlayerName(ServerPlayer player) {
-        String format = OneriaConfig.PLAYER_NAME_FORMAT.get();
+        String format = ChatConfig.PLAYER_NAME_FORMAT.get();
 
         String prefix = OneriaServerUtilities.getPlayerPrefix(player);
         if (prefix == null) prefix = "";

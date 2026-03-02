@@ -1,0 +1,140 @@
+#═══════════════════════════════════════════════════════════════
+#  ONERIA - PROFESSION & RESTRICTION SYSTEM
+#═══════════════════════════════════════════════════════════════
+#
+#This configuration file manages:
+#  - Profession definitions (name, color, display)
+#  - Global restrictions (crafts, blocks, items, equipment)
+#  - Profession-specific permissions (overrides)
+#
+#Format for profession definitions:
+#  id;DisplayName;ColorCode
+#  Example: chasseur;Chasseur;§a (green hunter)
+#
+#Format for restrictions:
+#  - Use Minecraft resource locations (namespace:path)
+#  - Example: minecraft:diamond_pickaxe
+#  - Supports wildcards: minecraft:*_sword (all swords)
+#
+#Format for profession overrides:
+#  profession_id;item1,item2,item3
+#  Example: mineur;minecraft:iron_pickaxe,minecraft:diamond_pickaxe
+#
+#═══════════════════════════════════════════════════════════════
+["Profession System"]
+	#
+	#═══════════════════════════════════════
+	#  PROFESSION DEFINITIONS
+	#═══════════════════════════════════════
+	#
+	#Define all available professions with their display properties.
+	#Format: id;DisplayName;ColorCode
+	#
+	#Available color codes:
+	#  §0 = Black       §1 = Dark Blue    §2 = Dark Green
+	#  §3 = Dark Aqua   §4 = Dark Red     §5 = Dark Purple
+	#  §6 = Gold        §7 = Gray         §8 = Dark Gray
+	#  §9 = Blue        §a = Green        §b = Aqua
+	#  §c = Red         §d = Light Purple §e = Yellow
+	#  §f = White
+	#
+	#Examples:
+	#  chasseur;Chasseur;§a           (Green hunter)
+	#  forgeron;Forgeron;§c           (Red blacksmith)
+	#  alchimiste;Alchimiste;§5       (Purple alchemist)
+	professions = ["chasseur;Chasseur;§a", "pecheur;Pêcheur;§b", "mineur;Mineur;§8", "bucheron;Bûcheron;§6", "forgeron;Forgeron;§c", "alchimiste;Alchimiste;§5", "marchand;Marchand;§e", "garde;Garde;§9"]
+
+#
+#═══════════════════════════════════════
+#  GLOBAL RESTRICTIONS
+#═══════════════════════════════════════
+#
+#Define what is BLOCKED for ALL players by default.
+#Players with specific professions can override these via
+#the profession override lists below.
+#
+#Use Minecraft resource locations (namespace:item_name)
+#Supports wildcards with * at the end of namespace or path.
+["Global Restrictions"]
+	#
+	#Crafts that are blocked for everyone (unless overridden by profession).
+	#
+	#Examples:
+	#  minecraft:diamond_sword      - Block diamond sword crafting
+	#  minecraft:*_pickaxe          - Block all pickaxes
+	#  minecraft:iron_*             - Block all iron items
+	globalBlockedCrafts = ["minecraft:diamond_sword", "minecraft:diamond_pickaxe", "minecraft:diamond_axe", "minecraft:netherite_sword", "minecraft:netherite_pickaxe"]
+	#
+	#Blocks that cannot be broken by anyone (unless overridden by profession).
+	#
+	#Examples:
+	#  minecraft:diamond_ore        - Cannot mine diamond ore
+	#  minecraft:ancient_debris     - Cannot mine ancient debris
+	#  minecraft:*_ore              - Cannot mine any ore
+	globalUnbreakableBlocks = ["minecraft:diamond_ore", "minecraft:deepslate_diamond_ore", "minecraft:iron_ore", "minecraft:deepslate_iron_ore", "minecraft:gold_ore", "minecraft:deepslate_gold_ore"]
+	#
+	#Items that cannot be used/interacted with (right-click blocked).
+	#
+	#Examples:
+	#  minecraft:flint_and_steel    - Cannot use flint and steel
+	#  minecraft:*_bucket           - Cannot use any bucket
+	globalBlockedItems = ["minecraft:flint_and_steel", "minecraft:fire_charge"]
+	#
+	#Equipment (armor, tools, weapons) that cannot be equipped/held.
+	#
+	#Examples:
+	#  minecraft:diamond_sword      - Cannot equip diamond sword
+	#  minecraft:diamond_helmet     - Cannot wear diamond helmet
+	#  minecraft:diamond_*          - Cannot use any diamond equipment
+	globalBlockedEquipment = ["minecraft:diamond_sword", "minecraft:diamond_helmet", "minecraft:diamond_chestplate", "minecraft:diamond_leggings", "minecraft:diamond_boots"]
+
+#
+#═══════════════════════════════════════
+#  PROFESSION OVERRIDES
+#═══════════════════════════════════════
+#
+#Define what each profession is ALLOWED to do despite global restrictions.
+#Format: profession_id;item1,item2,item3
+#
+#The profession_id must match the id from the profession definitions above.
+#
+#Examples:
+#  mineur;minecraft:iron_pickaxe,minecraft:diamond_pickaxe
+#  forgeron;minecraft:diamond_sword,minecraft:anvil
+#  bucheron;minecraft:iron_axe,minecraft:diamond_axe
+["Profession Overrides"]
+	#
+	#Crafts that each profession IS ALLOWED to make.
+	#Overrides global craft restrictions.
+	professionAllowedCrafts = ["mineur;minecraft:iron_pickaxe,minecraft:diamond_pickaxe", "forgeron;minecraft:diamond_sword,minecraft:iron_sword,minecraft:anvil", "bucheron;minecraft:iron_axe,minecraft:diamond_axe"]
+	#
+	#Blocks that each profession IS ALLOWED to break.
+	#Overrides global unbreakable blocks.
+	professionAllowedBlocks = ["mineur;minecraft:diamond_ore,minecraft:deepslate_diamond_ore,minecraft:iron_ore,minecraft:gold_ore", "bucheron;minecraft:oak_log,minecraft:birch_log,minecraft:spruce_log"]
+	#
+	#Items that each profession IS ALLOWED to use.
+	#Overrides global blocked items.
+	professionAllowedItems = ["alchimiste;minecraft:brewing_stand,minecraft:cauldron", "garde;minecraft:flint_and_steel"]
+	#
+	#Equipment that each profession IS ALLOWED to use/wear.
+	#Overrides global blocked equipment.
+	professionAllowedEquipment = ["garde;minecraft:diamond_sword,minecraft:diamond_helmet,minecraft:diamond_chestplate", "mineur;minecraft:diamond_pickaxe,minecraft:iron_pickaxe"]
+
+#
+#═══════════════════════════════════════
+#  MESSAGES
+#═══════════════════════════════════════
+#
+#Customize messages shown to players when actions are blocked.
+#Variables available:
+#  {item}       - The item/block/craft name
+#  {profession} - Required profession(s)
+[Messages]
+	#Message shown when a craft is blocked
+	craftBlockedMessage = "§c✘ Vous ne pouvez pas crafter cet objet ! §7Métier requis: §e{profession}"
+	#Message shown when block breaking is blocked
+	blockBreakBlockedMessage = "§c✘ Vous ne pouvez pas casser ce bloc ! §7Métier requis: §e{profession}"
+	#Message shown when item usage is blocked
+	itemUseBlockedMessage = "§c✘ Vous ne pouvez pas utiliser cet objet ! §7Métier requis: §e{profession}"
+	#Message shown when equipment is blocked
+	equipmentBlockedMessage = "§c✘ Vous ne pouvez pas équiper cet objet ! §7Métier requis: §e{profession}"

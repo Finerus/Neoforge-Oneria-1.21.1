@@ -2,10 +2,9 @@ package net.oneria.oneriaserverutilities;
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.item.Item;
-import net.minecraft.world.level.block.Block;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -15,8 +14,13 @@ import java.util.regex.Pattern;
 public class ProfessionRestrictionManager {
 
     // Cache pour optimiser les performances
-    private static final Map<UUID, Set<String>> playerProfessionsCache = new HashMap<>();
-    private static final Map<String, ProfessionData> professionDataCache = new HashMap<>();
+    private static final Map<UUID, Set<String>> playerProfessionsCache = new ConcurrentHashMap<>();
+    private static final Map<String, ProfessionData> professionDataCache = new ConcurrentHashMap<>();
+
+    // Cache des patterns regex compilés (point 2 de l'optimisation)
+    // Evite de recompiler le même pattern à chaque appel
+    private static final Map<String, Pattern> compiledPatterns = new ConcurrentHashMap<>();
+
     private static long lastCacheUpdate = 0;
     private static final long CACHE_DURATION = 30000; // 30 secondes
     private static boolean isInitialized = false;
@@ -71,6 +75,7 @@ public class ProfessionRestrictionManager {
     public static void reloadCache() {
         professionDataCache.clear();
         playerProfessionsCache.clear();
+        compiledPatterns.clear(); // On vide aussi les patterns compilés
         isInitialized = false;
 
         try {
@@ -292,19 +297,23 @@ public class ProfessionRestrictionManager {
 
     /**
      * Vérifie si une ressource correspond à un pattern (supporte les wildcards *)
+     * Les patterns avec wildcard sont compilés une seule fois et mis en cache.
      */
     private static boolean matchesPattern(String resourceId, String pattern) {
         pattern = pattern.trim();
 
+        // Correspondance exacte - pas besoin de regex
         if (resourceId.equals(pattern)) {
             return true;
         }
 
+        // Pattern avec wildcard : on compile une seule fois et on met en cache
         if (pattern.contains("*")) {
-            String regex = pattern
-                    .replace(".", "\\.")
-                    .replace("*", ".*");
-            return Pattern.matches(regex, resourceId);
+            Pattern compiled = compiledPatterns.computeIfAbsent(pattern, p -> {
+                String regex = p.replace(".", "\\.").replace("*", ".*");
+                return Pattern.compile(regex);
+            });
+            return compiled.matcher(resourceId).matches();
         }
 
         return false;
@@ -411,6 +420,7 @@ public class ProfessionRestrictionManager {
     public static void clearCache() {
         playerProfessionsCache.clear();
         professionDataCache.clear();
+        compiledPatterns.clear();
         lastCacheUpdate = 0;
         isInitialized = false;
     }

@@ -24,19 +24,19 @@ public class OneriaScheduleManager {
     public static void reload() {
         try {
             // Vérifier que la config est chargée
-            if (OneriaConfig.OPENING_TIME == null || OneriaConfig.CLOSING_TIME == null) {
+            if (ScheduleConfig.OPENING_TIME == null || ScheduleConfig.CLOSING_TIME == null) {
                 OneriaServerUtilities.LOGGER.info("[Schedule] Config not loaded yet, skipping initialization");
                 return;
             }
 
-            openingTime = LocalTime.parse(OneriaConfig.OPENING_TIME.get(), TIME_FORMATTER);
-            closingTime = LocalTime.parse(OneriaConfig.CLOSING_TIME.get(), TIME_FORMATTER);
+            openingTime = LocalTime.parse(ScheduleConfig.OPENING_TIME.get(), TIME_FORMATTER);
+            closingTime = LocalTime.parse(ScheduleConfig.CLOSING_TIME.get(), TIME_FORMATTER);
             sentWarnings.clear();
             hasClosedToday = false;
             hasOpenedToday = false;
 
             OneriaServerUtilities.LOGGER.info("[Schedule] Initialized - Opening: {}, Closing: {}",
-                    OneriaConfig.OPENING_TIME.get(), OneriaConfig.CLOSING_TIME.get());
+                    ScheduleConfig.OPENING_TIME.get(), ScheduleConfig.CLOSING_TIME.get());
         } catch (IllegalStateException e) {
             // Config pas encore construite
             OneriaServerUtilities.LOGGER.debug("[Schedule] Config not built yet: {}", e.getMessage());
@@ -52,7 +52,7 @@ public class OneriaScheduleManager {
      * Checks if the server is currently open
      */
     public static boolean isServerOpen() {
-        if (!OneriaConfig.ENABLE_SCHEDULE.get()) return true;
+        if (!ScheduleConfig.ENABLE_SCHEDULE.get()) return true;
 
         // PROTECTION: Si pas initialisé, considérer comme ouvert
         if (openingTime == null || closingTime == null) {
@@ -74,7 +74,7 @@ public class OneriaScheduleManager {
      * Called every tick to manage schedule
      */
     public static void tick(MinecraftServer server) {
-        if (!OneriaConfig.ENABLE_SCHEDULE.get()) return;
+        if (!ScheduleConfig.ENABLE_SCHEDULE.get()) return;
 
         // PROTECTION: Vérifier que le schedule est initialisé
         if (openingTime == null || closingTime == null) {
@@ -113,7 +113,7 @@ public class OneriaScheduleManager {
 
 
     private static void checkWarnings(MinecraftServer server, LocalTime now) {
-        for (int minutes : OneriaConfig.WARNING_TIMES.get()) {
+        for (int minutes : ScheduleConfig.WARNING_TIMES.get()) {
             LocalTime warningTime = closingTime.minusMinutes(minutes);
 
             if (now.getHour() == warningTime.getHour() &&
@@ -124,9 +124,9 @@ public class OneriaScheduleManager {
 
                 String message;
                 if (minutes == 1) {
-                    message = OneriaConfig.MSG_CLOSING_IMMINENT.get();
+                    message = ScheduleConfig.MSG_CLOSING_IMMINENT.get();
                 } else {
-                    message = OneriaConfig.MSG_WARNING.get().replace("{minutes}", String.valueOf(minutes));
+                    message = ScheduleConfig.MSG_WARNING.get().replace("{minutes}", String.valueOf(minutes));
                 }
 
                 server.getPlayerList().broadcastSystemMessage(
@@ -138,9 +138,9 @@ public class OneriaScheduleManager {
     }
 
     private static void sendOpeningMessage(MinecraftServer server) {
-        String message = OneriaConfig.MSG_SERVER_OPENED.get()
-                .replace("{opening}", OneriaConfig.OPENING_TIME.get())
-                .replace("{closing}", OneriaConfig.CLOSING_TIME.get());
+        String message = ScheduleConfig.MSG_SERVER_OPENED.get()
+                .replace("{opening}", ScheduleConfig.OPENING_TIME.get())
+                .replace("{closing}", ScheduleConfig.CLOSING_TIME.get());
 
         // Send only to connected staff
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -151,11 +151,11 @@ public class OneriaScheduleManager {
     }
 
     private static void closeServer(MinecraftServer server) {
-        if (!OneriaConfig.KICK_NON_STAFF.get()) return;
+        if (!ScheduleConfig.KICK_NON_STAFF.get()) return;
 
-        String kickMessage = OneriaConfig.MSG_SERVER_CLOSED.get()
-                .replace("{opening}", OneriaConfig.OPENING_TIME.get())
-                .replace("{closing}", OneriaConfig.CLOSING_TIME.get());
+        String kickMessage = ScheduleConfig.MSG_SERVER_CLOSED.get()
+                .replace("{opening}", ScheduleConfig.OPENING_TIME.get())
+                .replace("{closing}", ScheduleConfig.CLOSING_TIME.get());
 
         List<ServerPlayer> playersToKick = new ArrayList<>();
 
@@ -181,13 +181,13 @@ public class OneriaScheduleManager {
      * @return null if OK, otherwise the kick message
      */
     public static Component canPlayerJoin(ServerPlayer player) {
-        if (!OneriaConfig.ENABLE_SCHEDULE.get()) return null;
+        if (!ScheduleConfig.ENABLE_SCHEDULE.get()) return null;
         if (OneriaPermissions.isStaff(player)) return null;
         if (isServerOpen()) return null;
 
-        String message = OneriaConfig.MSG_SERVER_CLOSED.get()
-                .replace("{opening}", OneriaConfig.OPENING_TIME.get())
-                .replace("{closing}", OneriaConfig.CLOSING_TIME.get());
+        String message = ScheduleConfig.MSG_SERVER_CLOSED.get()
+                .replace("{opening}", ScheduleConfig.OPENING_TIME.get())
+                .replace("{closing}", ScheduleConfig.CLOSING_TIME.get());
 
         return Component.literal(message);
     }

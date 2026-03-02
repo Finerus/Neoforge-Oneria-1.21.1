@@ -15,9 +15,6 @@ public class OneriaMessagingManager {
 
     private static final Map<UUID, UUID> lastMessaged = new HashMap<>();
 
-    /**
-     * Envoie un message privé entre deux joueurs avec format Oneria
-     */
     public static int sendMessage(ServerPlayer sender, ServerPlayer target, String message) {
         UUID senderUuid = sender.getUUID();
         UUID targetUuid = target.getUUID();
@@ -30,37 +27,43 @@ public class OneriaMessagingManager {
         String senderDisplay = (senderNick != null) ? senderNick : sender.getName().getString();
         String targetDisplay = (targetNick != null) ? targetNick : target.getName().getString();
 
-        MutableComponent senderName = Component.literal(targetDisplay)
+        MutableComponent targetNameComponent = Component.literal(targetDisplay)
                 .withStyle(style -> style
                         .withBold(true)
+                        .withItalic(true)
                         .withColor(0x999999)
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                 Component.literal("Cliquer pour répondre")))
                         .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                                 "/msg " + target.getName().getString() + " ")));
 
-        MutableComponent targetName = Component.literal(senderDisplay)
+        MutableComponent senderNameComponent = Component.literal(senderDisplay)
                 .withStyle(style -> style
                         .withBold(true)
+                        .withItalic(true)
                         .withColor(0x999999)
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                 Component.literal("Cliquer pour répondre")))
                         .withClickEvent(new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND,
                                 "/msg " + sender.getName().getString() + " ")));
 
-        MutableComponent toSender = Component.literal("§7[MP] Vous écrivez à ")
-                .append(senderName)
-                .append(Component.literal("§7 : " + message));
+        MutableComponent toSender = Component.literal("[MP] Vous écrivez à ")
+                .withStyle(style -> style.withColor(0x999999).withItalic(true))
+                .append(targetNameComponent)
+                .append(Component.literal(" : " + message)
+                        .withStyle(style -> style.withColor(0x999999).withItalic(true)));
 
-        MutableComponent toTarget = Component.literal("§7[MP] ")
-                .append(targetName)
-                .append(Component.literal("§7 vous écrit : " + message));
+        MutableComponent toTarget = Component.literal("[MP] ")
+                .withStyle(style -> style.withColor(0x999999).withItalic(true))
+                .append(senderNameComponent)
+                .append(Component.literal(" vous écrit : " + message)
+                        .withStyle(style -> style.withColor(0x999999).withItalic(true)));
 
         sender.sendSystemMessage(toSender);
         target.sendSystemMessage(toTarget);
 
         try {
-            if (OneriaConfig.LOG_PRIVATE_MESSAGES.get()) {
+            if (ChatConfig.LOG_PRIVATE_MESSAGES.get()) {
                 OneriaServerUtilities.LOGGER.info("[MP] {} -> {}: {}",
                         sender.getName().getString(),
                         target.getName().getString(),
@@ -74,12 +77,14 @@ public class OneriaMessagingManager {
     public static int reply(ServerPlayer sender, String message, MinecraftServer server) {
         UUID lastId = lastMessaged.get(sender.getUUID());
         if (lastId == null) {
-            sender.sendSystemMessage(Component.literal("§c[MP] Vous n'avez personne à qui répondre."));
+            sender.sendSystemMessage(Component.literal("[MP] Vous n'avez personne à qui répondre.")
+                    .withStyle(style -> style.withColor(0xFF5555).withItalic(true)));
             return 0;
         }
         ServerPlayer target = server.getPlayerList().getPlayer(lastId);
         if (target == null) {
-            sender.sendSystemMessage(Component.literal("§c[MP] Ce joueur n'est plus connecté."));
+            sender.sendSystemMessage(Component.literal("[MP] Ce joueur n'est plus connecté.")
+                    .withStyle(style -> style.withColor(0xFF5555).withItalic(true)));
             return 0;
         }
         return sendMessage(sender, target, message);

@@ -13,6 +13,7 @@ import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.network.chat.Component;
 
 /**
@@ -20,26 +21,23 @@ import net.minecraft.network.chat.Component;
  * Le fichier est sauvegardé dans le dossier world/data/oneriamod/
  */
 public class NicknameManager {
-    private static final Map<UUID, String> nicknames = new HashMap<>();
+    private static final Map<UUID, String> nicknames = new ConcurrentHashMap<>();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static File nicknameFile = null;
 
     /**
      * Définit le fichier de sauvegarde et charge les nicknames
-     * Appelé automatiquement au premier accès
+     * synchronized : empêche deux threads d'initialiser en même temps
      */
-    private static void ensureInitialized() {
+    private static synchronized void ensureInitialized() {
         if (nicknameFile != null) return;
 
         try {
-            // Utiliser le dossier de travail (là où se trouve le serveur)
             File worldFolder = new File("world");
             if (!worldFolder.exists()) {
-                // Si on est pas dans le bon dossier, utiliser le dossier courant
                 worldFolder = new File(".");
             }
 
-            // Créer le dossier world/data/oneriamod/
             File dataFolder = new File(worldFolder, "data/oneriamod");
             if (!dataFolder.exists()) {
                 dataFolder.mkdirs();
@@ -47,7 +45,6 @@ public class NicknameManager {
 
             nicknameFile = new File(dataFolder, "nicknames.json");
 
-            // Charger les nicknames si le fichier existe
             if (nicknameFile.exists()) {
                 loadFromFile();
             }
@@ -89,41 +86,49 @@ public class NicknameManager {
     }
 
     /**
-     * Sauvegarde les nicknames dans le fichier JSON
+     * Sauvegarde les nicknames dans le fichier JSON de manière asynchrone.
+     * On prend un snapshot des données d'abord pour ne pas bloquer le thread serveur.
      */
     private static void saveToFile() {
         ensureInitialized();
         if (nicknameFile == null) return;
 
-        try {
-            File parent = nicknameFile.getParentFile();
-            if (parent != null && !parent.exists()) parent.mkdirs();
+        // Snapshot immédiat sur le thread serveur (rapide)
+        Map<UUID, String> snapshot = new HashMap<>(nicknames);
+        File targetFile = nicknameFile;
 
-            Map<String, String> data = new HashMap<>();
-            MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        // L'écriture disque se fait sur un thread séparé
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                File parent = targetFile.getParentFile();
+                if (parent != null && !parent.exists()) parent.mkdirs();
 
-            for (Map.Entry<UUID, String> entry : nicknames.entrySet()) {
-                UUID uuid = entry.getKey();
-                String mcName = "Unknown";
-                if (server != null) {
-                    ServerPlayer online = server.getPlayerList().getPlayer(uuid);
-                    if (online != null) {
-                        mcName = online.getName().getString();
-                    } else if (server.getProfileCache() != null) {
-                        mcName = server.getProfileCache().get(uuid)
-                                .map(p -> p.getName()).orElse("Unknown");
+                Map<String, String> data = new HashMap<>();
+                MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+
+                for (Map.Entry<UUID, String> entry : snapshot.entrySet()) {
+                    UUID uuid = entry.getKey();
+                    String mcName = "Unknown";
+                    if (server != null) {
+                        ServerPlayer online = server.getPlayerList().getPlayer(uuid);
+                        if (online != null) {
+                            mcName = online.getName().getString();
+                        } else if (server.getProfileCache() != null) {
+                            mcName = server.getProfileCache().get(uuid)
+                                    .map(p -> p.getName()).orElse("Unknown");
+                        }
                     }
+                    data.put(uuid.toString() + " (" + mcName + ")", entry.getValue());
                 }
-                data.put(uuid.toString() + " (" + mcName + ")", entry.getValue());
-            }
 
-            try (FileWriter writer = new FileWriter(nicknameFile)) {
-                GSON.toJson(data, writer);
+                try (FileWriter writer = new FileWriter(targetFile)) {
+                    GSON.toJson(data, writer);
+                }
+                OneriaServerUtilities.LOGGER.debug("[NicknameManager] Saved {} nicknames", snapshot.size());
+            } catch (Exception e) {
+                OneriaServerUtilities.LOGGER.error("[NicknameManager] Failed to save nicknames", e);
             }
-            OneriaServerUtilities.LOGGER.debug("[NicknameManager] Saved {} nicknames", nicknames.size());
-        } catch (Exception e) {
-            OneriaServerUtilities.LOGGER.error("[NicknameManager] Failed to save nicknames", e);
-        }
+        });
     }
 
     /**
@@ -225,7 +230,7 @@ public class NicknameManager {
      * Recharge les nicknames depuis le fichier
      */
     public static void reload() {
-        nicknameFile = null; // Réinitialiser
+        nicknameFile = null;
         nicknames.clear();
         ensureInitialized();
     }

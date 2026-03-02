@@ -5,7 +5,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
 import net.oneria.oneriaserverutilities.ColorHelper;
 import net.oneria.oneriaserverutilities.NicknameManager;
-import net.oneria.oneriaserverutilities.OneriaConfig;
+import net.oneria.oneriaserverutilities.ChatConfig;
 import net.oneria.oneriaserverutilities.OneriaServerUtilities;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -37,8 +37,8 @@ public class MixinPlayerList {
         String messageText = component.getString();
 
         try {
-            if (OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE == null ||
-                    !OneriaConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
+            if (ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE == null ||
+                    !ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
                 return; // Système désactivé, laisser vanilla
             }
 
@@ -48,7 +48,7 @@ public class MixinPlayerList {
 
                 ci.cancel(); // Cancel le message vanilla
 
-                String joinMsg = OneriaConfig.JOIN_MESSAGE.get();
+                String joinMsg = ChatConfig.JOIN_MESSAGE.get();
                 if (!joinMsg.equalsIgnoreCase("none")) {
                     // Extraire le nom du joueur du message vanilla
                     String playerName = extractPlayerName(messageText, true);
@@ -64,7 +64,7 @@ public class MixinPlayerList {
 
                 ci.cancel(); // Cancel le message vanilla
 
-                String leaveMsg = OneriaConfig.LEAVE_MESSAGE.get();
+                String leaveMsg = ChatConfig.LEAVE_MESSAGE.get();
                 if (!leaveMsg.equalsIgnoreCase("none")) {
                     // Extraire le nom du joueur du message vanilla
                     String playerName = extractPlayerName(messageText, false);
@@ -107,7 +107,7 @@ public class MixinPlayerList {
     @Unique
     private void sendCustomJoinMessage(String playerName) {
         try {
-            String joinMsg = OneriaConfig.JOIN_MESSAGE.get();
+            String joinMsg = ChatConfig.JOIN_MESSAGE.get();
 
             // Trouver le joueur pour obtenir son nickname
             ServerPlayer player = findPlayerByName(playerName);
@@ -141,7 +141,7 @@ public class MixinPlayerList {
     @Unique
     private void sendCustomLeaveMessage(String playerName) {
         try {
-            String leaveMsg = OneriaConfig.LEAVE_MESSAGE.get();
+            String leaveMsg = ChatConfig.LEAVE_MESSAGE.get();
 
             // Trouver le joueur pour obtenir son nickname
             ServerPlayer player = findPlayerByName(playerName);

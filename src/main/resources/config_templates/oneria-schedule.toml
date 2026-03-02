@@ -1,0 +1,48 @@
+["Schedule System"]
+	#Enable the server schedule system.
+	#When enabled, the server will only allow players during opening hours.
+	enableSchedule = false
+	#Server opening time in HH:MM format (24h).
+	#Example: 19:00
+	openingTime = "19:00"
+	#Server closing time in HH:MM format (24h).
+	#Example: 23:59
+	closingTime = "23:59"
+	#List of minutes before closing to warn players.
+	#Example: [30, 15, 5, 1] will warn at 30min, 15min, 5min and 1min before closing.
+	warningTimes = [30, 15, 5, 1]
+	#If 'true', non-staff players are kicked when the server closes.
+	kickNonStaff = true
+
+["Schedule Messages"]
+	#Message sent to players when the server closes.
+	#Variables: {time}
+	msgServerClosed = "§c§lThe server is now closed. See you tomorrow at {time}!"
+	#Message broadcast when the server opens.
+	#Variables: {time}
+	msgServerOpened = "§a§lThe server is now open! Welcome!"
+	#Warning message sent before closing.
+	#Variables: {minutes}, {time}
+	msgWarning = "§e§lWarning: §r§eThe server closes in §c{minutes} minutes §e(at {time})."
+	#Message sent when closing is imminent (last warning).
+	#Variables: {minutes}
+	msgClosingImminent = "§c§lThe server closes in {minutes} minute(s)! Finish what you're doing!"
+
+["Welcome Message"]
+	#Enable the welcome message shown to players on join.
+	enableWelcome = true
+	#Lines of the welcome message. Supports color codes (§ or &).
+	#Each entry is a separate line.
+	welcomeLines = ["§6§m------------------------------------", "§e§lWelcome to the server!", "§7Enjoy your stay.", "§6§m------------------------------------"]
+	#Sound played on join. Use a valid Minecraft sound ID.
+	#Example: minecraft:ui.toast.challenge_complete
+	#Set to 'none' to disable.
+	welcomeSound = "minecraft:ui.toast.challenge_complete"
+	#Volume of the welcome sound (0.0 to 1.0).
+	# Default: 1.0
+	# Range: 0.0 ~ 1.0
+	welcomeSoundVolume = 1.0
+	#Pitch of the welcome sound (0.5 to 2.0).
+	# Default: 1.0
+	# Range: 0.5 ~ 2.0
+	welcomeSoundPitch = 1.0

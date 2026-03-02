@@ -76,7 +76,7 @@ public class OneriaEventHandler {
         if (kickMessage != null) {
             player.connection.disconnect(kickMessage);
             OneriaServerUtilities.LOGGER.info("Kicked {} (server closed, non-staff)", player.getName().getString());
-        } else if (OneriaConfig.ENABLE_SCHEDULE.get()) {
+        } else if (ScheduleConfig.ENABLE_SCHEDULE.get()) {
             if (OneriaPermissions.isStaff(player)) {
                 if (!OneriaScheduleManager.isServerOpen()) {
                     player.sendSystemMessage(Component.literal("§6[STAFF] Connection authorized (server closed)."));
@@ -90,12 +90,12 @@ public class OneriaEventHandler {
     }
 
     private static void sendWelcomeMessage(ServerPlayer player) {
-        if (!OneriaConfig.ENABLE_WELCOME.get()) return;
+        if (!ScheduleConfig.ENABLE_WELCOME.get()) return;
 
         String playerName = player.getName().getString();
         String displayName = player.getDisplayName().getString();
 
-        for (String line : OneriaConfig.WELCOME_LINES.get()) {
+        for (String line : ScheduleConfig.WELCOME_LINES.get()) {
             String formattedLine = line
                     .replace("{player}", playerName)
                     .replace("{nickname}", displayName);
@@ -103,7 +103,7 @@ public class OneriaEventHandler {
             player.sendSystemMessage(Component.literal(formattedLine));
         }
 
-        String soundName = OneriaConfig.WELCOME_SOUND.get();
+        String soundName = ScheduleConfig.WELCOME_SOUND.get();
         if (!soundName.isEmpty()) {
             try {
                 ResourceLocation soundLocation = ResourceLocation.parse(soundName);
@@ -112,8 +112,8 @@ public class OneriaEventHandler {
                 player.playNotifySound(
                         soundEvent,
                         SoundSource.MASTER,
-                        OneriaConfig.WELCOME_SOUND_VOLUME.get().floatValue(),
-                        OneriaConfig.WELCOME_SOUND_PITCH.get().floatValue()
+                        ScheduleConfig.WELCOME_SOUND_VOLUME.get().floatValue(),
+                        ScheduleConfig.WELCOME_SOUND_PITCH.get().floatValue()
                 );
             } catch (Exception e) {
                 OneriaServerUtilities.LOGGER.warn("Failed to play welcome sound: {}", soundName);

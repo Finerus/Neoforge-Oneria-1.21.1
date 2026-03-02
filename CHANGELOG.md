@@ -1,6 +1,115 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [3.0.0] - 2026-03-02
+
+**⚠ Breaking Change:** Configuration entirely restructured into 5 separate files under `config/oneria/`.
+Automatic migration is included — no manual action required on first launch.
+
+---
+
+**Added**
+
+* **License Audit Log:** Every license action permanently recorded in `world/data/oneriamod/license-audit.json`:
+  - Tracks `GIVE`, `REVOKE`, and `GIVE_RP` actions.
+  - Stores timestamp, staff name & UUID, target name & UUID, profession, and extra info.
+  - Persists across restarts — full history always available.
+  - Logged to server console simultaneously for real-time monitoring.
+
+* **Temporary License Registry:** RP licenses issued via `/license giverp` now tracked in `world/data/oneriamod/licenses-temp.json`:
+  - Stores issuance date, expiration date, duration in days, staff emitter, and recipient.
+  - Acts as a permanent administrative registry — no automatic expiration logic (date is printed on the physical item).
+  - Also logged to `license-audit.json` with the expiration date as extra info.
+
+* **Config Split — 5 separate files:** The monolithic `oneriaserverutilities-server.toml` has been split into themed config files under `config/oneria/`:
+  - `oneria-core.toml` — Obfuscation, Permissions, WorldBorder & Zones.
+  - `oneria-chat.toml` — Chat formatting, timestamps, markdown, join/leave messages.
+  - `oneria-schedule.toml` — Schedule system, warnings, welcome message & sound.
+  - `oneria-moderation.toml` — Silent commands and teleportation platforms.
+  - `oneria-professions.toml` — Profession definitions and restrictions (moved from `config/` root to `config/oneria/`).
+
+* **ConfigMigrator — Automatic migration on first launch:**
+  - Detects the legacy `oneriaserverutilities-server.toml` on startup.
+  - Parses all values and redistributes them into the 5 new files, preserving every custom value.
+  - Handles renamed keys automatically (e.g. `serverClosedMessage` → `msgServerClosed`, `warningMessage` → `msgWarning`).
+  - Renames the legacy file to `.migrated.bak` — your data is never deleted.
+  - Skips migration entirely if new files already exist — safe to restart multiple times.
+  - Full migration report logged to server console.
+
+* **OneriaPatternUtils:** New shared wildcard pattern matching utility:
+  - Used by both `ClientProfessionRestrictions` and `ProfessionSyncHelper`.
+  - Eliminates duplicated matching logic across the codebase.
+
+**Improved**
+
+* **LicenseManager — Enriched API:**
+  - New inner classes: `AuditEntry` and `TempLicenseEntry`.
+  - New methods: `logAction()`, `addTempLicense()`, `getAuditLog()`, `getAllTempLicenses()`.
+  - All three files share the same async save pattern via `CompletableFuture`.
+  - `reload()` now resets and reloads all three files simultaneously.
+
+* **Thread Safety — ConcurrentHashMap across all managers:**
+  - `OneriaPermissions`, `LicenseManager`, `ProfessionRestrictionManager`, `NicknameManager`, and `ProfessionRestrictionEventHandler` migrated to `ConcurrentHashMap`.
+  - Eliminates race conditions under high player count or concurrent server-side events.
+
+* **Regex cache in ProfessionRestrictionManager:**
+  - Wildcard patterns (e.g. `minecraft:*_sword`) are now compiled once via `computeIfAbsent()` and cached in a `ConcurrentHashMap`.
+  - Avoids repeated `Pattern.compile()` calls on every craft, break, use, and equip check.
+
+* **Async I/O in NicknameManager:**
+  - File reads and writes now run via `CompletableFuture` to avoid blocking the server thread.
+
+* **Tick-based filtering in CraftingAndArmorRestrictionEventHandler:**
+  - Equipment checks no longer run on every tick.
+  - Reduces CPU overhead on servers with many simultaneous online players.
+
+* **OneriaCommands — modifyList() factorization:**
+  - The 9 handlers for whitelist/blacklist/alwaysvisible (add/remove/list × 3 lists) are now delegated to a single `modifyList()` method.
+  - Eliminates ~60 lines of duplicated logic.
+  - Original formatting style preserved (1522 lines vs 1606 — reduction from factorization only, no logic removed).
+
+* **OneriaCommands — giveLicense(), revokeLicense(), giveRPLicense():**
+  - Now call `LicenseManager.logAction()` on every action.
+  - `giveRPLicense()` additionally calls `LicenseManager.addTempLicense()` to register the temp entry.
+  - Staff player resolved from `CommandSourceStack` — supports both player and console execution.
+
+**Fixed**
+
+* **UUID Bug in ProfessionRestrictionManager:**
+  - `isExemptFromProfessionRestrictions()` was comparing by player name instead of UUID.
+  - Player name changes no longer silently break profession exemptions.
+
+**Technical**
+
+* **New Classes:**
+  - `ConfigMigrator` — One-shot migration utility, runs before `registerConfig()` on startup.
+  - `OneriaPatternUtils` — Shared wildcard pattern matching, used by `ClientProfessionRestrictions` and `ProfessionSyncHelper`.
+  - `ChatConfig` — Config class for chat system and join/leave messages (`oneria-chat.toml`).
+  - `ScheduleConfig` — Config class for schedule, messages, and welcome system (`oneria-schedule.toml`).
+  - `ModerationConfig` — Config class for silent commands and platforms (`oneria-moderation.toml`).
+
+* **Enhanced Classes:**
+  - `LicenseManager` — Three-file I/O, `AuditEntry`/`TempLicenseEntry` inner classes, full audit & temp license API.
+  - `OneriaCommands` — `giveLicense()`, `revokeLicense()`, `giveRPLicense()` wired to audit log and temp registry. `modifyList()` factorization.
+  - `OneriaConfig` — Now only contains Obfuscation, Permissions, and WorldBorder/Zones. Chat, Schedule, Moderation extracted to dedicated classes.
+  - `OneriaServerUtilities` — Registers 5 configs with explicit `oneria/` paths, calls `ConfigMigrator.migrateIfNeeded()` before registration.
+  - `ProfessionRestrictionManager` — ConcurrentHashMap, regex cache, UUID-based exemption check.
+  - `NicknameManager` — Async I/O via CompletableFuture.
+  - `CraftingAndArmorRestrictionEventHandler` — Tick-based equipment check filtering.
+  - `ClientProfessionRestrictions` / `ProfessionSyncHelper` — Deduplicated via OneriaPatternUtils.
+
+* **Data Storage:**
+  - `world/data/oneriamod/license-audit.json` — Append-only audit log, JSON array of `AuditEntry` objects.
+  - `world/data/oneriamod/licenses-temp.json` — RP license registry, JSON array of `TempLicenseEntry` objects.
+
+**Migration Notes**
+
+* **Fully automatic** — `ConfigMigrator` handles everything on first launch. No manual action required.
+* Legacy `oneriaserverutilities-server.toml` is backed up as `oneriaserverutilities-server.toml.migrated.bak` in the same `config/` folder.
+* `oneria-professions.toml` moves from `config/` root to `config/oneria/` — handled by the migrator.
+* If migration fails for any reason, the legacy file is left completely untouched and a detailed error is logged. Contact the dev team for manual migration assistance.
+* All custom values (whitelist, platforms, schedules, messages, zones, etc.) are fully preserved through migration.
+
 ## [2.1.1] - 2026-02-23
 
 **Added**
