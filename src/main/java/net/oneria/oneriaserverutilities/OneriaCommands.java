@@ -664,6 +664,15 @@ public class OneriaCommands {
                             return OneriaMessagingManager.reply(sender, msg, ctx.getSource().getServer());
                         })));
 
+        // Remplace /list vanilla
+        dispatcher.getRoot().getChildren().removeIf(node -> node.getName().equals("list"));
+        dispatcher.register(Commands.literal("list")
+                .executes(OneriaCommands::playerList));
+
+        // /oneria help
+        oneriaRoot.then(Commands.literal("help")
+                .executes(OneriaCommands::showHelp));
+
         // =========================================================================
         // Register root
         // =========================================================================
@@ -1506,6 +1515,50 @@ public class OneriaCommands {
             ctx.getSource().sendSuccess(() -> r, false);
         }
         return 1;
+    }
+
+    private static int showHelp(CommandContext<CommandSourceStack> ctx) {
+        boolean isStaff = OneriaPermissions.isStaff(ctx.getSource().getPlayer());
+        StringBuilder sb = new StringBuilder();
+        sb.append("§6╔═══════════════════════════════════╗\n");
+        sb.append("§6║ §e§lONERIA MOD §7— Commandes\n");
+        sb.append("§6╠═══════════════════════════════════╣\n");
+        sb.append("§6║ §e/list §7— Joueurs en ligne\n");
+        sb.append("§6║ §e/schedule §7— Horaires du serveur\n");
+        sb.append("§6║ §e/msg §8<joueur> <message> §7— MP\n");
+        sb.append("§6║ §e/r §8<message> §7— Répondre\n");
+        if (isStaff) {
+            sb.append("§6╠═══════════════════════════════════╣\n");
+            sb.append("§6║ §c§lSTAFF\n");
+            sb.append("§6║ §e/oneria nick §8<joueur> <nick>\n");
+            sb.append("§6║ §e/oneria license give/revoke/list\n");
+            sb.append("§6║ §e/oneria staff tp/gamemode/effect\n");
+            sb.append("§6║ §e/whois §8<nick>\n");
+            sb.append("§6║ §e/oneria config status/reload\n");
+        }
+        sb.append("§6╚═══════════════════════════════════╝");
+        String msg = sb.toString();
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
+        return 1;
+    }
+
+    private static int playerList(CommandContext<CommandSourceStack> ctx) {
+        var players = ctx.getSource().getServer().getPlayerList().getPlayers();
+        StringBuilder sb = new StringBuilder();
+        sb.append("§eJoueurs en ligne (").append(players.size()).append(") : ");
+        for (int i = 0; i < players.size(); i++) {
+            ServerPlayer p = players.get(i);
+            String nick = NicknameManager.getNickname(p.getUUID());
+            if (nick != null) {
+                sb.append(nick).append(" §8(").append(p.getName().getString()).append(")§r");
+            } else {
+                sb.append("§f").append(p.getName().getString());
+            }
+            if (i < players.size() - 1) sb.append("§7, ");
+        }
+        String msg = sb.toString();
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
+        return players.size();
     }
 
     private static int showColors(CommandContext<CommandSourceStack> ctx) {

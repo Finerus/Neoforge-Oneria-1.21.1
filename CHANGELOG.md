@@ -1,6 +1,18 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [3.0.3] - 2026-03-03
+
+**Added**
+
+* **Custom `/list` Command:**
+  - Replaces vanilla `/list` with a cleaner output showing nicknames and real usernames in parentheses.
+  - Players without a nickname are displayed by their real username only.
+
+* **`/oneria help` Command:**
+  - Displays available commands to the player.
+  - Staff players see an additional section with staff-only commands.
+
 ## [3.0.2] - 2026-03-03
 
 **Added**
