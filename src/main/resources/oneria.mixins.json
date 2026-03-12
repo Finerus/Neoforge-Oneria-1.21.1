@@ -9,7 +9,8 @@
     "MixinServerCommonPacketListenerImpl",
     "MixinServerGamePacketListenerImpl",
     "MixinPlayerList",
-    "MixinEntity"
+    "MixinEntity",
+    "MixinDeathMessage"
   ],
   "injectors": {
     "defaultRequire": 1

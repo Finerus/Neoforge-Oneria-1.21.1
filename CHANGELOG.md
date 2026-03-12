@@ -1,6 +1,67 @@
 # Changelog - Oneria Mod
 All notable changes to this project will be documented in this file.
 
+## [3.1.1] - 2026-03-12
+
+**Added**
+
+* **Death RP System:** New system allowing staff to mark players as subject to permanent death (RP perma-death).
+  - When a marked player dies, the vanilla death message is completely suppressed and replaced by a fully configurable custom message broadcast to all online players.
+  - Suppression works reliably in both singleplayer and multiplayer via Mixin `@Redirect` on `PlayerList.broadcastSystemMessage()` inside `ServerPlayer.die()` — the player's death itself is never cancelled, only the broadcast.
+  - A configurable sound is played to all online players on death.
+  - Optional automatic whitelist removal on death.
+  - **Global toggle:** `/oneria deathrp enable <true|false>` — enables or disables the system for all players without an individual override. Broadcasts a configurable message and sound to all online players when toggled.
+  - **Individual override:** `/oneria deathrp player <player> enable <true|false>` — sets a per-player override, taking priority over the global state. Sends a configurable message and sound to the target player only.
+  - **Override reset:** `/oneria deathrp player <player> reset` — removes the individual override; the player then follows the global state again.
+  - **Status command:** `/oneria deathrp status` — displays the current global state, whitelist removal setting, and the full list of individual overrides with player names.
+  - All four display modes supported for notification messages: `CHAT`, `ACTION_BAR`, `TITLE`, `IMMERSIVE` (with automatic fallback to `ACTION_BAR` if ImmersiveMessages is absent client-side).
+  - Separate configurable messages and sounds for global activation vs. deactivation, and for individual activation vs. deactivation.
+  - Individual overrides persisted in `world/data/oneriamod/deathrp.json` — `UUID (McUsername)` key format, async save, survives server restarts.
+  - All commands require OP level 2.
+
+**Technical**
+
+* **New Classes:**
+  - `DeathRPManager` — Core manager: in-memory state, JSON persistence (lazy init, async save, retrocompatible UUID key format), death handling, toggle notifications, sound broadcasting, and `sendMessageToPlayer()` utility with all four display modes.
+  - `MixinDeathMessage` — `@Redirect` mixin on `ServerPlayer.die()` intercepting the single `broadcastSystemMessage()` call to suppress the vanilla death message for marked players without affecting the death itself.
+
+* **Enhanced Classes:**
+  - `OneriaConfig` — Added 19 new config entries in a dedicated `[DeathRP]` section (global enabled, whitelist remove, death message, death sound, individual toggle messages/modes/sounds, global toggle messages/modes/sounds).
+  - `OneriaCommands` — Added `/oneria deathrp` subcommand tree (4 commands). Added `updateConfigString()` and `updateConfigDouble()` helper methods. Added all DeathRP keys to `/oneria config set`.
+
+* **New Mixin:** `MixinDeathMessage` registered in `oneria.mixins.json`.
+
+**Configuration**
+
+* **New Section: `[DeathRP]` in `oneria-core.toml`**
+
+| Clé | Défaut | Description |
+|---|---|---|
+| `globalEnabled` | `false` | Activation globale du système |
+| `whitelistRemove` | `false` | Retirer de la whitelist à la mort |
+| `deathMessage` | `"&c[Mort RP] &f%player%..."` | Message de mort (`%player%`, `%realname%`) |
+| `deathSound` | `"minecraft:entity.wither.death"` | Son joué à tous à la mort |
+| `deathSoundVolume` | `1.0` | Volume du son de mort |
+| `deathSoundPitch` | `1.0` | Pitch du son de mort |
+| `playerToggle.enableMessage` | `"&6[Mort RP] ..."` | Message d'activation individuelle |
+| `playerToggle.enableMessageMode` | `"CHAT"` | Mode d'affichage (CHAT/ACTION_BAR/TITLE/IMMERSIVE) |
+| `playerToggle.disableMessage` | `"&6[Mort RP] ..."` | Message de désactivation individuelle |
+| `playerToggle.disableMessageMode` | `"CHAT"` | Mode d'affichage |
+| `playerToggle.toggleSound` | `"minecraft:block.note_block.pling"` | Son de toggle individuel |
+| `globalToggle.enableMessage` | `"&6[Mort RP] ..."` | Message d'activation globale (`%staff%`) |
+| `globalToggle.enableMessageMode` | `"CHAT"` | Mode d'affichage |
+| `globalToggle.disableMessage` | `"&6[Mort RP] ..."` | Message de désactivation globale (`%staff%`) |
+| `globalToggle.disableMessageMode` | `"CHAT"` | Mode d'affichage |
+| `globalToggle.globalToggleSound` | `"minecraft:ui.toast.challenge_complete"` | Son de toggle global |
+
+Tous ces paramètres sont modifiables en live via `/oneria config set <clé> <valeur>` sans redémarrage.
+
+**Migration Notes**
+
+* Aucun changement cassant — entièrement rétrocompatible avec 3.1.0.
+* Le système est désactivé par défaut (`globalEnabled = false`).
+* Aucun joueur n'est marqué au démarrage — les overrides individuels sont vides jusqu'à usage explicite des commandes.
+
 ## [3.1.0] - 2026-03-08
 
 **Added**

@@ -34,6 +34,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import net.oneria.oneriaserverutilities.DeathRPManager;
+import java.util.Map;
 
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -306,6 +309,70 @@ public class OneriaCommands {
                             ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Zone Message Mode set to: " + mode), true);
                             return 1;
                         })));
+
+        setNode.then(Commands.literal("deathRpGlobalEnabled")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.DEATH_RP_GLOBAL_ENABLED, "Mort RP globale activee"))));
+
+        setNode.then(Commands.literal("deathRpWhitelistRemove")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, OneriaConfig.DEATH_RP_WHITELIST_REMOVE, "Retrait whitelist a la mort RP"))));
+
+        setNode.then(Commands.literal("deathRpDeathMessage")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_DEATH_MESSAGE, "Message de mort RP"))));
+
+        setNode.then(Commands.literal("deathRpDeathSound")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_DEATH_SOUND, "Son de mort RP"))));
+
+        setNode.then(Commands.literal("deathRpDeathSoundVolume")
+                .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.0, 10.0))
+                        .executes(ctx -> updateConfigDouble(ctx, OneriaConfig.DEATH_RP_DEATH_SOUND_VOLUME, "Volume son mort RP"))));
+
+        setNode.then(Commands.literal("deathRpDeathSoundPitch")
+                .then(Commands.argument("value", DoubleArgumentType.doubleArg(0.5, 2.0))
+                        .executes(ctx -> updateConfigDouble(ctx, OneriaConfig.DEATH_RP_DEATH_SOUND_PITCH, "Pitch son mort RP"))));
+
+        setNode.then(Commands.literal("deathRpPlayerEnableMsg")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_PLAYER_ENABLE_MSG, "Message activation individuelle"))));
+
+        setNode.then(Commands.literal("deathRpPlayerEnableMode")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_PLAYER_ENABLE_MODE, "Mode activation individuelle"))));
+
+        setNode.then(Commands.literal("deathRpPlayerDisableMsg")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_PLAYER_DISABLE_MSG, "Message desactivation individuelle"))));
+
+        setNode.then(Commands.literal("deathRpPlayerDisableMode")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_PLAYER_DISABLE_MODE, "Mode desactivation individuelle"))));
+
+        setNode.then(Commands.literal("deathRpPlayerToggleSound")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_PLAYER_TOGGLE_SOUND, "Son toggle individuel"))));
+
+        setNode.then(Commands.literal("deathRpGlobalEnableMsg")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_GLOBAL_ENABLE_MSG, "Message activation globale"))));
+
+        setNode.then(Commands.literal("deathRpGlobalEnableMode")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_GLOBAL_ENABLE_MODE, "Mode activation globale"))));
+
+        setNode.then(Commands.literal("deathRpGlobalDisableMsg")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_GLOBAL_DISABLE_MSG, "Message desactivation globale"))));
+
+        setNode.then(Commands.literal("deathRpGlobalDisableMode")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_GLOBAL_DISABLE_MODE, "Mode desactivation globale"))));
+
+        setNode.then(Commands.literal("deathRpGlobalToggleSound")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .executes(ctx -> updateConfigString(ctx, OneriaConfig.DEATH_RP_GLOBAL_TOGGLE_SOUND, "Son toggle global"))));
 
         configNode.then(setNode);
         oneriaRoot.then(configNode);
@@ -743,6 +810,34 @@ public class OneriaCommands {
                 .requires(src -> src.getEntity() instanceof net.minecraft.server.level.ServerPlayer)
                 .executes(OneriaCommands::myWarn));
 
+        // ── Construction du sous-arbre /oneria deathrp ─────────────────────────────
+
+        var deathRpNode = Commands.literal("deathrp")
+                .requires(source -> source.hasPermission(2));
+
+        // /oneria deathrp enable <true|false>
+        deathRpNode.then(Commands.literal("enable")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(OneriaCommands::deathRpSetGlobal)));
+
+        // /oneria deathrp player <joueur> enable <true|false>
+        // /oneria deathrp player <joueur> reset
+        var deathRpPlayerNode = Commands.literal("player")
+                .then(Commands.argument("joueur", EntityArgument.player())
+                        .then(Commands.literal("enable")
+                                .then(Commands.argument("value", BoolArgumentType.bool())
+                                        .executes(OneriaCommands::deathRpSetPlayer)))
+                        .then(Commands.literal("reset")
+                                .executes(OneriaCommands::deathRpResetPlayer)));
+
+        deathRpNode.then(deathRpPlayerNode);
+
+        // /oneria deathrp status
+        deathRpNode.then(Commands.literal("status")
+                .executes(OneriaCommands::deathRpStatus));
+
+        oneriaRoot.then(deathRpNode);
+
 
         // =========================================================================
         // Register root
@@ -885,6 +980,11 @@ public class OneriaCommands {
                             "§6║  §eStatus: " + scheduleStatus + "\n" +
                             "§6║  §eOpening: §f" + safe.apply(() -> ScheduleConfig.OPENING_TIME.get()) + "\n" +
                             "§6║  §eClosing: §f" + safe.apply(() -> ScheduleConfig.CLOSING_TIME.get()) + "\n" +
+                            "§6║\n" +
+                            "§6║ §7Mort RP\n" +
+                            "§6║  §eMort RP global    : §f" + safe.apply(() -> OneriaConfig.DEATH_RP_GLOBAL_ENABLED.get()) + "\n" +
+                            "§6║  §eRetrait whitelist : §f" + safe.apply(() -> OneriaConfig.DEATH_RP_WHITELIST_REMOVE.get()) + "\n" +
+                            "§6║  §eSon de mort       : §f" + safe.apply(() -> OneriaConfig.DEATH_RP_DEATH_SOUND.get()) + "\n" +
                             "§6║\n" +
                             "§6║ §7Chat System\n" +
                             "§6║  §eChat Format: §f" + safe.apply(() -> ChatConfig.ENABLE_CHAT_FORMAT.get()) + "\n" +
@@ -1157,6 +1257,49 @@ public class OneriaCommands {
         );
 
         return 1;
+    }
+
+    /**
+     * Helper pour mettre à jour une ConfigValue<String> via commande.
+     * À ajouter à côté de updateConfigBool() et updateConfigInt() dans OneriaCommands.
+     */
+    private static int updateConfigString(CommandContext<CommandSourceStack> ctx,
+                                          ModConfigSpec.ConfigValue<String> configValue,
+                                          String label) {
+        try {
+            String value = StringArgumentType.getString(ctx, "value");
+            if (configValue == null) {
+                ctx.getSource().sendFailure(Component.literal("§c[Oneria] Config non disponible."));
+                return 0;
+            }
+            configValue.set(value);
+            configValue.save();
+            ctx.getSource().sendSuccess(
+                    () -> Component.literal("§a[Oneria] §e" + label + " §amis a jour : §f" + value), true);
+            return 1;
+        } catch (IllegalStateException e) {
+            ctx.getSource().sendFailure(Component.literal("§c[Oneria] La config n'est pas encore construite."));
+            return 0;
+        }
+    }
+
+    private static int updateConfigDouble(CommandContext<CommandSourceStack> ctx,
+                                          ModConfigSpec.DoubleValue configValue,
+                                          String label) {
+        try {
+            double value = DoubleArgumentType.getDouble(ctx, "value");
+            if (configValue == null) {
+                ctx.getSource().sendFailure(Component.literal("§c[Oneria] Config non disponible."));
+                return 0;
+            }
+            configValue.set(value);
+            configValue.save();
+            ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + label + " mis a jour : §f" + value), true);
+            return 1;
+        } catch (IllegalStateException e) {
+            ctx.getSource().sendFailure(Component.literal("§c[Oneria] La config n'est pas encore construite."));
+            return 0;
+        }
     }
 
     // --- SCHEDULE HANDLER ---
@@ -1606,6 +1749,10 @@ public class OneriaCommands {
             sb.append("§6║ §e/oneria staff tp/gamemode/effect\n");
             sb.append("§6║ §e/whois §8<nick>\n");
             sb.append("§6║ §e/oneria config status/reload\n");
+            sb.append("§6║ §e/oneria deathrp enable §8<true|false> §7— Activer/desactiver la mort RP globale\n");
+            sb.append("§6║ §e/oneria deathrp player §8<joueur> enable <true|false> §7— Override individuel\n");
+            sb.append("§6║ §e/oneria deathrp player §8<joueur> reset §7— Supprimer l'override\n");
+            sb.append("§6║ §e/oneria deathrp status §7— Voir l'etat du systeme et les overrides\n");
         }
         sb.append("§6╚═══════════════════════════════════╝");
         String msg = sb.toString();
@@ -1634,6 +1781,134 @@ public class OneriaCommands {
 
     private static int showColors(CommandContext<CommandSourceStack> ctx) {
         ctx.getSource().sendSuccess(() -> OneriaChatFormatter.getColorsHelp(), false);
+        return 1;
+    }
+
+    /**
+     * /oneria deathrp enable <true|false>
+     * Active ou désactive le système de mort RP pour TOUS les joueurs sans override.
+     */
+    private static int deathRpSetGlobal(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        boolean enabled = BoolArgumentType.getBool(ctx, "value");
+        String staffName;
+        try {
+            staffName = ctx.getSource().getPlayerOrException().getName().getString();
+        } catch (CommandSyntaxException e) {
+            staffName = "Console";
+        }
+
+        // Mise à jour de la config en direct
+        try {
+            if (OneriaConfig.DEATH_RP_GLOBAL_ENABLED != null) {
+                OneriaConfig.DEATH_RP_GLOBAL_ENABLED.set(enabled);
+                OneriaConfig.DEATH_RP_GLOBAL_ENABLED.save();
+            }
+        } catch (IllegalStateException e) {
+            ctx.getSource().sendFailure(Component.literal("§c[Oneria] La config n'est pas encore disponible."));
+            return 0;
+        }
+
+        // Notification globale (message + son)
+        MinecraftServer server = ctx.getSource().getServer();
+        if (server != null) {
+            DeathRPManager.broadcastGlobalToggle(staffName, enabled, server);
+        }
+
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "§a[Oneria] Mort RP globale " + (enabled ? "activee" : "desactivee") + "."), true);
+        return 1;
+    }
+
+    /**
+     * /oneria deathrp player <joueur> enable <true|false>
+     * Définit un override individuel pour le joueur spécifié.
+     */
+    private static int deathRpSetPlayer(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "joueur");
+        boolean enabled = BoolArgumentType.getBool(ctx, "value");
+
+        DeathRPManager.setOverride(target.getUUID(), enabled);
+
+        // Notification au joueur concerné
+        DeathRPManager.notifyPlayerToggle(target, enabled);
+
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "§a[Oneria] Mort RP " + (enabled ? "activee" : "desactivee")
+                        + " pour §e" + target.getName().getString() + "§a."), true);
+        return 1;
+    }
+
+    /**
+     * /oneria deathrp player <joueur> reset
+     * Supprime l'override individuel — le joueur suit à nouveau le global.
+     */
+    private static int deathRpResetPlayer(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "joueur");
+        DeathRPManager.removeOverride(target.getUUID());
+
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                "§a[Oneria] Override de mort RP supprime pour §e"
+                        + target.getName().getString() + "§a. Il suit desormais le global."), true);
+        return 1;
+    }
+
+    /**
+     * /oneria deathrp status
+     * Affiche l'état global + tous les overrides individuels.
+     */
+    private static int deathRpStatus(CommandContext<CommandSourceStack> ctx) {
+        // Etat global
+        boolean globalEnabled;
+        try {
+            globalEnabled = OneriaConfig.DEATH_RP_GLOBAL_ENABLED != null
+                    && OneriaConfig.DEATH_RP_GLOBAL_ENABLED.get();
+        } catch (IllegalStateException e) {
+            globalEnabled = false;
+        }
+        boolean whitelistRemove;
+        try {
+            whitelistRemove = OneriaConfig.DEATH_RP_WHITELIST_REMOVE != null
+                    && OneriaConfig.DEATH_RP_WHITELIST_REMOVE.get();
+        } catch (IllegalStateException e) {
+            whitelistRemove = false;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("§6═══════════════════════════════\n");
+        sb.append("§6║ §eSystème de Mort RP\n");
+        sb.append("§6╠═══════════════════════════════\n");
+        sb.append("§6║ §7Etat global    : ").append(globalEnabled ? "§aActive" : "§cDesactive").append("\n");
+        sb.append("§6║ §7Retrait WL     : ").append(whitelistRemove ? "§aOui" : "§7Non").append("\n");
+        sb.append("§6╠═══════════════════════════════\n");
+        sb.append("§6║ §eOverrides individuels :\n");
+
+        Map<UUID, Boolean> overrides = DeathRPManager.getAllOverrides();
+        MinecraftServer server = ctx.getSource().getServer();
+
+        if (overrides.isEmpty()) {
+            sb.append("§6║  §7(aucun override)\n");
+        } else {
+            for (Map.Entry<UUID, Boolean> entry : overrides.entrySet()) {
+                String name = "Inconnu";
+                if (server != null) {
+                    ServerPlayer online = server.getPlayerList().getPlayer(entry.getKey());
+                    if (online != null) {
+                        name = online.getName().getString();
+                    } else if (server.getProfileCache() != null) {
+                        name = server.getProfileCache().get(entry.getKey())
+                                .map(com.mojang.authlib.GameProfile::getName)
+                                .orElse(entry.getKey().toString());
+                    }
+                }
+                sb.append("§6║  §e").append(name)
+                        .append(" §8(").append(entry.getKey()).append("§8)")
+                        .append(" §7→ ").append(entry.getValue() ? "§aActive" : "§cDesactive").append("\n");
+            }
+        }
+        sb.append("§6═══════════════════════════════");
+
+        final String msg = sb.toString();
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
         return 1;
     }
 
