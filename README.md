@@ -422,7 +422,7 @@ All saves are **asynchronous** via `CompletableFuture` — no server thread bloc
 - **Mixin-based** low-level interception for TabList obfuscation and chat formatting.
 - **Event-driven** via the NeoForge event system (login/logout, restrictions, nametags).
 - **5 separate config files** under `config/oneria/` — each system has its own file.
-- **Automatic config migration** from legacy `oneriaserverutilities-server.toml` on first launch.
+- **Automatic config migration** from legacy `RpEssentials-server.toml` on first launch.
 - **JSON storage** with Gson — async writes, sync reads on startup.
 
 ### Performance

@@ -25,7 +25,7 @@ All notable changes to this project will be documented in this file.
   - `MessagesConfig` — NeoForge `ModConfigSpec`-based config class exposing all user-facing strings as `ConfigValue<String>`. Includes `get(configValue, replacements...)` and `formatDuration(minutes)` helpers for placeholder substitution and duration formatting.
 
 * **Enhanced Classes:**
-  - `OneriaServerUtilities` — Registers `MessagesConfig.SPEC` under `oneria/oneria-messages.toml`.
+  - `RpEssentials` — Registers `MessagesConfig.SPEC` under `oneria/oneria-messages.toml`.
   - `OneriaCommands` — All French hardcoded strings replaced with `MessagesConfig.get(...)` calls across `warnSystemCheck()`, `updateConfigString()`, `updateConfigDouble()`, `showHelp()`, `playerList()`, `whoisCommand()`, `lastConnectionPlayer()`, `lastConnectionList()`, `warnAdd()`, `warnTemp()`, `warnRemove()`, `warnClear()`, `warnPurge()`, `myWarn()`, `displayWarnList()`, `warnInfo()`, `checkLicense()`, `deathRpSetGlobal()`, `deathRpSetPlayer()`, `deathRpResetPlayer()`, `deathRpStatus()`. All `config set deathRp*` labels also anglicised.
   - `OneriaMessagingManager` — `"Cliquer pour répondre"`, `"[MP] Vous écrivez à"`, `"[MP] ... vous écrit"`, `"[MP] Vous n'avez personne à qui répondre."`, `"[MP] Ce joueur n'est plus connecté."` all replaced with `MessagesConfig` calls.
   - `ProfessionRestrictionManager` — French fallback strings in `getCraftBlockedMessage()`, `getBlockBreakBlockedMessage()`, `getItemUseBlockedMessage()`, `getEquipmentBlockedMessage()`, and `getRequiredProfessions()` replaced with `MessagesConfig` calls.
@@ -215,7 +215,7 @@ Tous ces paramètres sont modifiables en live via `/oneria config set <clé> <va
   - `TempLicenseExpirationManager` — added `markRevokedLicenseItems(ServerPlayer)`, called on login and in midnight sweep.
   - `OneriaEventHandler` — calls `markRevokedLicenseItems()` on player login.
   - `OneriaCommands` — `revokeLicense()` now calls `markRevokedLicenseItems()` immediately if player is online.
-  - `OneriaServerUtilities` — added 10-minute tick (`% 12000`) to sweep all online players.
+  - `RpEssentials` — added 10-minute tick (`% 12000`) to sweep all online players.
   - `OneriaCommands` — `giveLicense()` now stores `professionId` in item `CUSTOM_DATA` for future revoke detection.
 
 ## [3.0.1] - 2026-03-03
@@ -238,7 +238,7 @@ Tous ces paramètres sont modifiables en live via `/oneria config set <clé> <va
   - `server.execute()` ensures the deferred logic still runs on the server thread.
   - Added imports `net.minecraft.server.MinecraftServer` and `net.neoforged.neoforge.server.ServerLifecycleHooks`.
 
-* **`OneriaServerUtilities.onServerTick()` — `server` Variable Scope:**
+* **`RpEssentials.onServerTick()` — `server` Variable Scope:**
   - `var server` was declared inside the `if (tickCounter++ % 40 == 0)` block, making it invisible to the rest of the method.
   - Now declared once at the top of the method and reused by all blocks.
 
@@ -266,7 +266,7 @@ Tous ces paramètres sont modifiables en live via `/oneria config set <clé> <va
 
 * **Modified Classes:**
   - `OneriaEventHandler` — removed `RevokedLicenseManager` calls, replaced raw thread, added `TempLicenseExpirationManager.checkOnLogin()`.
-  - `OneriaServerUtilities` — fixed `server` scope in `onServerTick()`, added `tickMidnightSweep` call every 1200 ticks.
+  - `RpEssentials` — fixed `server` scope in `onServerTick()`, added `tickMidnightSweep` call every 1200 ticks.
   - `OneriaCommands` — `revokeLicense()` no longer calls `RevokedLicenseManager`, now calls `ProfessionSyncHelper.syncToPlayer()` immediately after revocation. `giveLicense()` also calls `syncToPlayer()`.
   - `LicenseManager` — added `removeTempLicense()` and `logActionSystem()`.
 
@@ -296,7 +296,7 @@ Automatic migration is included — no manual action required on first launch.
   - Acts as a permanent administrative registry — no automatic expiration logic (date is printed on the physical item).
   - Also logged to `license-audit.json` with the expiration date as extra info.
 
-* **Config Split — 5 separate files:** The monolithic `oneriaserverutilities-server.toml` has been split into themed config files under `config/oneria/`:
+* **Config Split — 5 separate files:** The monolithic `RpEssentials-server.toml` has been split into themed config files under `config/oneria/`:
   - `oneria-core.toml` — Obfuscation, Permissions, WorldBorder & Zones.
   - `oneria-chat.toml` — Chat formatting, timestamps, markdown, join/leave messages.
   - `oneria-schedule.toml` — Schedule system, warnings, welcome message & sound.
@@ -304,7 +304,7 @@ Automatic migration is included — no manual action required on first launch.
   - `oneria-professions.toml` — Profession definitions and restrictions (moved from `config/` root to `config/oneria/`).
 
 * **ConfigMigrator — Automatic migration on first launch:**
-  - Detects the legacy `oneriaserverutilities-server.toml` on startup.
+  - Detects the legacy `RpEssentials-server.toml` on startup.
   - Parses all values and redistributes them into the 5 new files, preserving every custom value.
   - Handles renamed keys automatically (e.g. `serverClosedMessage` → `msgServerClosed`, `warningMessage` → `msgWarning`).
   - Renames the legacy file to `.migrated.bak` — your data is never deleted.
@@ -367,7 +367,7 @@ Automatic migration is included — no manual action required on first launch.
   - `LicenseManager` — Three-file I/O, `AuditEntry`/`TempLicenseEntry` inner classes, full audit & temp license API.
   - `OneriaCommands` — `giveLicense()`, `revokeLicense()`, `giveRPLicense()` wired to audit log and temp registry. `modifyList()` factorization.
   - `OneriaConfig` — Now only contains Obfuscation, Permissions, and WorldBorder/Zones. Chat, Schedule, Moderation extracted to dedicated classes.
-  - `OneriaServerUtilities` — Registers 5 configs with explicit `oneria/` paths, calls `ConfigMigrator.migrateIfNeeded()` before registration.
+  - `RpEssentials` — Registers 5 configs with explicit `oneria/` paths, calls `ConfigMigrator.migrateIfNeeded()` before registration.
   - `ProfessionRestrictionManager` — ConcurrentHashMap, regex cache, UUID-based exemption check.
   - `NicknameManager` — Async I/O via CompletableFuture.
   - `CraftingAndArmorRestrictionEventHandler` — Tick-based equipment check filtering.
@@ -380,7 +380,7 @@ Automatic migration is included — no manual action required on first launch.
 **Migration Notes**
 
 * **Fully automatic** — `ConfigMigrator` handles everything on first launch. No manual action required.
-* Legacy `oneriaserverutilities-server.toml` is backed up as `oneriaserverutilities-server.toml.migrated.bak` in the same `config/` folder.
+* Legacy `RpEssentials-server.toml` is backed up as `RpEssentials-server.toml.migrated.bak` in the same `config/` folder.
 * `oneria-professions.toml` moves from `config/` root to `config/oneria/` — handled by the migrator.
 * If migration fails for any reason, the legacy file is left completely untouched and a detailed error is logged. Contact the dev team for manual migration assistance.
 * All custom values (whitelist, platforms, schedules, messages, zones, etc.) are fully preserved through migration.
@@ -564,7 +564,7 @@ Automatic migration is included — no manual action required on first launch.
   - Cleanup on player login and logout.
 
 * **License Items:** Physical in-game items representing profession licenses.
-  - New item: `oneriaserverutilities:license` (max stack size: 1).
+  - New item: `RpEssentials:license` (max stack size: 1).
   - Custom item class: `LicenseItem` with tooltip enhancements.
   - Automatically generated with profession color, name, and metadata.
   - Includes issuance date and recipient information.
@@ -649,7 +649,7 @@ Automatic migration is included — no manual action required on first launch.
 * `OneriaConfig` - Added `ALWAYS_VISIBLE_LIST`, `BLUR_SPECTATORS`, `WHITELIST_EXEMPT_PROFESSIONS`.
 * `OneriaCommands` - Complete license management command suite with autocomplete.
 * `OneriaEventHandler` - Profession restriction sync on player login, revoked license cleanup.
-* `OneriaServerUtilities` - Integration with profession system, cache cleanup tick.
+* `RpEssentials` - Integration with profession system, cache cleanup tick.
 * `NetworkHandler` - Registration of profession sync packet.
 * `MixinServerCommonPacketListenerImpl` - Always visible list and spectator blur logic.
 
@@ -661,7 +661,7 @@ Automatic migration is included — no manual action required on first launch.
 
 **Network Protocol**
 
-* New packet: `oneriaserverutilities:sync_profession_restrictions`.
+* New packet: `RpEssentials:sync_profession_restrictions`.
 * Payload contains sets of blocked crafts and equipment specific to player.
 * Sent on player login and when licenses change.
 * Enables client-side restriction visualization.
@@ -778,7 +778,7 @@ All commands include smart autocomplete that suggests contextually relevant opti
   - Added `NoClassDefFoundError` catching in `getPlayerPrefix()` and `getPlayerSuffix()`.
   - Mod now gracefully handles LuckPerms absence with debug logging instead of crashes.
   - All LuckPerms-dependent features safely skip when mod is not present.
-  - Enhanced error handling in `OneriaServerUtilities` for better stability.
+  - Enhanced error handling in `RpEssentials` for better stability.
 
 * **Performance Issues:** Fixed severe FPS drops caused by tick loop:
   - Added server-side check to prevent client-side tick execution.
@@ -797,13 +797,13 @@ All commands include smart autocomplete that suggests contextually relevant opti
 
 * **Enhanced Classes:**
   - `OneriaEventHandler` - Now sends nametag configuration packet to clients on login.
-  - `OneriaServerUtilities` - Enhanced LuckPerms error handling with `NoClassDefFoundError` catching, added server-side tick protection.
+  - `RpEssentials` - Enhanced LuckPerms error handling with `NoClassDefFoundError` catching, added server-side tick protection.
   - `OneriaConfig` - Added `HIDE_NAMETAGS` and `SHOW_NAMETAG_PREFIX_SUFFIX` configuration options.
   - `OneriaCommands` - Added `/setplatform` command and nametag configuration commands.
   - `MixinEntity` - Enhanced to display nicknames with optional prefix/suffix above heads.
 
 * **Network Protocol:**
-  - Custom packet payload type: `oneriaserverutilities:hide_nametags`.
+  - Custom packet payload type: `RpEssentials:hide_nametags`.
   - Boolean payload for nametag visibility state.
   - Sent to players on login with current server configuration.
   - Client automatically resets state on disconnect.
@@ -984,7 +984,7 @@ All commands include smart autocomplete that suggests contextually relevant opti
   - `OneriaConfig` - Added `ENABLE_CUSTOM_JOIN_LEAVE`, `JOIN_MESSAGE`, `LEAVE_MESSAGE`, `ENABLE_WORLD_BORDER_WARNING`, `WORLD_BORDER_DISTANCE`, `WORLD_BORDER_MESSAGE`, `WORLD_BORDER_CHECK_INTERVAL`, `BLACKLIST`.
   - `OneriaEventHandler` - Integrated custom join/leave messages with proper null checks.
   - `OneriaScheduleManager` - Added comprehensive null safety for all public methods.
-  - `OneriaServerUtilities` - Enhanced LuckPerms error handling, added config loading listener.
+  - `RpEssentials` - Enhanced LuckPerms error handling, added config loading listener.
   - `OneriaPermissions` - Improved LuckPerms fallback logic.
   - `OneriaCommands` - Added blacklist management commands and new config setters.
   - `MixinServerCommonPacketListenerImpl` - Integrated blacklist checking in obfuscation logic.
@@ -1239,7 +1239,7 @@ All commands include smart autocomplete that suggests contextually relevant opti
 
 * **Enhanced Classes:**
   - `OneriaConfig` - Added complete Chat System configuration section.
-  - `OneriaServerUtilities` - Added `getPlayerSuffix()` method for LuckPerms suffix retrieval.
+  - `RpEssentials` - Added `getPlayerSuffix()` method for LuckPerms suffix retrieval.
   - `OneriaCommands` - Added `/colors` command for color reference.
 
 * **Mixin Updates:**

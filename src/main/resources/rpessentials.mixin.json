@@ -1,0 +1,18 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.rp.rpessentials.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "ClientboundPlayerInfoUpdatePacketAccessor",
+    "MixinServerPlayer",
+    "MixinServerCommonPacketListenerImpl",
+    "MixinServerGamePacketListenerImpl",
+    "MixinPlayerList",
+    "MixinEntity",
+    "MixinDeathMessage"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
