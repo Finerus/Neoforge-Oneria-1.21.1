@@ -743,6 +743,106 @@ public class RpEssentialsCommands {
                                 .then(Commands.argument("value", BoolArgumentType.bool())
                                         .executes(ctx -> setDayEnabled(ctx))))));
 
+        // ── Death Hours ──────────────────────────────────────────────────────────
+        setNode.then(Commands.literal("deathHoursEnabled")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx,
+                                ScheduleConfig.DEATH_HOURS_ENABLED, "Death Hours"))));
+
+        // /rpessentials config set deathHoursSlots "22:00-23:59,00:00-06:00"
+        // (slots séparés par virgule, l'admin les tape en une fois)
+        setNode.then(Commands.literal("deathHoursSlots")
+                .then(Commands.argument("slots", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            String raw = StringArgumentType.getString(ctx, "slots");
+                            java.util.List<String> slots = java.util.Arrays.asList(raw.split(","));
+                            slots = slots.stream().map(String::trim).collect(java.util.stream.Collectors.toList());
+                            try {
+                                ScheduleConfig.DEATH_HOURS_SLOTS.set(slots);
+                                ScheduleConfig.SPEC.save();
+                                RpEssentialsScheduleManager.reload();
+                                java.util.List<String> finalSlots = slots;
+                                ctx.getSource().sendSuccess(() -> Component.literal(
+                                        MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_UPDATED,
+                                                "label", "Death Hours Slots",
+                                                "value", String.join(", ", finalSlots))), true);
+                            } catch (IllegalStateException e) {
+                                ctx.getSource().sendFailure(Component.literal(
+                                        MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_NOT_LOADED)));
+                            }
+                            return 1;
+                        })));
+
+        // ── HRP Hours ─────────────────────────────────────────────────────────────
+        setNode.then(Commands.literal("enableHrpHours")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx,
+                                ScheduleConfig.ENABLE_HRP_HOURS, "HRP Hours"))));
+
+        setNode.then(Commands.literal("hrpToleratedSlots")
+                .then(Commands.argument("slots", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            String raw = StringArgumentType.getString(ctx, "slots");
+                            java.util.List<String> slots = java.util.Arrays.stream(raw.split(","))
+                                    .map(String::trim).collect(java.util.stream.Collectors.toList());
+                            try {
+                                ScheduleConfig.HRP_TOLERATED_SLOTS.set(slots);
+                                ScheduleConfig.SPEC.save();
+                                RpEssentialsScheduleManager.reload();
+                                java.util.List<String> finalSlots = slots;
+                                ctx.getSource().sendSuccess(() -> Component.literal(
+                                        MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_UPDATED,
+                                                "label", "HRP Tolerated Slots",
+                                                "value", String.join(", ", finalSlots))), true);
+                            } catch (IllegalStateException e) {
+                                ctx.getSource().sendFailure(Component.literal(
+                                        MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_NOT_LOADED)));
+                            }
+                            return 1;
+                        })));
+
+        setNode.then(Commands.literal("hrpAllowedSlots")
+                .then(Commands.argument("slots", StringArgumentType.greedyString())
+                        .executes(ctx -> {
+                            String raw = StringArgumentType.getString(ctx, "slots");
+                            java.util.List<String> slots = java.util.Arrays.stream(raw.split(","))
+                                    .map(String::trim).collect(java.util.stream.Collectors.toList());
+                            try {
+                                ScheduleConfig.HRP_ALLOWED_SLOTS.set(slots);
+                                ScheduleConfig.SPEC.save();
+                                RpEssentialsScheduleManager.reload();
+                                java.util.List<String> finalSlots = slots;
+                                ctx.getSource().sendSuccess(() -> Component.literal(
+                                        MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_UPDATED,
+                                                "label", "HRP Allowed Slots",
+                                                "value", String.join(", ", finalSlots))), true);
+                            } catch (IllegalStateException e) {
+                                ctx.getSource().sendFailure(Component.literal(
+                                        MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_NOT_LOADED)));
+                            }
+                            return 1;
+                        })));
+
+        setNode.then(Commands.literal("hrpToleratedMessage")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx,
+                                ScheduleConfig.HRP_TOLERATED_MESSAGE, "HRP Tolerated Message"))));
+
+        setNode.then(Commands.literal("hrpAllowedMessage")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx,
+                                ScheduleConfig.HRP_ALLOWED_MESSAGE, "HRP Allowed Message"))));
+
+        setNode.then(Commands.literal("hrpMessageMode")
+                .then(Commands.argument("value", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            builder.suggest("CHAT").suggest("ACTION_BAR")
+                                    .suggest("TITLE").suggest("IMMERSIVE");
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> updateConfigString(ctx,
+                                ScheduleConfig.HRP_MESSAGE_MODE, "HRP Message Mode"))));
+
         // -------------------------------------------------------------------------
         // MODULE: MESSAGERIE PRIVÉE — remplace /msg /tell /w /whisper + /r
         // -------------------------------------------------------------------------
@@ -1493,32 +1593,96 @@ public class RpEssentialsCommands {
     }
 
     private static int showSchedule(CommandContext<CommandSourceStack> ctx) {
-        boolean isOpen  = RpEssentialsScheduleManager.isServerOpen();
-        String timeInfo = RpEssentialsScheduleManager.getTimeUntilNextEvent();
         java.time.format.DateTimeFormatter fmt = java.time.format.DateTimeFormatter.ofPattern("HH:mm");
         java.time.DayOfWeek today = java.time.LocalDate.now().getDayOfWeek();
 
-        StringBuilder sb = new StringBuilder();
-        sb.append("§8§m----------------------------------\n");
-        sb.append(" §6§lSERVER SCHEDULE\n");
-        sb.append(" §7Status: ").append(isOpen ? "§a§lOUVERT" : "§c§lFERMÉ").append("\n\n");
+        boolean scheduleEnabled;
+        try {
+            scheduleEnabled = ScheduleConfig.ENABLE_SCHEDULE.get();
+        } catch (IllegalStateException e) {
+            scheduleEnabled = false;
+        }
 
-        for (java.time.DayOfWeek day : java.time.DayOfWeek.values()) {
-            RpEssentialsScheduleManager.DaySchedule s = RpEssentialsScheduleManager.getSchedules().get(day);
-            boolean isToday = day == today;
-            String prefix = isToday ? "§e▶ " : "§7  ";
-            String dayName = day.getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.FRENCH);
-            if (s == null) {
-                sb.append(prefix).append("§7").append(dayName).append(" : §cFermé\n");
-            } else {
-                sb.append(prefix).append(isToday ? "§e" : "§7").append(dayName)
-                        .append(" : §a").append(s.open().format(fmt))
-                        .append("§7 → §c").append(s.close().format(fmt)).append("\n");
+        boolean isOpen  = RpEssentialsScheduleManager.isServerOpen();
+        String timeInfo = scheduleEnabled
+                ? RpEssentialsScheduleManager.getTimeUntilNextEvent()
+                : MessagesConfig.get(MessagesConfig.SCHEDULE_STATUS_OPEN) + " (schedule disabled)";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append(MessagesConfig.get(MessagesConfig.SCHEDULE_HEADER)).append("\n");
+        sb.append(" §6§lSERVER SCHEDULE\n");
+        sb.append(" §7Status: ")
+                .append(isOpen
+                        ? MessagesConfig.get(MessagesConfig.SCHEDULE_STATUS_OPEN)
+                        : MessagesConfig.get(MessagesConfig.SCHEDULE_STATUS_CLOSED))
+                .append("\n\n");
+
+        if (scheduleEnabled) {
+            for (java.time.DayOfWeek day : java.time.DayOfWeek.values()) {
+                RpEssentialsScheduleManager.DaySchedule s =
+                        RpEssentialsScheduleManager.getSchedules().get(day);
+                boolean isToday = day == today;
+                String prefix = isToday
+                        ? MessagesConfig.get(MessagesConfig.SCHEDULE_DAY_TODAY_PREFIX)
+                        : MessagesConfig.get(MessagesConfig.SCHEDULE_DAY_OTHER_PREFIX);
+                String dayName = day.getDisplayName(
+                        java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH);
+
+                if (s == null) {
+                    sb.append(prefix)
+                            .append(MessagesConfig.get(MessagesConfig.SCHEDULE_DAY_CLOSED_FORMAT,
+                                    "day", dayName))
+                            .append("\n");
+                } else {
+                    sb.append(prefix)
+                            .append(MessagesConfig.get(MessagesConfig.SCHEDULE_DAY_OPEN_FORMAT,
+                                    "day",   dayName,
+                                    "open",  s.open().format(fmt),
+                                    "close", s.close().format(fmt)))
+                            .append("\n");
+                }
             }
         }
 
-        sb.append("\n §f").append(timeInfo).append("\n");
-        sb.append("§8§m----------------------------------");
+        // ── Death Hours ───────────────────────────────────────────────────
+        try {
+            if (ScheduleConfig.DEATH_HOURS_ENABLED.get()) {
+                sb.append("\n ").append(MessagesConfig.get(MessagesConfig.SCHEDULE_DEATH_HOURS_LABEL))
+                        .append(" — ");
+                if (RpEssentialsScheduleManager.isDeathHour()) {
+                    sb.append(MessagesConfig.get(MessagesConfig.SCHEDULE_DEATH_HOURS_ACTIVE));
+                } else {
+                    String slots = String.join(", ", ScheduleConfig.DEATH_HOURS_SLOTS.get());
+                    sb.append(MessagesConfig.get(MessagesConfig.SCHEDULE_DEATH_HOURS_INACTIVE,
+                            "slots", slots));
+                }
+                sb.append("\n");
+            }
+        } catch (IllegalStateException ignored) {}
+
+        // ── HRP Hours ─────────────────────────────────────────────────────
+        try {
+            if (ScheduleConfig.ENABLE_HRP_HOURS.get()) {
+                sb.append(" ").append(MessagesConfig.get(MessagesConfig.SCHEDULE_HRP_LABEL))
+                        .append(" — ");
+                if (RpEssentialsScheduleManager.isHrpAllowed()) {
+                    sb.append(MessagesConfig.get(MessagesConfig.SCHEDULE_HRP_ALLOWED));
+                } else if (RpEssentialsScheduleManager.isHrpTolerated()) {
+                    sb.append(MessagesConfig.get(MessagesConfig.SCHEDULE_HRP_TOLERATED));
+                } else {
+                    String tolerated = String.join(", ", ScheduleConfig.HRP_TOLERATED_SLOTS.get());
+                    String allowed   = String.join(", ", ScheduleConfig.HRP_ALLOWED_SLOTS.get());
+                    sb.append(MessagesConfig.get(MessagesConfig.SCHEDULE_HRP_INACTIVE,
+                            "slots", "Tolerated: " + tolerated + " / Allowed: " + allowed));
+                }
+                sb.append("\n");
+            }
+        } catch (IllegalStateException ignored) {}
+
+        if (scheduleEnabled) {
+            sb.append("\n §f").append(timeInfo).append("\n");
+        }
+        sb.append(MessagesConfig.get(MessagesConfig.SCHEDULE_FOOTER));
 
         String msg = sb.toString();
         ctx.getSource().sendSuccess(() -> Component.literal(msg), false);

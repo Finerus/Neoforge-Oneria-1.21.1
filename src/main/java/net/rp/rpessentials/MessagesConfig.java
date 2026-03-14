@@ -182,6 +182,27 @@ public class MessagesConfig {
     public static final ModConfigSpec.ConfigValue<String> SCHEDULE_TIME_INVALID;
     public static final ModConfigSpec.ConfigValue<String> AUTO_UNWHITELIST_STAFF_NOTIFY;
 
+    // =========================================================================
+    // CATEGORY: SCHEDULE MESSAGES
+    // =========================================================================
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_HEADER;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_STATUS_OPEN;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_STATUS_CLOSED;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DAY_OPEN_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DAY_CLOSED_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DAY_TODAY_PREFIX;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DAY_OTHER_PREFIX;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_FOOTER;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_LABEL;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_ACTIVE;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_INACTIVE;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_HRP_LABEL;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_HRP_TOLERATED;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_HRP_ALLOWED;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_HRP_INACTIVE;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_NOTIFY;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_NOTIFY_MODE;;
+
     static {
         // =========================================================================
         BUILDER.push("System");
@@ -513,6 +534,64 @@ public class MessagesConfig {
                 .comment("Part of the license check message when a player does NOT have the license.",
                         "Placeholders: {player} = player name, {profession} = profession name.")
                 .define("noLicense", "§e{player} §cdoes NOT have §ea §f{profession} §clicense.");
+
+        BUILDER.pop();
+
+        BUILDER.push("Schedule Display");
+
+        SCHEDULE_HEADER = BUILDER
+                .comment("Header line of /schedule.")
+                .define("scheduleHeader", "§8§m----------------------------------");
+        SCHEDULE_STATUS_OPEN = BUILDER
+                .comment("Status shown when server is open.")
+                .define("scheduleStatusOpen", "§a§lOPEN");
+        SCHEDULE_STATUS_CLOSED = BUILDER
+                .comment("Status shown when server is closed.")
+                .define("scheduleStatusClosed", "§c§lCLOSED");
+        SCHEDULE_DAY_OPEN_FORMAT = BUILDER
+                .comment("Format for an open day. Placeholders: {day} {open} {close}")
+                .define("scheduleDayOpenFormat", "{day} : §a{open}§7 → §c{close}");
+        SCHEDULE_DAY_CLOSED_FORMAT = BUILDER
+                .comment("Format for a closed day. Placeholder: {day}")
+                .define("scheduleDayClosedFormat", "{day} : §cClosed");
+        SCHEDULE_DAY_TODAY_PREFIX = BUILDER
+                .comment("Prefix for the current day.")
+                .define("scheduleDayTodayPrefix", "§e▶ ");
+        SCHEDULE_DAY_OTHER_PREFIX = BUILDER
+                .comment("Prefix for other days.")
+                .define("scheduleDayOtherPrefix", "  §7");
+        SCHEDULE_FOOTER = BUILDER
+                .comment("Footer line of /schedule.")
+                .define("scheduleFooter", "§8§m----------------------------------");
+        SCHEDULE_DEATH_HOURS_LABEL = BUILDER
+                .comment("Label for the Death Hours section.")
+                .define("scheduleDeathHoursLabel", "§c☠ Death Hours");
+        SCHEDULE_DEATH_HOURS_ACTIVE = BUILDER
+                .comment("Shown when death hours are active now.")
+                .define("scheduleDeathHoursActive", "§cACTIVE");
+        SCHEDULE_DEATH_HOURS_INACTIVE = BUILDER
+                .comment("Shown when death hours are not active now. Placeholder: {slots}")
+                .define("scheduleDeathHoursInactive", "§7{slots}");
+        SCHEDULE_HRP_LABEL = BUILDER
+                .comment("Label for the HRP Hours section.")
+                .define("scheduleHrpLabel", "§6✦ HRP Hours");
+        SCHEDULE_HRP_TOLERATED = BUILDER
+                .comment("Shown when HRP is currently tolerated.")
+                .define("scheduleHrpTolerated", "§6TOLERATED");
+        SCHEDULE_HRP_ALLOWED = BUILDER
+                .comment("Shown when HRP is currently allowed.")
+                .define("scheduleHrpAllowed", "§aALLOWED");
+        SCHEDULE_HRP_INACTIVE = BUILDER
+                .comment("Shown when HRP hours are not active now. Placeholder: {slots}")
+                .define("scheduleHrpInactive", "§7{slots}");
+        SCHEDULE_DEATH_HOURS_NOTIFY = BUILDER
+                .comment("Message broadcast to all players when death hours begin.",
+                        "Placeholder: {slots}")
+                .define("scheduleDeathHoursNotify",
+                        "§c☠ [Death Hours] RP death is now active until: {slots}. Be careful.");
+        SCHEDULE_DEATH_HOURS_NOTIFY_MODE = BUILDER
+                .comment("Display mode for death hours notification: CHAT, ACTION_BAR, TITLE, IMMERSIVE.")
+                .define("scheduleDeathHoursNotifyMode", "CHAT");
 
         BUILDER.pop();
 

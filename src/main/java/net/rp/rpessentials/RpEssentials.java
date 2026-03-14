@@ -21,7 +21,6 @@ import java.util.EnumSet;
 @Mod("rpessentials")
 public class RpEssentials {
 
-    // ⚠ CHANGED: valeur du MODID
     public static final String MODID = "rpessentials";
     public static final Logger LOGGER = LogUtils.getLogger();
     private int tickCounter = 0;
