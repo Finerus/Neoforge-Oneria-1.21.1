@@ -16,6 +16,9 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import org.slf4j.Logger;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.EnumSet;
 
 @Mod("rpessentials")
@@ -28,13 +31,13 @@ public class RpEssentials {
     public RpEssentials(IEventBus modEventBus, ModContainer modContainer) {
         ConfigMigrator.migrateIfNeeded();
 
-        modContainer.registerConfig(ModConfig.Type.SERVER, RpEssentialsConfig.SPEC,       "rpessentials/rpessentials-core.toml");
-        modContainer.registerConfig(ModConfig.Type.SERVER, ChatConfig.SPEC,         "rpessentials/rpessentials-chat.toml");
-        modContainer.registerConfig(ModConfig.Type.SERVER, ScheduleConfig.SPEC,     "rpessentials/rpessentials-schedule.toml");
-        modContainer.registerConfig(ModConfig.Type.SERVER, ModerationConfig.SPEC,   "rpessentials/rpessentials-moderation.toml");
-        modContainer.registerConfig(ModConfig.Type.SERVER, ProfessionConfig.SPEC,   "rpessentials/rpessentials-professions.toml");
-        modContainer.registerConfig(ModConfig.Type.SERVER, MessagesConfig.SPEC,     "rpessentials/rpessentials-messages.toml");
-        modContainer.registerConfig(ModConfig.Type.SERVER, NametagConfig.SPEC,  "rpessentials/rpessentials-nametag.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, RpEssentialsConfig.SPEC,     "rpessentials/rpessentials-core.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ChatConfig.SPEC,             "rpessentials/rpessentials-chat.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ScheduleConfig.SPEC,         "rpessentials/rpessentials-schedule.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ModerationConfig.SPEC,       "rpessentials/rpessentials-moderation.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, ProfessionConfig.SPEC,       "rpessentials/rpessentials-professions.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, MessagesConfig.SPEC,         "rpessentials/rpessentials-messages.toml");
+        modContainer.registerConfig(ModConfig.Type.SERVER, NametagConfig.SPEC,          "rpessentials/rpessentials-nametag.toml");
 
         RpEssentialsItems.ITEMS.register(modEventBus);
 
@@ -79,9 +82,9 @@ public class RpEssentials {
 
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
-        if (event.getServer() == null) return;
         MinecraftServer server = event.getServer();
 
+        // ── TabList blur — toutes les 40 ticks (2s) ───────────────────────────
         if (tickCounter % 40 == 0) {
             try {
                 if (RpEssentialsConfig.ENABLE_BLUR.get()) {
@@ -93,24 +96,68 @@ public class RpEssentials {
             } catch (IllegalStateException ignored) {}
         }
 
-        if (tickCounter % 400 == 0) {
-            ProfessionRestrictionEventHandler.cleanupCaches();
-            CraftingAndArmorRestrictionEventHandler.cleanupCaches();
-        }
-
-        if (tickCounter % 20 == 0) {
-            RpEssentialsScheduleManager.tick(server);
+        // ── World Border — intervalle configurable (défaut 40 ticks = 2s) ───────
+        int wbInterval = 40;
+        try { wbInterval = RpEssentialsConfig.WORLD_BORDER_CHECK_INTERVAL.get(); }
+        catch (IllegalStateException ignored) {}
+        if (tickCounter % wbInterval == 0) {
             WorldBorderManager.tick(server);
         }
 
+        // ── Schedule + caches — toutes les 400 ticks (20s) ───────────────────
+        if (tickCounter % 400 == 0) {
+            ProfessionRestrictionEventHandler.cleanupCaches();
+            CraftingAndArmorRestrictionEventHandler.cleanupCaches();
+
+            LocalTime now   = LocalTime.now();
+            DayOfWeek today = LocalDate.now().getDayOfWeek();
+
+            // ── Schedule principal ─────────────────────────────────────────
+            try {
+                if (ScheduleConfig.ENABLE_SCHEDULE.get() && !RpEssentialsScheduleManager.getSchedules().isEmpty()) {
+                    RpEssentialsScheduleManager.DaySchedule s = RpEssentialsScheduleManager.getSchedules().get(today);
+
+                    if (!RpEssentialsScheduleManager.hasOpenedToday() && s != null
+                            && now.getHour()   == s.open().getHour()
+                            && now.getMinute() == s.open().getMinute()) {
+                        RpEssentialsScheduleManager.markOpenedToday();
+                        RpEssentialsScheduleManager.sendOpeningMessage(server, s);
+                    }
+
+                    if (s != null && s.isOpen(now)) {
+                        RpEssentialsScheduleManager.checkWarnings(server, now, s);
+                    }
+
+                    if (!RpEssentialsScheduleManager.hasClosedToday() && s == null) {
+                        RpEssentialsScheduleManager.markClosedToday();
+                        RpEssentialsScheduleManager.closeServer(server);
+                    }
+
+                    if (!RpEssentialsScheduleManager.hasClosedToday() && s != null
+                            && now.getHour()   == s.close().getHour()
+                            && now.getMinute() == s.close().getMinute()) {
+                        RpEssentialsScheduleManager.markClosedToday();
+                        RpEssentialsScheduleManager.closeServer(server);
+                    }
+                }
+            } catch (IllegalStateException ignored) {}
+
+            // ── Death Hours ────────────────────────────────────────────────
+            RpEssentialsScheduleManager.tickDeathHoursNotifications(server, now);
+
+            // ── HRP Hours ─────────────────────────────────────────────────
+            RpEssentialsScheduleManager.tickHrpNotifications(server, now);
+        }
+
+        // ── Midnight sweep — toutes les 1200 ticks (60s) ─────────────────────
         if (tickCounter % 1200 == 0) {
-            java.time.LocalTime now = java.time.LocalTime.now();
+            LocalTime now = LocalTime.now();
             RpEssentialsScheduleManager.tickMidnightSweep(server);
             TempLicenseExpirationManager.tickMidnightSweep(server, now.getHour(), now.getMinute());
             LastConnectionManager.tickAutoUnwhitelist(server, now.getHour(), now.getMinute());
-            tickCounter = 0;
         }
 
         tickCounter++;
+        if (tickCounter >= 1200) tickCounter = 0;
     }
 }

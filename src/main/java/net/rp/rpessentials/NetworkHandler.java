@@ -15,6 +15,7 @@ public class NetworkHandler {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
 
+        // ── Packet legacy : cacher/afficher tous les nametags (compatibilité) ──────
         registrar.playToClient(
                 HideNametagsPacket.TYPE,
                 HideNametagsPacket.STREAM_CODEC,
@@ -24,13 +25,17 @@ public class NetworkHandler {
                 )
         );
 
+        // ── Nouveau packet : sync complète config + données joueurs ───────────────
         registrar.playToClient(
-                SyncNametagDataPacket.TYPE,
-                SyncNametagDataPacket.CODEC,
-                SyncNametagDataPacket::handle
+                NametagSyncPacket.TYPE,
+                NametagSyncPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(
+                        NetworkHandler::handleNametagSync,
+                        null
+                )
         );
 
-        // Packet pour synchroniser les restrictions de métiers
+        // ── Restrictions métiers ──────────────────────────────────────────────────
         registrar.playToClient(
                 SyncProfessionRestrictionsPacket.TYPE,
                 SyncProfessionRestrictionsPacket.STREAM_CODEC,
@@ -41,17 +46,30 @@ public class NetworkHandler {
         );
     }
 
-    private static void handleHideNametags(HideNametagsPacket packet, net.neoforged.neoforge.network.handling.IPayloadContext context) {
-        context.enqueueWork(() -> {
+    // ── Handlers ──────────────────────────────────────────────────────────────────
+
+    private static void handleHideNametags(HideNametagsPacket packet,
+                                           net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
             ClientNametagConfig.setHideNametags(packet.hideNametags());
-            RpEssentials.LOGGER.info("Received nametag config from server - Hide: {}", packet.hideNametags());
+            RpEssentials.LOGGER.info("[Nametag] Legacy config received — hide: {}", packet.hideNametags());
         });
     }
 
-    private static void handleSyncProfessionRestrictions(SyncProfessionRestrictionsPacket packet, net.neoforged.neoforge.network.handling.IPayloadContext context) {
-        context.enqueueWork(() -> {
+    private static void handleNametagSync(NametagSyncPacket packet,
+                                          net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
+            ClientNametagConfig.applySync(packet);
+            RpEssentials.LOGGER.debug("[Nametag] Sync received — advanced: {}, players: {}",
+                    packet.advancedEnabled(), packet.players().size());
+        });
+    }
+
+    private static void handleSyncProfessionRestrictions(SyncProfessionRestrictionsPacket packet,
+                                                          net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> {
             ClientProfessionRestrictions.updateRestrictions(packet.blockedCrafts(), packet.blockedEquipment());
-            RpEssentials.LOGGER.info("Synced profession restrictions from server - {} crafts, {} equipment blocked",
+            RpEssentials.LOGGER.info("[Profession] Synced restrictions — {} crafts, {} equipment blocked",
                     packet.blockedCrafts().size(), packet.blockedEquipment().size());
         });
     }

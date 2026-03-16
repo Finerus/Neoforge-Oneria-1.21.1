@@ -1,17 +1,16 @@
 package net.rp.rpessentials;
 
-import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.network.chat.Component;
 
 import java.util.*;
 
 public class WorldBorderManager {
 
-    private static final Map<UUID, Boolean> hasBeenWarned = new HashMap<>();
+    private static final Map<UUID, Boolean> hasBeenWarned   = new HashMap<>();
     private static final Map<UUID, Set<String>> playerZoneState = new HashMap<>();
     private static boolean systemInitialized = false;
 
@@ -25,11 +24,7 @@ public class WorldBorderManager {
             }
         } catch (Exception e) { return; }
 
-        try {
-            if (server.getTickCount() % RpEssentialsConfig.WORLD_BORDER_CHECK_INTERVAL.get() != 0) return;
-        } catch (Exception e) { return; }
-
-        double maxDist = RpEssentialsConfig.WORLD_BORDER_DISTANCE.get();
+        double maxDist   = RpEssentialsConfig.WORLD_BORDER_DISTANCE.get();
         double maxDistSq = maxDist * maxDist;
 
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
@@ -42,26 +37,36 @@ public class WorldBorderManager {
         }
     }
 
+    // =========================================================================
+    // VÉRIFICATION DISTANCE BORDURE
+    // =========================================================================
+
     private static void checkPlayerDistance(ServerPlayer player, double maxDistSq, double maxDist) {
-        BlockPos spawn = player.serverLevel().getSharedSpawnPos();
+        var spawn = player.serverLevel().getSharedSpawnPos();
         double dx = player.getX() - spawn.getX();
         double dz = player.getZ() - spawn.getZ();
-        double distSq = dx * dx + dz * dz;
+        double distSq     = dx * dx + dz * dz;
         double actualDist = Math.sqrt(distSq);
 
-        UUID playerId = player.getUUID();
-        boolean isOutsideBorder = distSq > maxDistSq;
-        Boolean alreadyWarned = hasBeenWarned.getOrDefault(playerId, false);
+        UUID uuid = player.getUUID();
+        boolean isOutside     = distSq > maxDistSq;
+        boolean alreadyWarned = hasBeenWarned.getOrDefault(uuid, false);
 
-        if (isOutsideBorder && !alreadyWarned) {
+        if (isOutside && !alreadyWarned) {
             RpEssentials.LOGGER.info("[WorldBorder] Player {} exceeded border at {}/{} blocks",
-                    player.getName().getString(), String.format("%.1f", actualDist), String.format("%.0f", maxDist));
+                    player.getName().getString(),
+                    String.format("%.1f", actualDist),
+                    String.format("%.0f", maxDist));
             sendBorderWarning(player, actualDist);
-            hasBeenWarned.put(playerId, true);
-        } else if (!isOutsideBorder && alreadyWarned) {
-            hasBeenWarned.put(playerId, false);
+            hasBeenWarned.put(uuid, true);
+        } else if (!isOutside && alreadyWarned) {
+            hasBeenWarned.put(uuid, false);
         }
     }
+
+    // =========================================================================
+    // VÉRIFICATION ZONES NOMMÉES
+    // =========================================================================
 
     private static void checkNamedZones(ServerPlayer player) {
         List<? extends String> zones;
@@ -69,23 +74,23 @@ public class WorldBorderManager {
             zones = RpEssentialsConfig.NAMED_ZONES.get();
         } catch (Exception e) { return; }
 
-        UUID playerId = player.getUUID();
-        Set<String> currentZones = playerZoneState.computeIfAbsent(playerId, k -> new HashSet<>());
+        UUID uuid = player.getUUID();
+        Set<String> currentZones = playerZoneState.computeIfAbsent(uuid, k -> new HashSet<>());
 
         for (String zoneDef : zones) {
             String[] parts = zoneDef.split(";");
             if (parts.length < 5) continue;
             try {
-                String zoneName = parts[0].trim();
-                double cx = Double.parseDouble(parts[1].trim());
-                double cz = Double.parseDouble(parts[2].trim());
-                double radius = Double.parseDouble(parts[3].trim());
-                String msgEnter = parts[4].trim();
-                String msgExit = parts.length >= 6 ? parts[5].trim() : "";
+                String zoneName  = parts[0].trim();
+                double cx        = Double.parseDouble(parts[1].trim());
+                double cz        = Double.parseDouble(parts[2].trim());
+                double radius    = Double.parseDouble(parts[3].trim());
+                String msgEnter  = parts[4].trim();
+                String msgExit   = parts.length >= 6 ? parts[5].trim() : "";
 
                 double dx = player.getX() - cx;
                 double dz = player.getZ() - cz;
-                boolean inZone = (dx * dx + dz * dz) <= (radius * radius);
+                boolean inZone    = (dx * dx + dz * dz) <= (radius * radius);
                 boolean wasInZone = currentZones.contains(zoneName);
 
                 if (inZone && !wasInZone) {
@@ -101,34 +106,36 @@ public class WorldBorderManager {
         }
     }
 
-    private static void sendZoneMessage(ServerPlayer player, String message) {
-        try {
-            sendImmersiveOrFallback(player, message, 5f);
-        } catch (Exception e) {
-            RpEssentials.LOGGER.error("[WorldBorder] Error sending zone message", e);
-        }
-    }
+    // =========================================================================
+    // ENVOI DES MESSAGES
+    // =========================================================================
 
     private static void sendBorderWarning(ServerPlayer player, double distance) {
         try {
             String message = RpEssentialsConfig.WORLD_BORDER_MESSAGE.get()
                     .replace("{distance}", String.format("%.0f", distance))
-                    .replace("{player}", player.getName().getString());
+                    .replace("{player}",   player.getName().getString());
 
-            sendImmersiveOrFallback(player, message, 6f);
+            sendMessage(player, message, 6f);
 
             player.playNotifySound(
                     SoundEvents.NOTE_BLOCK_BASS.value(),
                     SoundSource.MASTER,
-                    1.0f,
-                    0.5f
-            );
+                    1.0f, 0.5f);
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[WorldBorder] Error sending border warning", e);
         }
     }
 
-    private static void sendImmersiveOrFallback(ServerPlayer player, String message, float duration) {
+    private static void sendZoneMessage(ServerPlayer player, String message) {
+        try {
+            sendMessage(player, message, 5f);
+        } catch (Exception e) {
+            RpEssentials.LOGGER.error("[WorldBorder] Error sending zone message", e);
+        }
+    }
+
+    private static void sendMessage(ServerPlayer player, String message, float duration) {
         String mode = "ACTION_BAR";
         try {
             mode = RpEssentialsConfig.ZONE_MESSAGE_MODE.get().toUpperCase();
@@ -143,16 +150,20 @@ public class WorldBorderManager {
                             .fadeIn(0.5f)
                             .fadeOut(0.5f)
                             .sendServer(player);
-                } catch (Exception e) {
+                } catch (Exception | NoClassDefFoundError e) {
                     // Fallback si le mod client n'est pas présent
                     player.displayClientMessage(formatted, true);
                     RpEssentials.LOGGER.warn("[WorldBorder] ImmersiveMessageAPI unavailable, falling back to action bar");
                 }
             }
             case "CHAT" -> player.sendSystemMessage(formatted);
-            default -> player.displayClientMessage(formatted, true); // ACTION_BAR
+            default      -> player.displayClientMessage(formatted, true); // ACTION_BAR
         }
     }
+
+    // =========================================================================
+    // CACHE
+    // =========================================================================
 
     public static void clearCache(UUID playerId) {
         hasBeenWarned.remove(playerId);

@@ -31,11 +31,12 @@ public class RpEssentialsScheduleManager {
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("HH:mm");
     private static final Map<DayOfWeek, DaySchedule> schedules = new EnumMap<>(DayOfWeek.class);
 
-    private static final Set<Integer> sentWarnings = new HashSet<>();
-    private static boolean hasClosedToday  = false;
-    private static boolean hasOpenedToday  = false;
-    private static DayOfWeek lastResetDay  = null;
-    private static String lastHrpSlotKey   = "";
+    private static final Set<Integer> sentWarnings    = new HashSet<>();
+    private static boolean hasClosedToday             = false;
+    private static boolean hasOpenedToday             = false;
+    private static DayOfWeek lastResetDay             = null;
+    private static String lastHrpSlotKey              = "";
+    private static String lastDeathHoursSlotKey       = "";
 
     // =========================================================================
     // RELOAD
@@ -162,51 +163,13 @@ public class RpEssentialsScheduleManager {
     }
 
     // =========================================================================
-    // TICK PRINCIPAL — appelé toutes les 20 ticks depuis RpEssentials
+    // ACCESSEURS D'ÉTAT — utilisés par RpEssentials.onServerTick
     // =========================================================================
 
-    public static void tick(MinecraftServer server) {
-        if (server.getTickCount() % 400 != 0) return;
-
-        LocalTime now   = LocalTime.now();
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
-
-        // ── Schedule principal (uniquement si activé) ──────────────────────
-        try {
-            if (ScheduleConfig.ENABLE_SCHEDULE.get() && !schedules.isEmpty()) {
-                DaySchedule s = schedules.get(today);
-
-                if (!hasOpenedToday && s != null
-                        && now.getHour()   == s.open().getHour()
-                        && now.getMinute() == s.open().getMinute()) {
-                    hasOpenedToday = true;
-                    sendOpeningMessage(server, s);
-                }
-
-                if (s != null && s.isOpen(now)) {
-                    checkWarnings(server, now, s);
-                }
-
-                if (!hasClosedToday && s == null) {
-                    hasClosedToday = true;
-                    closeServer(server);
-                }
-
-                if (!hasClosedToday && s != null
-                        && now.getHour()   == s.close().getHour()
-                        && now.getMinute() == s.close().getMinute()) {
-                    hasClosedToday = true;
-                    closeServer(server);
-                }
-            }
-        } catch (IllegalStateException ignored) {}
-
-        // ── Death Hours (indépendant du schedule principal) ────────────────
-        tickDeathHoursNotifications(server, now);
-
-        // ── HRP Hours (indépendant du schedule principal) ──────────────────
-        tickHrpNotifications(server, now);
-    }
+    public static boolean hasOpenedToday() { return hasOpenedToday; }
+    public static boolean hasClosedToday() { return hasClosedToday; }
+    public static void markOpenedToday()   { hasOpenedToday = true; }
+    public static void markClosedToday()   { hasClosedToday = true; }
 
     // =========================================================================
     // TICK MIDNIGHT — appelé toutes les 1200 ticks depuis RpEssentials
@@ -223,11 +186,12 @@ public class RpEssentialsScheduleManager {
 
         LocalTime now = LocalTime.now();
         if (now.getHour() == 0 && now.getMinute() <= 1) {
-            lastResetDay   = today;
-            hasClosedToday = false;
-            hasOpenedToday = false;
+            lastResetDay          = today;
+            hasClosedToday        = false;
+            hasOpenedToday        = false;
             sentWarnings.clear();
-            lastHrpSlotKey = "";
+            lastHrpSlotKey        = "";
+            lastDeathHoursSlotKey = "";
             RpEssentials.LOGGER.info("[Schedule] Daily flags reset for {}", today);
         }
     }
@@ -271,10 +235,10 @@ public class RpEssentialsScheduleManager {
     }
 
     // =========================================================================
-    // PRIVÉ
+    // MÉTHODES DE TICK — appelées depuis RpEssentials.onServerTick
     // =========================================================================
 
-    private static void checkWarnings(MinecraftServer server, LocalTime now, DaySchedule s) {
+    public static void checkWarnings(MinecraftServer server, LocalTime now, DaySchedule s) {
         try {
             for (int minutes : ScheduleConfig.WARNING_TIMES.get()) {
                 LocalTime warnTime = s.close().minusMinutes(minutes);
@@ -295,7 +259,7 @@ public class RpEssentialsScheduleManager {
         } catch (IllegalStateException ignored) {}
     }
 
-    private static void sendOpeningMessage(MinecraftServer server, DaySchedule s) {
+    public static void sendOpeningMessage(MinecraftServer server, DaySchedule s) {
         try {
             String msg = ScheduleConfig.MSG_SERVER_OPENED.get()
                     .replace("{open}",  s.open().format(FMT))
@@ -308,7 +272,7 @@ public class RpEssentialsScheduleManager {
         } catch (IllegalStateException ignored) {}
     }
 
-    private static void closeServer(MinecraftServer server) {
+    public static void closeServer(MinecraftServer server) {
         try {
             if (!ScheduleConfig.KICK_NON_STAFF.get()) return;
         } catch (IllegalStateException e) {
@@ -342,75 +306,115 @@ public class RpEssentialsScheduleManager {
         RpEssentials.LOGGER.info("[Schedule] Server closed, kicked {} player(s).", toKick.size());
     }
 
-    private static String lastDeathHoursSlotKey = "";
-
-    private static void tickDeathHoursNotifications(MinecraftServer server, LocalTime now) {
+    public static void tickDeathHoursNotifications(MinecraftServer server, LocalTime now) {
         try {
             if (!ScheduleConfig.DEATH_HOURS_ENABLED.get()) return;
-        } catch (IllegalStateException e) {
-            return;
-        }
+        } catch (IllegalStateException e) { return; }
 
         boolean active = isDeathHour();
+
+        // Auto-toggle du global Death RP selon les death hours
+        try {
+            boolean currentGlobal = RpEssentialsConfig.DEATH_RP_GLOBAL_ENABLED.get();
+            if (active && !currentGlobal) {
+                RpEssentialsConfig.DEATH_RP_GLOBAL_ENABLED.set(true);
+                RpEssentials.LOGGER.info("[DeathRP] Death hours started — global Death RP enabled.");
+            } else if (!active && currentGlobal) {
+                RpEssentialsConfig.DEATH_RP_GLOBAL_ENABLED.set(false);
+                RpEssentials.LOGGER.info("[DeathRP] Death hours ended — global Death RP disabled.");
+            }
+        } catch (IllegalStateException ignored) {}
 
         if (!active) {
             lastDeathHoursSlotKey = "";
             return;
         }
 
-        String key = now.getHour() + ":" + now.getMinute();
-        if (key.equals(lastDeathHoursSlotKey)) return;
-        lastDeathHoursSlotKey = key;
+        // Clé = le slot actif → fire une seule fois par slot
+        String currentSlot = null;
+        try {
+            for (String slot : ScheduleConfig.DEATH_HOURS_SLOTS.get()) {
+                if (isInSlot(now, slot)) { currentSlot = slot; break; }
+            }
+        } catch (IllegalStateException ignored) {}
+
+        if (currentSlot == null || currentSlot.equals(lastDeathHoursSlotKey)) return;
+        if (server.getPlayerList().getPlayers().isEmpty()) return;
+        lastDeathHoursSlotKey = currentSlot;
 
         try {
-            String slots = String.join(", ", ScheduleConfig.DEATH_HOURS_SLOTS.get());
-            String rawMsg = MessagesConfig.get(MessagesConfig.SCHEDULE_DEATH_HOURS_NOTIFY,
-                    "slots", slots);
-            String mode = MessagesConfig.get(MessagesConfig.SCHEDULE_DEATH_HOURS_NOTIFY_MODE);
+            String slots  = String.join(", ", ScheduleConfig.DEATH_HOURS_SLOTS.get());
+            String rawMsg = MessagesConfig.get(MessagesConfig.SCHEDULE_DEATH_HOURS_NOTIFY, "slots", slots);
+            String mode   = MessagesConfig.get(MessagesConfig.SCHEDULE_DEATH_HOURS_NOTIFY_MODE);
             for (ServerPlayer p : server.getPlayerList().getPlayers())
                 DeathRPManager.sendMessageToPlayer(p, rawMsg, mode);
         } catch (IllegalStateException ignored) {}
     }
 
-    private static void tickHrpNotifications(MinecraftServer server, LocalTime now) {
+    public static void tickHrpNotifications(MinecraftServer server, LocalTime now) {
         try {
             if (!ScheduleConfig.ENABLE_HRP_HOURS.get()) return;
-        } catch (IllegalStateException e) {
-            return;
-        }
+        } catch (IllegalStateException e) { return; }
+
         boolean allowed   = isHrpAllowed();
         boolean tolerated = isHrpTolerated();
         if (!allowed && !tolerated) { lastHrpSlotKey = ""; return; }
 
-        String key = now.getHour() + ":" + now.getMinute();
-        if (key.equals(lastHrpSlotKey)) return;
-        lastHrpSlotKey = key;
+        // Clé = le slot actif → fire une seule fois par slot
+        String currentSlot = null;
+        try {
+            List<? extends String> slots = allowed
+                    ? ScheduleConfig.HRP_ALLOWED_SLOTS.get()
+                    : ScheduleConfig.HRP_TOLERATED_SLOTS.get();
+            for (String slot : slots) {
+                if (isInSlot(now, slot)) { currentSlot = slot; break; }
+            }
+        } catch (IllegalStateException ignored) {}
+
+        if (currentSlot == null || currentSlot.equals(lastHrpSlotKey)) return;
+        if (server.getPlayerList().getPlayers().isEmpty()) return;
+        lastHrpSlotKey = currentSlot;
 
         try {
             String rawMsg = allowed
                     ? ScheduleConfig.HRP_ALLOWED_MESSAGE.get()
                     : ScheduleConfig.HRP_TOLERATED_MESSAGE.get();
+            String[] parts = currentSlot.split("-", 2);
+            rawMsg = rawMsg
+                    .replace("{start}", parts[0].trim())
+                    .replace("{end}",   parts.length > 1 ? parts[1].trim() : "?");
             String mode = ScheduleConfig.HRP_MESSAGE_MODE.get();
             for (ServerPlayer p : server.getPlayerList().getPlayers())
                 DeathRPManager.sendMessageToPlayer(p, rawMsg, mode);
         } catch (IllegalStateException ignored) {}
     }
 
+    // =========================================================================
+    // UTILITAIRES PRIVÉS
+    // =========================================================================
+
     private static DaySchedule getNextOpenSchedule() {
         DayOfWeek today = LocalDate.now().getDayOfWeek();
-        for (int i = 1; i <= 7; i++) {
-            DaySchedule s = schedules.get(today.plus(i));
-            if (s != null) return s;
+        LocalTime now   = LocalTime.now();
+        for (int i = 0; i <= 7; i++) {
+            DayOfWeek day = today.plus(i);
+            DaySchedule s = schedules.get(day);
+            if (s == null) continue;
+            if (i == 0 && !s.open().isAfter(now)) continue;
+            return s;
         }
         return null;
     }
 
     private static String getNextOpenDayName() {
         DayOfWeek today = LocalDate.now().getDayOfWeek();
-        for (int i = 1; i <= 7; i++) {
+        LocalTime now   = LocalTime.now();
+        for (int i = 0; i <= 7; i++) {
             DayOfWeek next = today.plus(i);
-            if (schedules.get(next) != null)
-                return next.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+            DaySchedule s  = schedules.get(next);
+            if (s == null) continue;
+            if (i == 0 && !s.open().isAfter(now)) continue;
+            return i == 0 ? "Today" : next.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
         }
         return "N/A";
     }

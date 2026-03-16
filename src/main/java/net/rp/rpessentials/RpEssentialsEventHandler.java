@@ -8,22 +8,12 @@ import net.minecraft.sounds.SoundSource;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
-import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.minecraft.world.level.storage.LevelResource;
 
-import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 
 @EventBusSubscriber(modid = RpEssentials.MODID)
 public class RpEssentialsEventHandler {
-
-    @SubscribeEvent
-    public static void onServerStarting(ServerStartingEvent event) {
-        Path worldData = event.getServer()
-                .getWorldPath(LevelResource.ROOT)
-                .resolve("data");
-        ConfigMigrator.migrateDataIfNeeded(worldData);
-    }
 
     @SubscribeEvent
     public static void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
@@ -35,16 +25,6 @@ public class RpEssentialsEventHandler {
         if (server == null) return;
 
         ProfessionSyncHelper.syncToPlayer(player);
-
-        // Sync nametag data vers tous les joueurs connectés
-        SyncNametagDataPacket.broadcastForPlayer(player);
-        // Et envoyer les données des joueurs déjà connectés au nouveau joueur
-        for (ServerPlayer online : player.getServer().getPlayerList().getPlayers()) {
-            if (!online.getUUID().equals(player.getUUID())) {
-                net.neoforged.neoforge.network.PacketDistributor
-                        .sendToPlayer(player, SyncNametagDataPacket.from(online));
-            }
-        }
 
         try {
             if (ScheduleConfig.ENABLE_WELCOME != null && ScheduleConfig.ENABLE_WELCOME.get()) {
@@ -77,12 +57,28 @@ public class RpEssentialsEventHandler {
             // config pas encore chargée
         }
 
+        // Envoi legacy hideNametags (conservé pour rétrocompatibilité)
         try {
             boolean hideNametags = RpEssentialsConfig.HIDE_NAMETAGS.get();
             PacketDistributor.sendToPlayer(player, new HideNametagsPacket(hideNametags));
         } catch (IllegalStateException e) {
             // config pas encore chargée
         }
+
+        // Sync nametag avancé : envoi après 500 ms pour laisser le client finir de charger
+        CompletableFuture.runAsync(() -> {
+            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+            server.execute(() -> {
+                // Envoie la config + la liste de tous les autres joueurs au nouveau joueur
+                NametagSyncHelper.sendTo(player, server);
+                // Met à jour tous les autres joueurs pour qu'ils connaissent le nouveau
+                for (ServerPlayer other : server.getPlayerList().getPlayers()) {
+                    if (!other.getUUID().equals(player.getUUID())) {
+                        NametagSyncHelper.sendTo(other, server);
+                    }
+                }
+            });
+        });
     }
 
     @SubscribeEvent
@@ -91,5 +87,15 @@ public class RpEssentialsEventHandler {
 
         LastConnectionManager.recordLogout(player);
         RpEssentialsMessagingManager.clearCache(player.getUUID());
+
+        // Met à jour tous les joueurs restants pour retirer le joueur parti de leurs données
+        MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        if (server != null) {
+            server.execute(() -> {
+                for (ServerPlayer other : server.getPlayerList().getPlayers()) {
+                    NametagSyncHelper.sendTo(other, server);
+                }
+            });
+        }
     }
 }

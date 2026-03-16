@@ -201,7 +201,22 @@ public class MessagesConfig {
     public static final ModConfigSpec.ConfigValue<String> SCHEDULE_HRP_ALLOWED;
     public static final ModConfigSpec.ConfigValue<String> SCHEDULE_HRP_INACTIVE;
     public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_NOTIFY;
-    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_NOTIFY_MODE;;
+    public static final ModConfigSpec.ConfigValue<String> SCHEDULE_DEATH_HOURS_NOTIFY_MODE;
+
+    // =========================================================================
+    // CATEGORY: RP COMMANDS
+    // =========================================================================
+    public static final ModConfigSpec.ConfigValue<String> RP_PERMISSION_DENIED;
+    public static final ModConfigSpec.ConfigValue<String> RP_AFK_TELEPORT;
+    public static final ModConfigSpec.ConfigValue<String> RP_COMMERCE_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> RP_INCOGNITO_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> RP_INCOGNITO_LOG;
+    public static final ModConfigSpec.ConfigValue<String> RP_ACTION_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> RP_ACTION_SPY;
+    public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_TITLE;
+    public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_SUBTITLE;
+    public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_CHAT_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_SENT;
 
     static {
         // =========================================================================
@@ -708,16 +723,70 @@ public class MessagesConfig {
 
         BUILDER.pop();
 
+        BUILDER.push("RP Commands");
+        RP_PERMISSION_DENIED = BUILDER
+                .comment("Message shown when a player lacks permission for an RP staff command.")
+                .define("permissionDenied", "§c[ERROR] Permission denied.");
+
+        RP_AFK_TELEPORT = BUILDER
+                .comment("Message shown to the player when they use /rp afk.")
+                .define("afkTeleport", "§b[INFO] Transferring to AFK zone.");
+
+        RP_COMMERCE_FORMAT = BUILDER
+                .comment("Format of the /rp commerce broadcast.",
+                        "Placeholders: {player} = sender nickname, {message} = message content.")
+                .define("commerceFormat", "§a[COMMERCE] §e{player} §f: {message}");
+
+        RP_INCOGNITO_FORMAT = BUILDER
+                .comment("Format of the /rp incognito broadcast seen by all players.",
+                        "Placeholder: {message} = message content.")
+                .define("incognitoFormat", "§8§l[INCOGNITO] §7{message}");
+
+        RP_INCOGNITO_LOG = BUILDER
+                .comment("Log line sent to staff members when /rp incognito is used.",
+                        "Placeholders: {player} = real sender nickname, {message} = message content.")
+                .define("incognitoLog", "§7[INCOGNITO-LOG] §e{player} §7: §f{message}");
+
+        RP_ACTION_FORMAT = BUILDER
+                .comment("Format of the /rp action and /me messages shown to nearby players.",
+                        "Placeholders: {player} = sender nickname, {action} = action text.")
+                .define("actionFormat", "§5* §e{player} §f{action} §5*");
+
+        RP_ACTION_SPY = BUILDER
+                .comment("Format of the spy log shown to staff outside action range.",
+                        "Placeholders: {player} = sender nickname, {action} = action text.")
+                .define("actionSpy", "§7[SPY] §e{player} §7(far) : §5* §f{action} §5*");
+
+        RP_ANNONCE_TITLE = BUILDER
+                .comment("Title text shown in the center of the screen for /rp annonce title.")
+                .define("annonceTitleText", "§6§l[ANNONCE]");
+
+        RP_ANNONCE_SUBTITLE = BUILDER
+                .comment("Subtitle format for /rp annonce title.",
+                        "Placeholder: {message} = announcement content.")
+                .define("annonceSubtitleFormat", "§e{message}");
+
+        RP_ANNONCE_CHAT_FORMAT = BUILDER
+                .comment("Format of /rp annonce chat broadcast.",
+                        "Placeholder: {message} = announcement content.")
+                .define("annonceChatFormat", "§6§l[ANNONCE] §f{message}");
+
+        RP_ANNONCE_SENT = BUILDER
+                .comment("Feedback sent to the staff member after sending an announcement.")
+                .define("annonceSent", "§a[INFO] Announcement sent.");
+
+        BUILDER.pop();
+
         BUILDER.push("Roles");
         SETROLE_UNKNOWN = BUILDER
                 .comment("Shown when the role ID is not found. Placeholder: {role}")
                 .define("setroleUnknown", "§c[RPE] Unknown role: {role}.");
         SETROLE_SUCCESS_STAFF = BUILDER
                 .comment("Staff feedback on /setrole. Placeholders: {role} {player}")
-                .define("setroleSuccessStaff", "§a[RPE] Role §e{role} §aassigned to §e{player}§a.");
+                .define("setroleSuccessStaff", "§a✔ §aRole §e§l{role} §aassigned to §e§l{player}§a.");
         SETROLE_SUCCESS_PLAYER = BUILDER
                 .comment("Message sent to the target. Placeholder: {role}")
-                .define("setroleSuccessPlayer", "§6[RPE] §fYour role has been updated: §e{role}");
+                .define("setroleSuccessPlayer", "§6[RPE] §fYour role has been updated: §e§l{role}§f.");
         BUILDER.pop();
 
         BUILDER.push("Schedule Commands");

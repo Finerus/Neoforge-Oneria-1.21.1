@@ -9,20 +9,9 @@ All notable changes to this project will be documented in this file.
 
 **Added**
 
-* **Custom Nametag System:** Full client-side nametag rendering with distance obfuscation and block occlusion.
-  - Configurable via new `rpessentials-nametag.toml`.
-  - Block occlusion: nametag hidden when a solid block is between the viewer and the target (client-side raycast, cached every 50ms).
-  - Distance obfuscation: same `§k` logic as the existing TabList system, configurable distance threshold.
-  - Configurable format with tokens `$prefix`, `$name`, `$suffix`, `$profession`.
-  - Staff members always see real names regardless of distance and occlusion (configurable).
-  - Disabled by default — fully backward compatible with existing `hideNametags` behaviour.
-  - Data pushed server→client via new `SyncNametagDataPacket` on login and on every nickname/license change.
-  - All nametag caches reset cleanly on client disconnect.
-
 * **Per-Day Schedule System:** The schedule system now supports individual opening/closing times per day of the week.
   - Each day (`MONDAY` through `SUNDAY`) has its own `enabled`, `open`, and `close` fields.
   - Disabled days are treated as fully closed.
-  - Supports cross-midnight ranges (e.g. `22:00` → `02:00`).
   - `/rpessentials config set scheduleDay <DAY> <open|close|enabled> <value>` — live update without restart.
   - `canPlayerJoin()` now displays the next open day and its hours in the kick message. Placeholders: `{day}`, `{open}`, `{close}`.
   - `/rpessentials schedule` and `/schedule` now display the full week at a glance with the current day highlighted.
@@ -43,7 +32,7 @@ All notable changes to this project will be documented in this file.
   - Configurable inactivity threshold (days).
   - Runs once per day at midnight.
   - Requires `enableLastConnection = true`.
-  - Staff members online at the time receive a clickable `[Annuler]` button to immediately re-whitelist the player.
+  - Staff members online at the time receive a clickable cancel button to immediately re-whitelist the player.
   - Optional extra commands executed per removed player. Placeholders: `{player}`, `{uuid}`.
   - Disabled by default.
 

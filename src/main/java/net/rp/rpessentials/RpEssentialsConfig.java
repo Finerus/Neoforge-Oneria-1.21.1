@@ -62,6 +62,16 @@ public class RpEssentialsConfig {
     public static ModConfigSpec.DoubleValue         DEATH_RP_GLOBAL_TOGGLE_SOUND_VOLUME;
     public static ModConfigSpec.DoubleValue         DEATH_RP_GLOBAL_TOGGLE_SOUND_PITCH;
 
+    // === NAMETAG ADVANCED SYSTEM ===
+    public static ModConfigSpec.BooleanValue NAMETAG_ADVANCED_ENABLED;
+    public static ModConfigSpec.ConfigValue<String> NAMETAG_FORMAT;
+    public static ModConfigSpec.IntValue NAMETAG_OBFUSCATION_DISTANCE;
+    public static ModConfigSpec.IntValue NAMETAG_RENDER_DISTANCE;
+    public static ModConfigSpec.BooleanValue NAMETAG_HIDE_BEHIND_BLOCKS;
+    public static ModConfigSpec.BooleanValue NAMETAG_SHOW_WHILE_SNEAKING;
+    public static ModConfigSpec.BooleanValue NAMETAG_STAFF_ALWAYS_SEE_REAL;
+    public static ModConfigSpec.BooleanValue NAMETAG_OBFUSCATION_ENABLED;
+
     // === ROLES ===
     public static ModConfigSpec.ConfigValue<List<? extends String>> ROLES;
 
@@ -302,6 +312,71 @@ public class RpEssentialsConfig {
         BUILDER.pop(); // globalToggle
 
         BUILDER.pop(); // DeathRP
+
+        // ── Nametag Advanced System ──────────────────────────────────────────────────
+        BUILDER.push("Nametag Settings");
+
+        NAMETAG_ADVANCED_ENABLED = BUILDER
+                .comment(
+                        "CONFIGURATION: Advanced Nametag System",
+                        "If 'true', enables the full nametag system with proximity obfuscation,",
+                        "block occlusion, render distance and configurable format.",
+                        "If 'false', falls back to the legacy hideNametags behaviour.")
+                .define("nametagAdvancedEnabled", false);
+
+        NAMETAG_FORMAT = BUILDER
+                .comment(
+                        "CONFIGURATION: Nametag Format",
+                        "Variables: $prefix (LuckPerms prefix), $name (nickname or real name),",
+                        "           $realname (always the real MC name).",
+                        "Color codes & and § are supported.",
+                        "Examples: '$prefix$name'  |  '$prefix $name'  |  '&7[$prefix&7] $name'")
+                .define("nametagFormat", "$prefix$name");
+
+        NAMETAG_OBFUSCATION_DISTANCE = BUILDER
+                .comment(
+                        "CONFIGURATION: Nametag Obfuscation Distance",
+                        "Distance (in blocks) below which the nametag is shown clearly.",
+                        "Above this distance the name is replaced by obfuscated characters (§k...).",
+                        "Same logic as the TabList proximityDistance.")
+                .defineInRange("nametagObfuscationDistance", 8, 1, 128);
+
+        NAMETAG_RENDER_DISTANCE = BUILDER
+                .comment(
+                        "CONFIGURATION: Nametag Render Distance",
+                        "Maximum distance (in blocks) at which a nametag is displayed at all.",
+                        "Set to 0 for unlimited. Beyond this, the nametag is simply hidden.")
+                .defineInRange("nametagRenderDistance", 64, 0, 256);
+
+        NAMETAG_HIDE_BEHIND_BLOCKS = BUILDER
+                .comment(
+                        "CONFIGURATION: Hide Nametag Behind Blocks",
+                        "If 'true', a raycast is performed from the camera to the player's eye.",
+                        "The nametag is hidden if any block is in the way (no through-wall names).")
+                .define("nametagHideBehindBlocks", true);
+
+        NAMETAG_SHOW_WHILE_SNEAKING = BUILDER
+                .comment(
+                        "CONFIGURATION: Show Nametag While Sneaking",
+                        "If 'false', sneaking players do not show their nametag at all.",
+                        "If 'true', sneaking players still show their (possibly obfuscated) nametag.")
+                .define("nametagShowWhileSneaking", false);
+
+        NAMETAG_STAFF_ALWAYS_SEE_REAL = BUILDER
+                .comment(
+                        "CONFIGURATION: Staff Always See Real Nametags",
+                        "If 'true', staff members bypass all obfuscation and always see",
+                        "the formatted nametag with the real name, regardless of distance.")
+                .define("nametagStaffAlwaysSeeReal", true);
+
+        NAMETAG_OBFUSCATION_ENABLED = BUILDER
+                .comment(
+                        "CONFIGURATION: Enable Nametag Obfuscation",
+                        "If 'false', nametags are always shown clearly (no §k obfuscation).",
+                        "Other filters (distance, block occlusion, sneak) still apply.")
+                .define("nametagObfuscationEnabled", true);
+
+        BUILDER.pop();
 
         // =========================================================================
         // ROLES

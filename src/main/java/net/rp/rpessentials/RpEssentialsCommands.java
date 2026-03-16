@@ -220,7 +220,7 @@ public class RpEssentialsCommands {
                             ChatConfig.CHAT_MESSAGE_COLOR.set(color);
                             RpEssentialsConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
-                                            Component.literal("§a[Oneria] Chat Message Color set to: " + color),
+                                            Component.literal("§a[RpEssentials] Chat Message Color set to: " + color),
                                     true
                             );
                             return 1;
@@ -233,7 +233,7 @@ public class RpEssentialsCommands {
                             ChatConfig.TIMESTAMP_FORMAT.set(format);
                             RpEssentialsConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
-                                            Component.literal("§a[Oneria] Timestamp Format set to: " + format),
+                                            Component.literal("§a[RpEssentials] Timestamp Format set to: " + format),
                                     true
                             );
                             return 1;
@@ -250,6 +250,38 @@ public class RpEssentialsCommands {
         setNode.then(Commands.literal("sneakProximityDistance")
                 .then(Commands.argument("value", IntegerArgumentType.integer(1, 32))
                         .executes(ctx -> updateConfigInt(ctx, RpEssentialsConfig.SNEAK_PROXIMITY_DISTANCE, "Sneak Detection Distance"))));
+
+        setNode.then(Commands.literal("nametagAdvancedEnabled")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_ADVANCED_ENABLED, "Nametag Advanced"))));
+
+        setNode.then(Commands.literal("nametagObfuscationEnabled")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_OBFUSCATION_ENABLED, "Nametag Obfuscation"))));
+
+        setNode.then(Commands.literal("nametagHideBehindBlocks")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_HIDE_BEHIND_BLOCKS, "Nametag Hide Behind Blocks"))));
+
+        setNode.then(Commands.literal("nametagShowWhileSneaking")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_SHOW_WHILE_SNEAKING, "Nametag Show While Sneaking"))));
+
+        setNode.then(Commands.literal("nametagStaffAlwaysSeeReal")
+                .then(Commands.argument("value", BoolArgumentType.bool())
+                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_STAFF_ALWAYS_SEE_REAL, "Nametag Staff Bypass"))));
+
+        setNode.then(Commands.literal("nametagObfuscationDistance")
+                .then(Commands.argument("value", IntegerArgumentType.integer(1, 128))
+                        .executes(ctx -> updateConfigInt(ctx, RpEssentialsConfig.NAMETAG_OBFUSCATION_DISTANCE, "Nametag Obfuscation Distance"))));
+
+        setNode.then(Commands.literal("nametagRenderDistance")
+                .then(Commands.argument("value", IntegerArgumentType.integer(0, 256))
+                        .executes(ctx -> updateConfigInt(ctx, RpEssentialsConfig.NAMETAG_RENDER_DISTANCE, "Nametag Render Distance"))));
+
+        setNode.then(Commands.literal("nametagFormat")
+                .then(Commands.argument("value", StringArgumentType.greedyString())
+                        .executes(ctx -> updateConfigString(ctx, RpEssentialsConfig.NAMETAG_FORMAT, "Nametag Format"))));
 
         setNode.then(Commands.literal("hideNametags")
                 .then(Commands.argument("value", BoolArgumentType.bool())
@@ -271,7 +303,7 @@ public class RpEssentialsCommands {
                             ChatConfig.JOIN_MESSAGE.set(msg);
                             RpEssentialsConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
-                                            Component.literal("§a[Oneria] Join Message set to: " + msg),
+                                            Component.literal("§a[RpEssentials] Join Message set to: " + msg),
                                     true
                             );
                             return 1;
@@ -284,7 +316,7 @@ public class RpEssentialsCommands {
                             ChatConfig.LEAVE_MESSAGE.set(msg);
                             RpEssentialsConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
-                                            Component.literal("§a[Oneria] Leave Message set to: " + msg),
+                                            Component.literal("§a[RpEssentials] Leave Message set to: " + msg),
                                     true
                             );
                             return 1;
@@ -306,7 +338,7 @@ public class RpEssentialsCommands {
                             RpEssentialsConfig.WORLD_BORDER_MESSAGE.set(msg);
                             RpEssentialsConfig.SPEC.save();
                             ctx.getSource().sendSuccess(() ->
-                                            Component.literal("§a[Oneria] World Border Message set to: " + msg),
+                                            Component.literal("§a[RpEssentials] World Border Message set to: " + msg),
                                     true
                             );
                             return 1;
@@ -325,12 +357,12 @@ public class RpEssentialsCommands {
                         .executes(ctx -> {
                             String mode = StringArgumentType.getString(ctx, "mode").toUpperCase();
                             if (!mode.equals("IMMERSIVE") && !mode.equals("CHAT") && !mode.equals("ACTION_BAR")) {
-                                ctx.getSource().sendFailure(Component.literal("§c[Oneria] Valid modes: IMMERSIVE, CHAT, ACTION_BAR"));
+                                ctx.getSource().sendFailure(Component.literal("§c[RpEssentials] Valid modes: IMMERSIVE, CHAT, ACTION_BAR"));
                                 return 0;
                             }
                             RpEssentialsConfig.ZONE_MESSAGE_MODE.set(mode);
                             RpEssentialsConfig.SPEC.save();
-                            ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Zone Message Mode set to: " + mode), true);
+                            ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] Zone Message Mode set to: " + mode), true);
                             return 1;
                         })));
 
@@ -1067,7 +1099,8 @@ public class RpEssentialsCommands {
         RpEssentialsScheduleManager.reload();
         RpEssentialsPermissions.clearCache();
         NicknameManager.reload();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] Configuration, nicknames and nametags reloaded!"), true);
+        NametagSyncHelper.broadcastToAll(ctx.getSource().getServer());
+        ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] Configuration, nicknames and nametags reloaded!"), true);
         return 1;
     }
 
@@ -1075,7 +1108,7 @@ public class RpEssentialsCommands {
         int val = IntegerArgumentType.getInteger(ctx, "value");
         config.set(val);
         RpEssentialsConfig.SPEC.save();
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + name + " set to: " + val), true);
+        ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] " + name + " set to: " + val), true);
         return 1;
     }
 
@@ -1091,7 +1124,15 @@ public class RpEssentialsCommands {
             RpEssentials.LOGGER.info("Broadcast nametag config update: hide={}", val);
         }
 
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + name + " : " + (val ? "§aENABLED" : "§cDISABLED")), true);
+        if (config == RpEssentialsConfig.NAMETAG_ADVANCED_ENABLED
+                || config == RpEssentialsConfig.NAMETAG_OBFUSCATION_ENABLED
+                || config == RpEssentialsConfig.NAMETAG_HIDE_BEHIND_BLOCKS
+                || config == RpEssentialsConfig.NAMETAG_SHOW_WHILE_SNEAKING
+                || config == RpEssentialsConfig.NAMETAG_STAFF_ALWAYS_SEE_REAL) {
+            NametagSyncHelper.broadcastToAll(ctx.getSource().getServer());
+        }
+
+        ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] " + name + " : " + (val ? "§aENABLED" : "§cDISABLED")), true);
         return 1;
     }
 
@@ -1158,7 +1199,7 @@ public class RpEssentialsCommands {
             context.getSource().sendSuccess(() -> Component.literal(statusMessage), false);
             return 1;
         } catch (Exception e) {
-            context.getSource().sendFailure(Component.literal("§c[Oneria] Error displaying status: " + e.getMessage()));
+            context.getSource().sendFailure(Component.literal("§c[RpEssentials] Error displaying status: " + e.getMessage()));
             RpEssentials.LOGGER.error("Error in showStatus", e);
             return 0;
         }
@@ -1178,17 +1219,17 @@ public class RpEssentialsCommands {
 
         if (add) {
             if (list.contains(player)) {
-                ctx.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is already in " + listName + "."));
+                ctx.getSource().sendFailure(Component.literal("§c[RpEssentials] " + player + " is already in " + listName + "."));
                 return 0;
             }
             list.add(player);
-            ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " added to " + listName + "."), true);
+            ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] " + player + " added to " + listName + "."), true);
         } else {
             if (!list.remove(player)) {
-                ctx.getSource().sendFailure(Component.literal("§c[Oneria] " + player + " is not in " + listName + "."));
+                ctx.getSource().sendFailure(Component.literal("§c[RpEssentials] " + player + " is not in " + listName + "."));
                 return 0;
             }
-            ctx.getSource().sendSuccess(() -> Component.literal("§a[Oneria] " + player + " removed from " + listName + "."), true);
+            ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] " + player + " removed from " + listName + "."), true);
         }
 
         config.set(list);
@@ -1207,9 +1248,9 @@ public class RpEssentialsCommands {
     private static int listWhitelist(CommandContext<CommandSourceStack> ctx) {
         List<? extends String> whitelist = RpEssentialsConfig.WHITELIST.get();
         if (whitelist.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist is empty."), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[RpEssentials] Whitelist is empty."), false);
         } else {
-            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Whitelist: §f" + String.join(", ", whitelist)), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[RpEssentials] Whitelist: §f" + String.join(", ", whitelist)), false);
         }
         return 1;
     }
@@ -1225,9 +1266,9 @@ public class RpEssentialsCommands {
     private static int listBlacklist(CommandContext<CommandSourceStack> ctx) {
         List<? extends String> blacklist = RpEssentialsConfig.BLACKLIST.get();
         if (blacklist.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist is empty."), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[RpEssentials] Blacklist is empty."), false);
         } else {
-            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Blacklist (always hidden): §f" + String.join(", ", blacklist)), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[RpEssentials] Blacklist (always hidden): §f" + String.join(", ", blacklist)), false);
         }
         return 1;
     }
@@ -1243,9 +1284,9 @@ public class RpEssentialsCommands {
     private static int listAlwaysVisible(CommandContext<CommandSourceStack> ctx) {
         List<? extends String> alwaysVisible = RpEssentialsConfig.ALWAYS_VISIBLE_LIST.get();
         if (alwaysVisible.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Always Visible list is empty."), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[RpEssentials] Always Visible list is empty."), false);
         } else {
-            ctx.getSource().sendSuccess(() -> Component.literal("§e[Oneria] Always Visible (always shown in TabList): §f" + String.join(", ", alwaysVisible)), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§e[RpEssentials] Always Visible (always shown in TabList): §f" + String.join(", ", alwaysVisible)), false);
         }
         return 1;
     }
@@ -1401,7 +1442,7 @@ public class RpEssentialsCommands {
 
         final boolean wasUpdated = updated;
         ctx.getSource().sendSuccess(() ->
-                        Component.literal("§a[Oneria] Platform '" + platformName + "' " +
+                        Component.literal("§a[RpEssentials] Platform '" + platformName + "' " +
                                 (wasUpdated ? "updated" : "created") + " at " + dimension + " " + x + " " + y + " " + z),
                 true
         );
@@ -1411,7 +1452,7 @@ public class RpEssentialsCommands {
 
     /**
      * Helper pour mettre à jour une ConfigValue<String> via commande.
-     * À ajouter à côté de updateConfigBool() et updateConfigInt() dans OneriaCommands.
+     * À ajouter à côté de updateConfigBool() et updateConfigInt() dans RpEssentialsCommands.
      */
     private static int updateConfigString(CommandContext<CommandSourceStack> ctx,
                                           ModConfigSpec.ConfigValue<String> configValue,
@@ -1429,6 +1470,7 @@ public class RpEssentialsCommands {
                     () -> Component.literal(
                             MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_UPDATED, "label", label, "value", value)),
                     true);
+            NametagSyncHelper.broadcastToAll(ctx.getSource().getServer());
             return 1;
         } catch (IllegalStateException e) {
             ctx.getSource().sendFailure(Component.literal(
@@ -1486,28 +1528,30 @@ public class RpEssentialsCommands {
         }
         if (lpGroup == null) {
             ctx.getSource().sendFailure(Component.literal(
-                    MessagesConfig.get(MessagesConfig.SETROLE_UNKNOWN, "role", roleId)));
+                    MessagesConfig.get(MessagesConfig.SETROLE_UNKNOWN, "role", roleId.toUpperCase())));
             return 0;
         }
 
         final String finalLpGroup = lpGroup;
-        final String name = target.getName().getString();
+        final String name         = target.getName().getString();
+        final String roleDisplay  = roleId.toUpperCase();
+
+        CommandSourceStack silentSource = server.createCommandSourceStack()
+                .withSuppressedOutput()
+                .withPermission(4);
 
         for (String entry : rolesConfig) {
             String oldTag = entry.split(";", 2)[0].trim();
-            server.getCommands().performPrefixedCommand(
-                    server.createCommandSourceStack(), "tag " + name + " remove " + oldTag);
+            server.getCommands().performPrefixedCommand(silentSource, "tag " + name + " remove " + oldTag);
         }
-        server.getCommands().performPrefixedCommand(
-                server.createCommandSourceStack(), "tag " + name + " add " + roleId);
-        server.getCommands().performPrefixedCommand(
-                server.createCommandSourceStack(), "lp user " + name + " parent set " + finalLpGroup);
+        server.getCommands().performPrefixedCommand(silentSource, "tag " + name + " add " + roleId);
+        server.getCommands().performPrefixedCommand(silentSource, "lp user " + name + " parent set " + finalLpGroup);
 
         ctx.getSource().sendSuccess(() -> Component.literal(
                 MessagesConfig.get(MessagesConfig.SETROLE_SUCCESS_STAFF,
-                        "role", roleId, "player", name)), true);
+                        "role", roleDisplay, "player", name)), true);
         target.sendSystemMessage(Component.literal(
-                MessagesConfig.get(MessagesConfig.SETROLE_SUCCESS_PLAYER, "role", roleId)));
+                MessagesConfig.get(MessagesConfig.SETROLE_SUCCESS_PLAYER, "role", roleDisplay)));
         return 1;
     }
 
@@ -1976,7 +2020,7 @@ public class RpEssentialsCommands {
             );
 
             context.getSource().sendSuccess(() ->
-                    Component.literal("§a[Oneria] Nickname for §f" + target.getName().getString() +
+                    Component.literal("§a[RpEssentials] Nickname for §f" + target.getName().getString() +
                             "§a set to: " + formattedNickname), true);
 
             target.sendSystemMessage(Component.literal("§aYour nickname has been changed to: " + formattedNickname));
@@ -2007,7 +2051,7 @@ public class RpEssentialsCommands {
             );
 
             context.getSource().sendSuccess(() ->
-                    Component.literal("§a[Oneria] Nickname for §f" + target.getName().getString() + "§a reset."), true);
+                    Component.literal("§a[RpEssentials] Nickname for §f" + target.getName().getString() + "§a reset."), true);
 
             target.sendSystemMessage(Component.literal("§aYour nickname has been reset."));
 
@@ -2026,7 +2070,7 @@ public class RpEssentialsCommands {
 
         if (count == 0) {
             context.getSource().sendSuccess(() ->
-                    Component.literal("§e[Oneria] No active nicknames."), false);
+                    Component.literal("§e[RpEssentials] No active nicknames."), false);
             return 1;
         }
 
@@ -2489,7 +2533,7 @@ public class RpEssentialsCommands {
         } catch (IllegalStateException ignored) {}
 
         ctx.getSource().sendSuccess(() -> Component.literal(
-                "§a[Oneria] Warn §e#" + warnId + "§a added for §e" + target.getName().getString() + "§a."), false);
+                "§a[RpEssentials] Warn §e#" + warnId + "§a added for §e" + target.getName().getString() + "§a."), false);
         return 1;
     }
 
@@ -2545,7 +2589,7 @@ public class RpEssentialsCommands {
 
         String finalDurationStr = durationStr;
         ctx.getSource().sendSuccess(() -> Component.literal(
-                "§a[Oneria] Temp warn §e#" + warnId + "§a added for §e" + target.getName().getString() +
+                "§a[RpEssentials] Temp warn §e#" + warnId + "§a added for §e" + target.getName().getString() +
                         "§a (" + finalDurationStr + "). Reason: §f" + reason), false);
         return 1;
     }
@@ -2590,7 +2634,7 @@ public class RpEssentialsCommands {
         } catch (IllegalStateException ignored) {}
 
         ctx.getSource().sendSuccess(() -> Component.literal(
-                "§a[Oneria] Warn §e#" + warnId + "§a removed (was for §e" + entry.targetName + "§a)."), false);
+                "§a[RpEssentials] Warn §e#" + warnId + "§a removed (was for §e" + entry.targetName + "§a)."), false);
         return 1;
     }
 
@@ -2606,7 +2650,7 @@ public class RpEssentialsCommands {
 
         var all = WarnManager.getAll();
         if (all.isEmpty()) {
-            ctx.getSource().sendSuccess(() -> Component.literal("§7[Oneria] No registered warn."), false);
+            ctx.getSource().sendSuccess(() -> Component.literal("§7[RpEssentials] No registered warn."), false);
             return 1;
         }
 
@@ -2674,7 +2718,7 @@ public class RpEssentialsCommands {
 
         int finalRemoved = removed;
         ctx.getSource().sendSuccess(() -> Component.literal(
-                "§a[Oneria] §e" + finalRemoved + "§a warn(s) removed for §e" +
+                "§a[RpEssentials] §e" + finalRemoved + "§a warn(s) removed for §e" +
                         target.getName().getString() + "§a."), false);
         return 1;
     }
