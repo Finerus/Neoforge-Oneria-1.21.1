@@ -12,6 +12,11 @@
     "MixinEntity",
     "MixinDeathMessage"
   ],
+  "client": [
+    "client.MixinEntityRenderer",
+    "client.MixinPlayerTabOverlay"
+  ]
+,
   "injectors": {
     "defaultRequire": 1
   }

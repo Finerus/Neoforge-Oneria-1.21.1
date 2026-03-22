@@ -9,12 +9,10 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.rp.rpessentials.config.RpEssentialsConfig;
 import net.rp.rpessentials.config.ScheduleConfig;
 import net.rp.rpessentials.identity.NicknameManager;
 import net.rp.rpessentials.identity.RpEssentialsMessagingManager;
 import net.rp.rpessentials.moderation.LastConnectionManager;
-import net.rp.rpessentials.network.HideNametagsPacket;
 import net.rp.rpessentials.profession.ProfessionSyncHelper;
 
 import java.util.concurrent.CompletableFuture;
@@ -33,7 +31,23 @@ public class RpEssentialsEventHandler {
 
         ProfessionSyncHelper.syncToPlayer(player);
 
-        // ── Welcome message ───────────────────────────────────────────────────────
+        // ── Sync nametag (délai pour que le client finisse de charger) ────────────
+        CompletableFuture.runAsync(() -> {
+            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
+            server.execute(() -> {
+                // 1. Envoie les données du nouveau joueur à TOUS
+                SyncNametagDataPacket.broadcastForPlayer(player);
+
+                // 2. Envoie les données de TOUS les joueurs déjà en ligne au nouveau joueur
+                for (ServerPlayer online : server.getPlayerList().getPlayers()) {
+                    if (!online.getUUID().equals(player.getUUID())) {
+                        PacketDistributor.sendToPlayer(player, SyncNametagDataPacket.from(online));
+                    }
+                }
+            });
+        });
+
+        // ── Welcome message ───────────────────────────────────────────────────
         try {
             if (ScheduleConfig.ENABLE_WELCOME != null && ScheduleConfig.ENABLE_WELCOME.get()) {
                 String playerName = player.getName().getString();
@@ -50,7 +64,7 @@ public class RpEssentialsEventHandler {
             // config not yet loaded
         }
 
-        // ── Welcome sound ─────────────────────────────────────────────────────────
+        // ── Welcome sound ─────────────────────────────────────────────────────
         try {
             String soundId = ScheduleConfig.WELCOME_SOUND.get();
             if (soundId != null && !soundId.isBlank()) {
@@ -69,29 +83,6 @@ public class RpEssentialsEventHandler {
         } catch (IllegalStateException e) {
             // config not yet loaded
         }
-
-        // ── Legacy nametag hide packet (backwards compat) ─────────────────────────
-        try {
-            boolean hideNametags = RpEssentialsConfig.HIDE_NAMETAGS.get();
-            PacketDistributor.sendToPlayer(player, new HideNametagsPacket(hideNametags));
-        } catch (IllegalStateException e) {
-            // config not yet loaded
-        }
-
-        // ── Advanced nametag sync (delayed 500ms to let the client finish loading) ─
-        CompletableFuture.runAsync(() -> {
-            try { Thread.sleep(500); } catch (InterruptedException ignored) {}
-            server.execute(() -> {
-                // Send config + all other players' data to the newly joined player
-                NametagSyncHelper.sendTo(player, server);
-                // Update all other players so they know about the new player
-                for (ServerPlayer other : server.getPlayerList().getPlayers()) {
-                    if (!other.getUUID().equals(player.getUUID())) {
-                        NametagSyncHelper.sendTo(other, server);
-                    }
-                }
-            });
-        });
     }
 
     @SubscribeEvent

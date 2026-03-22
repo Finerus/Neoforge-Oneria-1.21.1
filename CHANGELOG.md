@@ -1,6 +1,92 @@
 # Changelog - Rp Essentials
 All notable changes to this project will be documented in this file.
 
+## [4.1.1]
+
+**Nametag system overhaul — Realistic Nametag behavior + nickname sync fix**
+GUYS I FINALLY MADE IT OMG, THE NAMETAG ARE FINALLY HIDDEN EVEN WHEN BEHIND A BLOCK
+I'M SO HAPPY GUYYYYSSSSS WOWOWOWOWOW, so just to be clear, you can now hide nametag, change them with the nickname and Im so happy wowowow
+
+---
+
+### Added
+
+* **Realistic Nametag behavior:** Nametags are now hidden behind opaque blocks without any client-side raycast.
+  - Implemented via `MixinEntityRenderer` — changes `Font.DisplayMode.SEE_THROUGH` to `Font.DisplayMode.NORMAL` on `drawInBatch`, activating the GPU depth test. This is the exact mechanism used by the Realistic Nametag mod.
+  - Works on both `ordinal = 0` (background layer, visible while sneaking) and `ordinal = 1` (white text layer, visible when not sneaking).
+  - No performance overhead — the depth test is handled entirely by the GPU.
+
+* **Server nickname displayed on nametag:** Nametags now display the nickname set on the server (via `/rpessentials nick`) instead of any locally cached nickname.
+  - `MixinEntityRenderer` captures the entity being rendered via `@Inject HEAD` into a `@Unique` field, then resolves the nickname from `ClientNametagCache` in each `@ModifyArg`.
+  - Fallback to the real MC username (`getGameProfile().getName()`) if the server data has not yet been received — never falls back to a locally-injected nickname.
+  - Supports LuckPerms prefix with color codes via `ColorHelper.parseColors()`.
+
+* **Full nametag data sync on login:** When a player joins, the server now sends nametag data for all currently online players to the new player (in addition to broadcasting the new player's data to everyone else).
+  - Both sends are deferred by 500ms via `CompletableFuture` to ensure the client has finished loading before receiving the packets.
+  - This fixes a case where players already in-game would show their local nickname to a freshly connected player whose `ClientNametagCache` was empty.
+
+* **Tab list player head hidden for obfuscated players:** The small face icon next to a player's name in the tab list is now hidden when that player is obfuscated (name replaced with `§k????`).
+  - Implemented via `MixinPlayerTabOverlay` using `@WrapOperation` with `@Local` (MixinExtras) to intercept the `PlayerFaceRenderer.draw()` call inside `PlayerTabOverlay.render()`.
+  - The `PlayerInfo` local variable is captured directly to check whether the player's display name contains `§k`, which is the obfuscation marker injected by `MixinServerCommonPacketListenerImpl`.
+  - When obfuscated, the face draw call is simply skipped — no placeholder is drawn.
+  - Non-obfuscated players, staff, whitelisted players, and always-visible players are unaffected.
+
+---
+
+### Changed
+
+* **`MixinEntityRenderer`:** Completely rewritten.
+  - Added `@Inject HEAD cancellable = true` → cancels `renderNameTag` entirely when `ClientNametagConfig.shouldHideNametags()` is true (global hide toggle).
+  - Added `@Inject HEAD` → captures current entity into `rpessentials$currentEntity`.
+  - Added `@Inject RETURN` → clears `rpessentials$currentEntity`.
+  - Added `@ModifyArg ordinal=0 index=7` → forces `Font.DisplayMode.NORMAL` (depth test / block occlusion).
+  - Added `@ModifyArg ordinal=0 index=0` and `@ModifyArg ordinal=1 index=0` → replaces the rendered `Component` with the server nickname. Never returns `null` (would crash `drawInBatch`) — falls back to `original` if `rpessentials$resolveNickname` returns null.
+  - All injections use `remap = false` and the NeoForge 1.21.1 method signature `...MultiBufferSource;IF)V` (with the extra `float partialTick` parameter).
+
+* **`ClientNametagRenderer`:** Rewritten to use `ClientNametagCache` (replaces the removed `ClientNametagConfig` player map).
+  - Handles `hideNametags` check via `RpEssentialsConfig.HIDE_NAMETAGS`.
+  - Sets `event.setContent()` with the nickname + prefix from cache.
+  - Returns early (does not override content) if cache has no entry yet for the player — avoids showing stale data.
+
+* **`ClientNametagConfig`:** Rebuilt as a minimal class — stores only the `hideNametags` boolean received via `HideNametagsPacket`. All advanced nametag config fields removed.
+
+* **`NetworkHandler`:** Restored `HideNametagsPacket` and `SyncNametagDataPacket` registrations that had been accidentally dropped. All GUI admin packets also restored.
+
+* **`RpEssentialsEventHandler`:** Nametag sync logic moved entirely inside the `CompletableFuture` block (500ms delay). Now sends data of all currently online players to the newly joined player in addition to broadcasting the new player's data to everyone.
+
+* **`RpEssentialsConfig`:** Removed unused advanced nametag config fields (`NAMETAG_ADVANCED_ENABLED`, `NAMETAG_FORMAT`, `NAMETAG_OBFUSCATION_DISTANCE`, `NAMETAG_RENDER_DISTANCE`, `NAMETAG_HIDE_BEHIND_BLOCKS`, `NAMETAG_SHOW_WHILE_SNEAKING`, `NAMETAG_STAFF_ALWAYS_SEE_REAL`, `NAMETAG_OBFUSCATION_ENABLED`). Only `HIDE_NAMETAGS` (in `[Obfuscation Settings]`) is kept.
+
+* **`RpEssentialsCommands`:** Removed all `/rpessentials config set nametag*` commands that referenced the now-deleted config fields.
+
+---
+
+### Removed
+
+* `NametagSyncPacket.java` — replaced by the already-existing `SyncNametagDataPacket`.
+* `NametagSyncHelper.java` — logic moved directly into `RpEssentialsEventHandler`.
+* `NametagFormatter.java` — formatting now handled inline in `MixinEntityRenderer` and `ClientNametagRenderer`.
+* `NametagConfig.java` — dedicated nametag config file removed; only `HIDE_NAMETAGS` survives in `rpessentials-core.toml`.
+* The `rpessentials-nametag.toml` config file is no longer generated. Existing files can be deleted safely.
+
+---
+
+### Fixed
+
+* **Nametag visible through blocks** — Fixed by switching `Font.DisplayMode` from `SEE_THROUGH` to `NORMAL`, activating the GPU depth test (same technique as Realistic Nametag mod).
+* **Server nickname not shown on nametag** — Fixed by reading from `ClientNametagCache` (server data) instead of falling back to `original` (which contained the locally injected nickname from `MixinServerPlayer`).
+* **`NullPointerException` in `Font.drawInBatch`** — Fixed by ensuring `@ModifyArg` handlers never return `null`; they now fall back to `original` when `rpessentials$resolveNickname` returns null (e.g. for the local player or non-player entities).
+* **Players already online not synced to new joiner** — Fixed by sending `SyncNametagDataPacket` for each online player to the newly connected player in `RpEssentialsEventHandler`.
+* **Player head visible in tab list for obfuscated players** — Fixed via `MixinPlayerTabOverlay`, which now skips the `PlayerFaceRenderer.draw()` call for any player whose display name contains the `§k` obfuscation marker, preventing skin-based identification of obfuscated players.
+
+---
+
+### Migration Notes
+
+* No breaking changes for existing servers.
+* `rpessentials-nametag.toml` is no longer loaded or generated — delete it from `config/rpessentials/` if present.
+* All existing `/rpessentials config set nametag*` commands have been removed. Use `hideNametags` in `rpessentials-core.toml` or `/rpessentials config set hideNametags true/false` to control nametag visibility.
+* Clients connecting to a 4.1.1 server must also run 4.1.1 — the packet registry version was bumped.
+
 ## [4.1.0]
 
 **Admin GUI System — Two new in-game interfaces for server staff to manage professions and player RP profiles without editing config files.**

@@ -14,20 +14,14 @@ import java.util.UUID;
 /**
  * Packet serveur → client.
  * Envoie les données nametag d'UN joueur cible au client récepteur.
- *
- * Émis :
- *   - Au login du joueur cible (vers tous les joueurs connectés)
- *   - Quand le nickname change (NicknameManager)
- *   - Quand une licence change (LicenseManager)
- *   - Quand le prefix LuckPerms change (si détectable)
  */
 public record SyncNametagDataPacket(
         UUID targetUUID,
-        String displayName,   // nickname ou realName
-        String prefix,        // LuckPerms prefix, peut être ""
-        String suffix,        // LuckPerms suffix, peut être ""
-        String profession,    // première licence active, peut être ""
-        boolean isStaff       // pour que le client sache si c'est un staff
+        String displayName,
+        String prefix,
+        String suffix,
+        String profession,
+        boolean isStaff
 ) implements CustomPacketPayload {
 
     public static final Type<SyncNametagDataPacket> TYPE =
@@ -35,32 +29,26 @@ public record SyncNametagDataPacket(
 
     public static final StreamCodec<FriendlyByteBuf, SyncNametagDataPacket> CODEC =
             StreamCodec.composite(
-                    // UUID
                     new StreamCodec<>() {
                         @Override public UUID decode(FriendlyByteBuf buf) { return buf.readUUID(); }
                         @Override public void encode(FriendlyByteBuf buf, UUID v) { buf.writeUUID(v); }
                     }, SyncNametagDataPacket::targetUUID,
-                    // displayName
                     new StreamCodec<>() {
                         @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
                         @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
                     }, SyncNametagDataPacket::displayName,
-                    // prefix
                     new StreamCodec<>() {
                         @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
                         @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
                     }, SyncNametagDataPacket::prefix,
-                    // suffix
                     new StreamCodec<>() {
                         @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
                         @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
                     }, SyncNametagDataPacket::suffix,
-                    // profession
                     new StreamCodec<>() {
                         @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
                         @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
                     }, SyncNametagDataPacket::profession,
-                    // isStaff
                     new StreamCodec<>() {
                         @Override public Boolean decode(FriendlyByteBuf buf) { return buf.readBoolean(); }
                         @Override public void encode(FriendlyByteBuf buf, Boolean v) { buf.writeBoolean(v); }
@@ -78,9 +66,11 @@ public record SyncNametagDataPacket(
     // =========================================================================
 
     public static void handle(SyncNametagDataPacket packet, IPayloadContext ctx) {
-        ctx.enqueueWork(() ->
-                net.rp.rpessentials.client.ClientNametagCache.update(packet)
-        );
+        ctx.enqueueWork(() -> {
+            RpEssentials.LOGGER.info("[SyncNametag] CLIENT received — uuid={} displayName='{}'",
+                    packet.targetUUID(), packet.displayName());
+            net.rp.rpessentials.client.ClientNametagCache.update(packet);
+        });
     }
 
     // =========================================================================
@@ -94,10 +84,9 @@ public record SyncNametagDataPacket(
                 ? NicknameManager.getNickname(uuid)
                 : target.getGameProfile().getName();
 
-        String prefix    = RpEssentials.getPlayerPrefix(target);
-        String suffix    = RpEssentials.getPlayerSuffix(target);
+        String prefix  = RpEssentials.getPlayerPrefix(target);
+        String suffix  = RpEssentials.getPlayerSuffix(target);
 
-        // Première licence active
         java.util.List<String> licenses = LicenseManager.getLicenses(uuid);
         String profession = licenses.isEmpty() ? "" : licenses.get(0);
 
@@ -112,6 +101,8 @@ public record SyncNametagDataPacket(
 
     public static void broadcastForPlayer(ServerPlayer target) {
         SyncNametagDataPacket packet = from(target);
+        RpEssentials.LOGGER.info("[SyncNametag] SERVER broadcasting for '{}' — displayName='{}'",
+                target.getName().getString(), packet.displayName());
         net.neoforged.neoforge.network.PacketDistributor.sendToAllPlayers(packet);
     }
 }

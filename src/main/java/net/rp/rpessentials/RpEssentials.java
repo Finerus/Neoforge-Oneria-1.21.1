@@ -44,7 +44,6 @@ public class RpEssentials {
         modContainer.registerConfig(ModConfig.Type.SERVER, ModerationConfig.SPEC,       "rpessentials/rpessentials-moderation.toml");
         modContainer.registerConfig(ModConfig.Type.SERVER, ProfessionConfig.SPEC,       "rpessentials/rpessentials-professions.toml");
         modContainer.registerConfig(ModConfig.Type.SERVER, MessagesConfig.SPEC,         "rpessentials/rpessentials-messages.toml");
-        modContainer.registerConfig(ModConfig.Type.SERVER, NametagConfig.SPEC,          "rpessentials/rpessentials-nametag.toml");
         modEventBus.addListener(RpKeyBindings::onRegisterKeyMappings);
 
         RpEssentialsItems.ITEMS.register(modEventBus);

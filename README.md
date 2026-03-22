@@ -2,7 +2,7 @@
 
 **Rp Essentials** is a comprehensive server-side utility mod built for immersive Roleplay servers running Minecraft 1.21.1 on NeoForge. It provides a complete suite of RP tools — proximity-based name obfuscation, a profession and license system, a warn system, connection tracking, private messaging, schedule automation, staff moderation tools, advanced chat formatting, world border warnings, named zones, Death RP, and deep LuckPerms integration — all configurable in real-time without restarts.
 
-> Current version: **4.0.0** — See [CHANGELOG](CHANGELOG.md) for the full history.
+> Current version: **4.1.1** — See [CHANGELOG](CHANGELOG.md) for the full history.
 
 ---
 
@@ -38,6 +38,7 @@
 Prevents metagaming by hiding player identities based on distance:
 
 - Player names in the TabList and above heads are replaced with `?????` beyond a configurable range (default: 8 blocks).
+- **Tab list player head hidden for obfuscated players:** The skin icon next to an obfuscated player's name in the tab list is hidden, preventing skin-based identification. Non-obfuscated players, staff, whitelisted players, and always-visible players are unaffected.
 - **Sneak Stealth Mode:** Crouching players are only detectable at 2 blocks (configurable).
 - **Nametag Hiding:** Optionally hide all player nametags above heads server-wide.
 - **Whitelist:** Players who always see all names clearly.
@@ -55,6 +56,15 @@ Persistent RP nicknames fully integrated across all mod systems:
 - Nicknames appear in the TabList, above heads, in chat, and in private messages.
 - Stored persistently in `world/data/rpessentials/nicknames.json`.
 - `/whois` allows staff to reverse-lookup any nickname to its real MC username and UUID.
+
+### Nametag System
+
+Realistic nametag behavior integrated with the nickname system:
+
+- **Block occlusion:** Nametags are hidden when a block is between the viewer and the target. Implemented by switching `Font.DisplayMode` from `SEE_THROUGH` to `NORMAL`, activating the GPU depth test — same technique as the Realistic Nametag mod. No raycast, no performance overhead.
+- **Server nickname on nametag:** The nametag displays the nickname set on the server (via `/rpessentials nick`), with the LuckPerms prefix and full color code support. Never uses a locally cached nickname.
+- **Global hide toggle:** All nametags can be hidden server-wide via `hideNametags = true` in `rpessentials-core.toml` or `/rpessentials config set hideNametags true/false`.
+- Sneak behavior is preserved — the nametag turns semi-transparent while crouching, as in vanilla.
 
 ### Profession & License System
 
@@ -115,10 +125,10 @@ Full chat formatting system:
 - Global chat message color configuration (16 Minecraft colors available).
 - Timestamp system with customizable Java `SimpleDateFormat`.
 - **Real-time Markdown support:**
-    - `**text**` → **Bold**
-    - `*text*` → *Italic*
-    - `__text__` → Underline
-    - `~~text~~` → Strikethrough
+  - `**text**` → **Bold**
+  - `*text*` → *Italic*
+  - `__text__` → Underline
+  - `~~text~~` → Strikethrough
 - `/colors` displays all available colors and formatting codes with a visual preview.
 - Full integration with the nickname system — nicknames appear in chat automatically.
 
@@ -211,17 +221,6 @@ Automatic removal of inactive players from the whitelist:
 - Staff members online at the time receive a clickable cancel button to immediately re-whitelist the player.
 - Optional extra commands executed per removed player. Placeholders: `{player}`, `{uuid}`.
 - Disabled by default.
-
-### Advanced Nametag System
-
-Client-side nametag system synchronized from the server:
-
-- Fully customizable nametag format.
-- Nametag obfuscation beyond a configurable distance.
-- Configurable nametag render distance.
-- Option to hide nametags behind blocks.
-- Option to show or hide nametags while sneaking.
-- Staff always sees real names.
 
 ### Staff Permission System
 
@@ -339,7 +338,7 @@ Every player-facing string in the mod is exposed as a configurable value via `on
 
 ## Configuration
 
-The mod uses **7 config files** under `config/rpessentials/`, generated automatically on first launch. All files are fully documented with inline comments.
+The mod uses **6 config files** under `config/rpessentials/`, generated automatically on first launch. All files are fully documented with inline comments.
 
 | File | Contents |
 |:-----|:---------|
@@ -348,7 +347,6 @@ The mod uses **7 config files** under `config/rpessentials/`, generated automati
 | `rpessentials-schedule.toml` | Per-day schedule, death hours, HRP hours, welcome message, auto-unwhitelist |
 | `rpessentials-moderation.toml` | Silent commands, platforms, last connection, warn system |
 | `rpessentials-professions.toml` | Profession definitions and all restriction lists |
-| `rpessentials-nametag.toml` | Advanced nametag system |
 | `rpessentials-messages.toml` | All customizable player-facing message strings |
 
 ### rpessentials-core.toml
@@ -394,7 +392,7 @@ The mod uses **7 config files** under `config/rpessentials/`, generated automati
 |:-------|:--------|:------------|
 | `globalEnabled` | `false` | Global state of the Death RP system. |
 | `whitelistRemove` | `false` | Automatically remove the player from the whitelist on RP death. |
-| `deathMessage` | `"..."` | Message broadcast to all players on RP death. Variables: `%player%`, `%realname%`. |
+| `deathMessage` | `"..."` | Message broadcast to all players on RP death. Variables: `{player}`, `{realname}`. |
 | `deathSound` | `"minecraft:entity.wither.death"` | Sound played on RP death. Use `none` to disable. |
 | `deathSoundVolume` | `1.0` | RP death sound volume. |
 | `deathSoundPitch` | `1.0` | RP death sound pitch. |
@@ -403,39 +401,6 @@ The mod uses **7 config files** under `config/rpessentials/`, generated automati
 | Option | Default | Description |
 |:-------|:--------|:------------|
 | `roles` | `["admin;admin","modo;modo","builder;builder","joueur;joueur"]` | Role definitions. Format: `roleId;lpGroup`. |
-
-### rpessentials-nametag.toml
-
-#### [Behaviour]
-| Option | Default | Description |
-|:-------|:--------|:------------|
-| `enabled` | `false` | Master switch for the advanced nametag system. |
-| `hideBehindBlocks` | `true` | Hide nametags behind blocks (raycast). |
-
-#### [Obfuscation]
-| Option | Default | Description |
-|:-------|:--------|:------------|
-| `obfuscationEnabled` | `true` | Enable distance-based nametag obfuscation. |
-| `obfuscationDistance` | `10.0` | Distance threshold in blocks. |
-| `obfuscationColor` | `"&8"` | Color applied to the obfuscated name. |
-| `obfuscationLength` | `-1` | Fixed obfuscated name length (-1 = real name length). |
-
-#### [Format]
-| Option | Default | Description |
-|:-------|:--------|:------------|
-| `format` | `"$prefix$name"` | Nametag format for visible players. |
-| `formatObfuscated` | `"$obfuscated"` | Nametag format for obfuscated players. |
-
-#### [Rendering]
-| Option | Default | Description |
-|:-------|:--------|:------------|
-| `renderDistance` | `-1.0` | Maximum nametag render distance in blocks (-1 = vanilla). |
-| `showWhileSneaking` | `false` | Show nametag while the player is sneaking. |
-
-#### [Staff]
-| Option | Default | Description |
-|:-------|:--------|:------------|
-| `staffAlwaysSeeReal` | `true` | Staff bypass all nametag restrictions and always see real names. |
 
 ### rpessentials-chat.toml
 
@@ -624,6 +589,7 @@ LuckPerms is **optional**. The mod works fully without it, with graceful fallbac
 - License database queries: ~0.5ms (with caching).
 - Network sync: ~1KB packet per player on login.
 - Cache cleanup runs every 20 seconds to prevent memory leaks.
+- Nametag block occlusion: zero raycast overhead — handled entirely by GPU depth test.
 - Estimated total overhead: <1% CPU usage on active servers.
 
 ---
@@ -634,7 +600,7 @@ LuckPerms is **optional**. The mod works fully without it, with graceful fallbac
 |:------|:------|
 | Mod ID | `rpessentials` |
 | Group ID | `net.rp.rpessentials` |
-| Version | 4.0.0 |
+| Version | 4.1.1 |
 | MC Version | 1.21.1 |
 | NeoForge | 21.1.215+ |
 | Java | 21 |

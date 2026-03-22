@@ -179,7 +179,7 @@ public class ProfessionEditorScreen extends Screen {
         int fieldW = Math.min(formW - 36, 180);
         EditBox restrictBox = new EditBox(this.font, formX + 16, y, fieldW, 18,
                 Component.literal("Restriction"));
-        restrictBox.setHint(Component.literal("§7ex: minecraft:iron_sword  ou  minecraft:*"));
+        restrictBox.setHint(Component.literal("§7ex: minecraft:iron_sword"));
         restrictBox.setMaxLength(128);
         restrictBox.setValue(stateRestrictionInput);
         restrictBox.setResponder(val -> {

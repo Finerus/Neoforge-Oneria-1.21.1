@@ -262,38 +262,6 @@ public class RpEssentialsCommands {
                 .then(Commands.argument("value", IntegerArgumentType.integer(1, 32))
                         .executes(ctx -> updateConfigInt(ctx, RpEssentialsConfig.SNEAK_PROXIMITY_DISTANCE, "Sneak Detection Distance"))));
 
-        setNode.then(Commands.literal("nametagAdvancedEnabled")
-                .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_ADVANCED_ENABLED, "Nametag Advanced"))));
-
-        setNode.then(Commands.literal("nametagObfuscationEnabled")
-                .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_OBFUSCATION_ENABLED, "Nametag Obfuscation"))));
-
-        setNode.then(Commands.literal("nametagHideBehindBlocks")
-                .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_HIDE_BEHIND_BLOCKS, "Nametag Hide Behind Blocks"))));
-
-        setNode.then(Commands.literal("nametagShowWhileSneaking")
-                .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_SHOW_WHILE_SNEAKING, "Nametag Show While Sneaking"))));
-
-        setNode.then(Commands.literal("nametagStaffAlwaysSeeReal")
-                .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.NAMETAG_STAFF_ALWAYS_SEE_REAL, "Nametag Staff Bypass"))));
-
-        setNode.then(Commands.literal("nametagObfuscationDistance")
-                .then(Commands.argument("value", IntegerArgumentType.integer(1, 128))
-                        .executes(ctx -> updateConfigInt(ctx, RpEssentialsConfig.NAMETAG_OBFUSCATION_DISTANCE, "Nametag Obfuscation Distance"))));
-
-        setNode.then(Commands.literal("nametagRenderDistance")
-                .then(Commands.argument("value", IntegerArgumentType.integer(0, 256))
-                        .executes(ctx -> updateConfigInt(ctx, RpEssentialsConfig.NAMETAG_RENDER_DISTANCE, "Nametag Render Distance"))));
-
-        setNode.then(Commands.literal("nametagFormat")
-                .then(Commands.argument("value", StringArgumentType.greedyString())
-                        .executes(ctx -> updateConfigString(ctx, RpEssentialsConfig.NAMETAG_FORMAT, "Nametag Format"))));
-
         setNode.then(Commands.literal("hideNametags")
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.HIDE_NAMETAGS, "Hide Nametags"))));
@@ -1110,8 +1078,14 @@ public class RpEssentialsCommands {
         RpEssentialsScheduleManager.reload();
         RpEssentialsPermissions.clearCache();
         NicknameManager.reload();
-        NametagSyncHelper.broadcastToAll(ctx.getSource().getServer());
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] Configuration, nicknames and nametags reloaded!"), true);
+
+        try {
+            boolean hideNametags = RpEssentialsConfig.HIDE_NAMETAGS.get();
+            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(player ->
+                    PacketDistributor.sendToPlayer(player, new HideNametagsPacket(hideNametags)));
+        } catch (IllegalStateException ignored) {}
+
+        ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] Configuration reloaded!"), true);
         return 1;
     }
 
@@ -1133,14 +1107,6 @@ public class RpEssentialsCommands {
                 PacketDistributor.sendToPlayer(player, new HideNametagsPacket(val));
             });
             RpEssentials.LOGGER.info("Broadcast nametag config update: hide={}", val);
-        }
-
-        if (config == RpEssentialsConfig.NAMETAG_ADVANCED_ENABLED
-                || config == RpEssentialsConfig.NAMETAG_OBFUSCATION_ENABLED
-                || config == RpEssentialsConfig.NAMETAG_HIDE_BEHIND_BLOCKS
-                || config == RpEssentialsConfig.NAMETAG_SHOW_WHILE_SNEAKING
-                || config == RpEssentialsConfig.NAMETAG_STAFF_ALWAYS_SEE_REAL) {
-            NametagSyncHelper.broadcastToAll(ctx.getSource().getServer());
         }
 
         ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] " + name + " : " + (val ? "§aENABLED" : "§cDISABLED")), true);
@@ -1481,7 +1447,6 @@ public class RpEssentialsCommands {
                     () -> Component.literal(
                             MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_UPDATED, "label", label, "value", value)),
                     true);
-            NametagSyncHelper.broadcastToAll(ctx.getSource().getServer());
             return 1;
         } catch (IllegalStateException e) {
             ctx.getSource().sendFailure(Component.literal(
