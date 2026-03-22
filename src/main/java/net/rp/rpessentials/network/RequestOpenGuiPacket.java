@@ -53,8 +53,6 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
     public static void handleOnServer(RequestOpenGuiPacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player)) return;
-
-            // Vérification des droits — si pas staff, on ignore silencieusement
             if (!RpEssentialsPermissions.isStaff(player)) return;
 
             switch (packet.guiType()) {
@@ -94,7 +92,6 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
         PacketDistributor.sendToPlayer(player, new OpenProfessionGuiPacket(entries));
     }
 
-    /** Extrait les items autorisés pour une profession depuis une liste "profession;item1,item2" */
     private static List<String> collectForProfession(String profId, List<? extends String> source) {
         for (String line : source) {
             String[] parts = line.split(";", 2);
@@ -122,8 +119,9 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
             String mcName = p.getGameProfile().getName();
             String nick   = NicknameManager.hasNickname(uuid) ? NicknameManager.getNickname(uuid) : "";
             String role   = detectCurrentRole(p);
-            String license = LicenseManager.getLicenses(uuid).stream().findFirst().orElse("");
-            players.add(new OpenPlayerProfileGuiPacket.PlayerData(uuid, mcName, nick, role, license));
+            // Full license list (not just the first one)
+            List<String> licenses = LicenseManager.getLicenses(uuid);
+            players.add(new OpenPlayerProfileGuiPacket.PlayerData(uuid, mcName, nick, role, licenses));
         }
 
         // ── IDs de professions disponibles ────────────────────────────────────
@@ -137,7 +135,7 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
             }
         } catch (IllegalStateException ignored) {}
 
-        // ── Rôles configurés (envoyés depuis le serveur, le client n'a pas accès à la config) ──
+        // ── Rôles configurés ──────────────────────────────────────────────────
         List<String> roleIds = new ArrayList<>();
         try {
             for (String entry : RpEssentialsConfig.ROLES.get()) {
@@ -152,7 +150,6 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
                 new OpenPlayerProfileGuiPacket(players, professionIds, roleIds));
     }
 
-    /** Détecte le rôle actuel d'un joueur via ses tags vanilla */
     private static String detectCurrentRole(ServerPlayer player) {
         try {
             for (String entry : RpEssentialsConfig.ROLES.get()) {

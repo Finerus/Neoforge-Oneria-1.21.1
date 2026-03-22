@@ -33,6 +33,15 @@ public class TempLicenseExpirationManager {
             revoke(server, uuid, e, player);
     }
 
+    /**
+     * Scans the player's inventory for license items whose profession is no longer active
+     * and marks them as revoked by setting the "revoked" flag in CUSTOM_DATA.
+     *
+     * The visual revoke message (title + body) is displayed exclusively by
+     * LicenseItem.appendHoverText() which reads the "revoked" flag at render time.
+     * We deliberately do NOT add lore lines here to avoid duplicating what
+     * appendHoverText already shows.
+     */
     public static void markRevokedLicenseItems(ServerPlayer player) {
         List<String> activeLicenses = LicenseManager.getLicenses(player.getUUID());
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
@@ -40,7 +49,8 @@ public class TempLicenseExpirationManager {
             if (stack.isEmpty() || !(stack.getItem() instanceof LicenseItem)) continue;
             if (!stack.has(net.minecraft.core.component.DataComponents.CUSTOM_DATA)) continue;
 
-            net.minecraft.nbt.CompoundTag tag = stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA).copyTag();
+            net.minecraft.nbt.CompoundTag tag =
+                    stack.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA).copyTag();
             String profId = tag.getString("professionId");
             if (profId.isEmpty()) continue;
 
@@ -48,21 +58,10 @@ public class TempLicenseExpirationManager {
             boolean alreadyRevoked = tag.getBoolean("revoked");
 
             if (!isActive && !alreadyRevoked) {
+                // Mark as revoked — LicenseItem.appendHoverText() will show the message.
                 tag.putBoolean("revoked", true);
                 stack.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
                         net.minecraft.world.item.component.CustomData.of(tag));
-
-                List<net.minecraft.network.chat.Component> lore = new java.util.ArrayList<>();
-                var existing = stack.get(net.minecraft.core.component.DataComponents.LORE);
-                if (existing != null) lore.addAll(existing.lines());
-                lore.add(net.minecraft.network.chat.Component.literal(
-                        MessagesConfig.get(
-                                MessagesConfig.LICENSE_REVOKED_TITLE)));
-                lore.add(net.minecraft.network.chat.Component.literal(
-                        MessagesConfig.get(
-                                MessagesConfig.LICENSE_REVOKED_BODY)));
-                stack.set(net.minecraft.core.component.DataComponents.LORE,
-                        new net.minecraft.world.item.component.ItemLore(lore));
             }
         }
     }

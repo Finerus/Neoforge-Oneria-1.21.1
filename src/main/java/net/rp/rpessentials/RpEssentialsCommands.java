@@ -43,10 +43,7 @@ import net.rp.rpessentials.moderation.DeathRPManager;
 import net.rp.rpessentials.moderation.LastConnectionManager;
 import net.rp.rpessentials.moderation.WarnManager;
 import net.rp.rpessentials.network.HideNametagsPacket;
-import net.rp.rpessentials.profession.LicenseManager;
-import net.rp.rpessentials.profession.ProfessionRestrictionManager;
-import net.rp.rpessentials.profession.ProfessionSyncHelper;
-import net.rp.rpessentials.profession.TempLicenseExpirationManager;
+import net.rp.rpessentials.profession.*;
 
 import java.util.Map;
 
@@ -689,6 +686,24 @@ public class RpEssentialsCommands {
                                 .then(Commands.argument("days_duration", IntegerArgumentType.integer(1, 365))
                                         .executes(RpEssentialsCommands::giveRPLicense)
                                 )
+                        )
+                )
+        );
+
+        licenseNode.then(Commands.literal("reissue")
+                .then(Commands.argument("player", EntityArgument.player())
+                        .then(Commands.argument("profession", StringArgumentType.word())
+                                .suggests((ctx, builder) -> {
+                                    try {
+                                        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+                                        LicenseManager.getLicenses(target.getUUID()).forEach(builder::suggest);
+                                    } catch (Exception e) {
+                                        ProfessionRestrictionManager.getAllProfessions()
+                                                .forEach(p -> builder.suggest(p.id));
+                                    }
+                                    return builder.buildFuture();
+                                })
+                                .executes(RpEssentialsCommands::reissueLicense)
                         )
                 )
         );
@@ -1754,44 +1769,66 @@ public class RpEssentialsCommands {
             return 0;
         }
 
-        String displayName = NicknameManager.getDisplayName(target);
-        ItemStack license = new ItemStack(RpEssentialsItems.LICENSE.get());
-        license.set(net.minecraft.core.component.DataComponents.CUSTOM_NAME,
-                Component.literal(professionData.colorCode +
-                        MessagesConfig.get(MessagesConfig.LICENSE_ITEM_NAME) +
-                        professionData.displayName));
-
-        java.util.List<Component> lore = new java.util.ArrayList<>();
-        lore.add(Component.literal(MessagesConfig.get(MessagesConfig.LICENSE_LORE_ISSUED_TO, "player", displayName)));
-        lore.add(Component.literal(MessagesConfig.get(MessagesConfig.LICENSE_LORE_DATE,
-                "date", java.time.LocalDate.now().toString())));
-        license.set(net.minecraft.core.component.DataComponents.LORE,
-                new net.minecraft.world.item.component.ItemLore(lore));
-
-        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
-        tag.putString("professionId", professionId);
-        license.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA,
-                net.minecraft.world.item.component.CustomData.of(tag));
-
-        if (!target.getInventory().add(license)) target.drop(license, false);
-
         LicenseManager.addLicense(target.getUUID(), professionId);
         ServerPlayer staff = ctx.getSource().getPlayer();
         LicenseManager.logAction("GIVE", staff, target, professionId, null);
-        ProfessionRestrictionManager.invalidatePlayerCache(target.getUUID());
-        ProfessionSyncHelper.syncToPlayer(target);
 
-        // Tag vanilla automatique
-        server.getCommands().performPrefixedCommand(
-                server.createCommandSourceStack(),
-                "tag " + target.getName().getString() + " add " + professionId);
+        // Give the physical item, add the tag, invalidate cache, sync
+        LicenseHelper.giveLicenseItem(server, staff, target, professionId);
 
+        String displayName = NicknameManager.getDisplayName(target);
         ctx.getSource().sendSuccess(() -> Component.literal(
                 MessagesConfig.get(MessagesConfig.LICENSE_GIVE_STAFF,
                         "profession", professionData.getFormattedName(),
                         "player", displayName)), true);
         target.sendSystemMessage(Component.literal(
                 MessagesConfig.get(MessagesConfig.LICENSE_GIVE_PLAYER,
+                        "profession", professionData.getFormattedName())));
+        return 1;
+    }
+
+    private static int reissueLicense(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+        String professionId = StringArgumentType.getString(ctx, "profession");
+        MinecraftServer server = ctx.getSource().getServer();
+
+        // Check the player actually has this license
+        if (!LicenseManager.hasLicense(target.getUUID(), professionId)) {
+            ctx.getSource().sendFailure(Component.literal(
+                    MessagesConfig.get(MessagesConfig.LICENSE_REISSUE_NOT_FOUND,
+                            "player", target.getName().getString(),
+                            "profession", professionId)));
+            return 0;
+        }
+
+        ProfessionRestrictionManager.ProfessionData professionData =
+                ProfessionRestrictionManager.getProfessionData(professionId);
+        if (professionData == null) {
+            ctx.getSource().sendFailure(Component.literal(
+                    MessagesConfig.get(MessagesConfig.LICENSE_UNKNOWN_PROFESSION, "profession", professionId)));
+            return 0;
+        }
+
+        ServerPlayer staff = ctx.getSource().getPlayer();
+        boolean gave = LicenseHelper.giveLicenseItem(server, staff, target, professionId);
+
+        if (!gave) {
+            ctx.getSource().sendFailure(Component.literal("§c[RPEssentials] Could not create item for: " + professionId));
+            return 0;
+        }
+
+        // Log as REISSUE in audit
+        LicenseManager.logActionSystem("REISSUE",
+                target.getName().getString(), target.getUUID().toString(),
+                professionId, "Reissued by " + (staff != null ? staff.getName().getString() : "Console"));
+
+        ctx.getSource().sendSuccess(() -> Component.literal(
+                MessagesConfig.get(MessagesConfig.LICENSE_REISSUE_STAFF,
+                        "profession", professionData.getFormattedName(),
+                        "player", target.getName().getString())), true);
+
+        target.sendSystemMessage(Component.literal(
+                MessagesConfig.get(MessagesConfig.LICENSE_REISSUE_PLAYER,
                         "profession", professionData.getFormattedName())));
         return 1;
     }

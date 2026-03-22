@@ -40,36 +40,24 @@ public record SaveProfessionPacket(
                 @Override
                 public SaveProfessionPacket decode(FriendlyByteBuf buf) {
                     return new SaveProfessionPacket(
-                            buf.readUtf(),
-                            buf.readUtf(),
-                            buf.readUtf(),
-                            readList(buf),
-                            readList(buf),
-                            readList(buf),
-                            readList(buf),
+                            buf.readUtf(), buf.readUtf(), buf.readUtf(),
+                            readList(buf), readList(buf), readList(buf), readList(buf),
                             buf.readBoolean()
                     );
                 }
-
                 @Override
                 public void encode(FriendlyByteBuf buf, SaveProfessionPacket p) {
-                    buf.writeUtf(p.id());
-                    buf.writeUtf(p.displayName());
-                    buf.writeUtf(p.color());
-                    writeList(buf, p.allowedCrafts());
-                    writeList(buf, p.allowedBlocks());
-                    writeList(buf, p.allowedItems());
-                    writeList(buf, p.allowedEquipment());
+                    buf.writeUtf(p.id()); buf.writeUtf(p.displayName()); buf.writeUtf(p.color());
+                    writeList(buf, p.allowedCrafts()); writeList(buf, p.allowedBlocks());
+                    writeList(buf, p.allowedItems()); writeList(buf, p.allowedEquipment());
                     buf.writeBoolean(p.isNew());
                 }
-
                 private List<String> readList(FriendlyByteBuf buf) {
                     int n = buf.readVarInt();
                     List<String> out = new ArrayList<>(n);
                     for (int i = 0; i < n; i++) out.add(buf.readUtf());
                     return out;
                 }
-
                 private void writeList(FriendlyByteBuf buf, List<String> list) {
                     buf.writeVarInt(list.size());
                     for (String s : list) buf.writeUtf(s);
@@ -86,14 +74,11 @@ public record SaveProfessionPacket(
     public static void handleOnServer(SaveProfessionPacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player)) return;
-
-            // Double vérification droits — ne jamais faire confiance au client
             if (!RpEssentialsPermissions.isStaff(player)) return;
 
-            // Nettoyage de l'ID
             String cleanId = packet.id().toLowerCase().trim().replaceAll("[^a-z0-9_]", "_");
             if (cleanId.isEmpty() || packet.displayName().trim().isEmpty()) {
-                player.sendSystemMessage(Component.literal("§c[RPEssentials] ID ou nom invalide."));
+                player.sendSystemMessage(Component.literal("§c[RPEssentials] Invalid ID or name."));
                 return;
             }
 
@@ -115,8 +100,6 @@ public record SaveProfessionPacket(
                 if (!found) {
                     updated.add(cleanId + ";" + packet.displayName().trim() + ";" + packet.color().trim());
                 }
-
-                // set() + save() — set() met en RAM, save() écrit sur le disque
                 ProfessionConfig.PROFESSIONS.set(updated);
                 ProfessionConfig.PROFESSIONS.save();
 
@@ -129,44 +112,79 @@ public record SaveProfessionPacket(
                 // ── 3. Recharge le cache en RAM ───────────────────────────────────
                 ProfessionRestrictionManager.reloadCache();
 
-                String action = found ? "mise à jour" : "créée";
-                player.sendSystemMessage(Component.literal(
-                        "§a[RPEssentials] Profession §e" + cleanId + " §a" + action + "."));
+                // ── 4. Message de confirmation avec résumé ────────────────────────
+                String actionVerb = found ? "updated" : "created";
+                player.sendSystemMessage(buildConfirmation(cleanId, packet, actionVerb));
+
                 RpEssentials.LOGGER.info("[GUI] Profession '{}' {} by {}",
-                        cleanId, action, player.getGameProfile().getName());
+                        cleanId, actionVerb, player.getGameProfile().getName());
 
             } catch (IllegalStateException e) {
                 player.sendSystemMessage(Component.literal(
-                        "§c[RPEssentials] Config non chargée, réessayez."));
+                        "§c[RPEssentials] Config not loaded, please try again."));
                 RpEssentials.LOGGER.error("[GUI] Config not loaded when saving profession", e);
             }
         });
     }
 
     /**
-     * Met à jour l'entrée "professionId;item1,item2" dans une ConfigValue de liste
-     * puis la persiste immédiatement sur le disque avec .save().
-     * Si items est vide, l'entrée existante est supprimée.
+     * Builds the confirmation message sent to the admin after saving.
+     * Shows how many entries each restriction category has.
      */
+    private static Component buildConfirmation(String id, SaveProfessionPacket p, String verb) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("§a[RPEssentials] Profession §e").append(id).append(" §a").append(verb).append(".\n");
+        sb.append("§7  §6Name: §f").append(p.displayName())
+                .append("  §6Color: §").append(p.color().replace("&","").replace("§",""))
+                .append("■§r\n");
+        sb.append(formatRestrictionLine("Crafts",    p.allowedCrafts()));
+        sb.append(formatRestrictionLine("Blocks",    p.allowedBlocks()));
+        sb.append(formatRestrictionLine("Items",     p.allowedItems()));
+        sb.append(formatRestrictionLine("Equipment", p.allowedEquipment()));
+
+        return Component.literal(sb.toString().stripTrailing());
+    }
+
+    /**
+     * Formats one restriction category line.
+     * Examples:
+     *   §7  Crafts:    §8none
+     *   §7  Equipment: §fminecraft:diamond_sword, minecraft:iron_sword §8(2)
+     */
+    private static String formatRestrictionLine(String label, List<String> items) {
+        if (items.isEmpty()) {
+            return "§7  " + label + ": §8none\n";
+        }
+        int max = 3;
+        StringBuilder line = new StringBuilder("§7  ").append(label).append(": §f");
+
+        List<String> shown = items.subList(0, Math.min(items.size(), max));
+        line.append(String.join("§7, §f", shown));
+
+        if (items.size() > max) {
+            line.append(" §8(+").append(items.size() - max).append(" more)");
+        } else {
+            line.append(" §8(").append(items.size()).append(")");
+        }
+        line.append("\n");
+        return line.toString();
+    }
+
     private static void setAndSave(
             ModConfigSpec.ConfigValue<List<? extends String>> configValue,
             String profId,
             List<String> items) {
 
         List<String> current = new ArrayList<>(configValue.get());
-
-        // Supprime l'ancienne entrée pour cette profession
         current.removeIf(line -> {
             String[] parts = line.split(";", 2);
             return parts.length >= 1 && parts[0].trim().equalsIgnoreCase(profId);
         });
-
-        // Ajoute la nouvelle seulement si la liste n'est pas vide
         if (!items.isEmpty()) {
             current.add(profId + ";" + String.join(",", items));
         }
-
         configValue.set(current);
-        configValue.save(); // ← persiste sur le disque
+        configValue.save();
     }
 }

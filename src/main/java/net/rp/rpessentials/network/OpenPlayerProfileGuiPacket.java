@@ -32,9 +32,9 @@ public record OpenPlayerProfileGuiPacket(
     public record PlayerData(
             UUID uuid,
             String mcName,
-            String currentNick,     // "" si pas de nickname
-            String currentRole,     // "" si aucun rôle détecté
-            String currentLicense   // première licence, "" si aucune
+            String currentNick,       // "" si pas de nickname
+            String currentRole,       // "" si aucun rôle détecté
+            List<String> currentLicenses  // liste complète des licences actives
     ) {}
 
     // =========================================================================
@@ -52,13 +52,14 @@ public record OpenPlayerProfileGuiPacket(
                     int playerCount = buf.readVarInt();
                     List<PlayerData> players = new ArrayList<>(playerCount);
                     for (int i = 0; i < playerCount; i++) {
-                        players.add(new PlayerData(
-                                buf.readUUID(),
-                                buf.readUtf(),
-                                buf.readUtf(),
-                                buf.readUtf(),
-                                buf.readUtf()
-                        ));
+                        UUID   uuid      = buf.readUUID();
+                        String mcName    = buf.readUtf();
+                        String nick      = buf.readUtf();
+                        String role      = buf.readUtf();
+                        int    licCount  = buf.readVarInt();
+                        List<String> lics = new ArrayList<>(licCount);
+                        for (int j = 0; j < licCount; j++) lics.add(buf.readUtf());
+                        players.add(new PlayerData(uuid, mcName, nick, role, lics));
                     }
                     // Professions
                     int profCount = buf.readVarInt();
@@ -81,7 +82,8 @@ public record OpenPlayerProfileGuiPacket(
                         buf.writeUtf(p.mcName());
                         buf.writeUtf(p.currentNick());
                         buf.writeUtf(p.currentRole());
-                        buf.writeUtf(p.currentLicense());
+                        buf.writeVarInt(p.currentLicenses().size());
+                        for (String lic : p.currentLicenses()) buf.writeUtf(lic);
                     }
                     // Professions
                     buf.writeVarInt(packet.availableProfessionIds().size());

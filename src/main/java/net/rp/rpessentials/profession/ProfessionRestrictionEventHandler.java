@@ -18,6 +18,7 @@ import net.neoforged.neoforge.event.level.BlockEvent;
 import net.rp.rpessentials.RpEssentials;
 import net.rp.rpessentials.config.ProfessionConfig;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -171,6 +172,14 @@ public class ProfessionRestrictionEventHandler {
 
     // =========================================================================
     // TOOLTIP INFORMATION
+    // Covers all 5 restriction types:
+    //  - globalBlockedCrafts
+    //  - globalUnbreakableBlocks  ← was missing
+    //  - globalBlockedItems
+    //  - globalBlockedEquipment
+    //  - containerOpenRestrictions ← was missing
+    // For blocks, the item resource location matches the block id for all
+    // standard blocks (minecraft:diamond_ore item == minecraft:diamond_ore block).
     // =========================================================================
 
     @SubscribeEvent
@@ -180,28 +189,76 @@ public class ProfessionRestrictionEventHandler {
 
         Item item = itemStack.getItem();
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(item);
+        ResourceLocation blockId = itemId; // for standard blocks, item id == block id
 
-        boolean craftRestricted = ProfessionRestrictionManager.isGloballyBlocked(
-                itemId, ProfessionConfig.GLOBAL_BLOCKED_CRAFTS.get());
-        boolean useRestricted = ProfessionRestrictionManager.isGloballyBlocked(
-                itemId, ProfessionConfig.GLOBAL_BLOCKED_ITEMS.get());
-        boolean equipRestricted = ProfessionRestrictionManager.isGloballyBlocked(
-                itemId, ProfessionConfig.GLOBAL_BLOCKED_EQUIPMENT.get());
+        try {
+            // ── Craft restriction ─────────────────────────────────────────────
+            if (ProfessionRestrictionManager.isGloballyBlocked(
+                    itemId, ProfessionConfig.GLOBAL_BLOCKED_CRAFTS.get())) {
+                String professions = ProfessionRestrictionManager.getRequiredProfessions(
+                        itemId, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get());
+                event.getToolTip().add(Component.literal("§7Craft: §c✘ §8— §7" + professions));
+            }
 
-        if (craftRestricted) {
-            String professions = ProfessionRestrictionManager.getRequiredProfessions(
-                    itemId, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get());
-            event.getToolTip().add(Component.literal("§7Craft: §c✘ §7Métier: " + professions));
-        }
-        if (useRestricted) {
-            String professions = ProfessionRestrictionManager.getRequiredProfessions(
-                    itemId, ProfessionConfig.PROFESSION_ALLOWED_ITEMS.get());
-            event.getToolTip().add(Component.literal("§7Utilisation: §c✘ §7Métier: " + professions));
-        }
-        if (equipRestricted) {
-            String professions = ProfessionRestrictionManager.getRequiredProfessions(
-                    itemId, ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT.get());
-            event.getToolTip().add(Component.literal("§7Équipement: §c✘ §7Métier: " + professions));
+            // ── Block break restriction ───────────────────────────────────────
+            // Checks using blockId (same value as itemId for standard blocks).
+            if (ProfessionRestrictionManager.isGloballyBlocked(
+                    blockId, ProfessionConfig.GLOBAL_UNBREAKABLE_BLOCKS.get())) {
+                String professions = ProfessionRestrictionManager.getRequiredProfessions(
+                        blockId, ProfessionConfig.PROFESSION_ALLOWED_BLOCKS.get());
+                event.getToolTip().add(Component.literal("§7Mining: §c✘ §8— §7" + professions));
+            }
+
+            // ── Item use restriction ──────────────────────────────────────────
+            if (ProfessionRestrictionManager.isGloballyBlocked(
+                    itemId, ProfessionConfig.GLOBAL_BLOCKED_ITEMS.get())) {
+                String professions = ProfessionRestrictionManager.getRequiredProfessions(
+                        itemId, ProfessionConfig.PROFESSION_ALLOWED_ITEMS.get());
+                event.getToolTip().add(Component.literal("§7Usage: §c✘ §8— §7" + professions));
+            }
+
+            // ── Equipment restriction ─────────────────────────────────────────
+            if (ProfessionRestrictionManager.isGloballyBlocked(
+                    itemId, ProfessionConfig.GLOBAL_BLOCKED_EQUIPMENT.get())) {
+                String professions = ProfessionRestrictionManager.getRequiredProfessions(
+                        itemId, ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT.get());
+                event.getToolTip().add(Component.literal("§7Equip: §c✘ §8— §7" + professions));
+            }
+
+            // ── Container open restriction ────────────────────────────────────
+            // Only relevant when the item is a placeable block (has a block form).
+            // We check the container restrictions list directly since the format is
+            // block_id;profession1,profession2 rather than a simple global blocked list.
+            List<? extends String> containerRestrictions =
+                    ProfessionConfig.CONTAINER_OPEN_RESTRICTIONS.get();
+            if (!containerRestrictions.isEmpty()) {
+                String blockIdStr = blockId.toString();
+                for (String entry : containerRestrictions) {
+                    if (!entry.contains(";")) continue;
+                    String[] parts = entry.split(";", 2);
+                    // Use the mod's own pattern-matching so wildcards work correctly
+                    if (!net.rp.rpessentials.RpEssentialsPatternUtils.matchesPattern(
+                            blockIdStr, parts[0].trim())) continue;
+
+                    // Build the required professions display string
+                    java.util.Set<String> required = new java.util.LinkedHashSet<>();
+                    for (String prof : parts[1].split(",")) {
+                        String profId = prof.trim();
+                        net.rp.rpessentials.profession.ProfessionRestrictionManager.ProfessionData data =
+                                ProfessionRestrictionManager.getProfessionData(profId);
+                        required.add(data != null ? data.getFormattedName() : profId);
+                    }
+                    String professions = required.isEmpty()
+                            ? net.rp.rpessentials.config.MessagesConfig.get(
+                            net.rp.rpessentials.config.MessagesConfig.PROFESSION_NONE_AVAILABLE)
+                            : String.join("§7, ", required);
+                    event.getToolTip().add(Component.literal("§7Open: §c✘ §8— §7" + professions));
+                    break; // one match is enough
+                }
+            }
+
+        } catch (IllegalStateException ignored) {
+            // Config not yet loaded — skip tooltip additions silently
         }
     }
 

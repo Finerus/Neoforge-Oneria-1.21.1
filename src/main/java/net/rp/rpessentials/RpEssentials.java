@@ -110,37 +110,42 @@ public class RpEssentials {
             WorldBorderManager.tick(server);
         }
 
-        // ── Schedule + caches — toutes les 400 ticks (20s) ───────────────────
         if (tickCounter % 400 == 0) {
             ProfessionRestrictionEventHandler.cleanupCaches();
 
             LocalTime now   = LocalTime.now();
-            DayOfWeek today = LocalDate.now().getDayOfWeek();
+            DayOfWeek today = LocalDate.now().getDayOfWeek(); // still needed for other calls
 
             // ── Schedule principal ─────────────────────────────────────────
             try {
                 if (ScheduleConfig.ENABLE_SCHEDULE.get() && !RpEssentialsScheduleManager.getSchedules().isEmpty()) {
-                    RpEssentialsScheduleManager.DaySchedule s = RpEssentialsScheduleManager.getSchedules().get(today);
 
-                    if (!RpEssentialsScheduleManager.hasOpenedToday() && s != null
-                            && now.getHour()   == s.open().getHour()
-                            && now.getMinute() == s.open().getMinute()) {
+                    // Use getActiveSchedule() — handles cross-midnight transparently.
+                    // It returns yesterday's schedule if its cross-midnight session is still open,
+                    // or today's schedule if today's session is open, or null if server is closed.
+                    RpEssentialsScheduleManager.DaySchedule active =
+                            RpEssentialsScheduleManager.getActiveSchedule();
+
+                    // Also keep a reference to today's schedule for opening-time detection
+                    RpEssentialsScheduleManager.DaySchedule todayS =
+                            RpEssentialsScheduleManager.getTodaySchedule();
+
+                    // Opening detection: fire when we hit today's open time
+                    if (!RpEssentialsScheduleManager.hasOpenedToday()
+                            && todayS != null
+                            && now.getHour()   == todayS.open().getHour()
+                            && now.getMinute() == todayS.open().getMinute()) {
                         RpEssentialsScheduleManager.markOpenedToday();
-                        RpEssentialsScheduleManager.sendOpeningMessage(server, s);
+                        RpEssentialsScheduleManager.sendOpeningMessage(server, todayS);
                     }
 
-                    if (s != null && s.isOpen(now)) {
-                        RpEssentialsScheduleManager.checkWarnings(server, now, s);
+                    // Warning + closing: driven by the ACTIVE session (may be yesterday's cross-midnight)
+                    if (active != null) {
+                        RpEssentialsScheduleManager.checkWarnings(server, now, active);
                     }
 
-                    if (!RpEssentialsScheduleManager.hasClosedToday() && s == null) {
-                        RpEssentialsScheduleManager.markClosedToday();
-                        RpEssentialsScheduleManager.closeServer(server);
-                    }
-
-                    if (!RpEssentialsScheduleManager.hasClosedToday() && s != null
-                            && now.getHour()   == s.close().getHour()
-                            && now.getMinute() == s.close().getMinute()) {
+                    // Closing detection: active was open last tick, now closed
+                    if (!RpEssentialsScheduleManager.hasClosedToday() && active == null) {
                         RpEssentialsScheduleManager.markClosedToday();
                         RpEssentialsScheduleManager.closeServer(server);
                     }

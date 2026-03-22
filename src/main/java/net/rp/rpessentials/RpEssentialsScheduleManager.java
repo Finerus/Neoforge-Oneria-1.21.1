@@ -23,8 +23,47 @@ public class RpEssentialsScheduleManager {
     // =========================================================================
 
     public record DaySchedule(LocalTime open, LocalTime close) {
+
+        /**
+         * Returns true if {@code now} falls within this schedule's session.
+         *
+         * Two cases:
+         *  - Normal    (open < close): 20:00 → 23:59  →  open ≤ now < close
+         *  - Cross-midnight (close < open): 22:00 → 02:00  →  now ≥ open  OR  now < close
+         */
         public boolean isOpen(LocalTime now) {
-            return !now.isBefore(open) && now.isBefore(close);
+            if (!close.isBefore(open)) {
+                // Normal same-day session
+                return !now.isBefore(open) && now.isBefore(close);
+            } else {
+                // Cross-midnight session: open side OR close side
+                return !now.isBefore(open) || now.isBefore(close);
+            }
+        }
+
+        /** True when this schedule's session extends past midnight. */
+        public boolean crossesMidnight() {
+            return close.isBefore(open);
+        }
+
+        /**
+         * Minutes remaining until this session closes, given the current time.
+         * Works for both normal and cross-midnight sessions.
+         * Returns a negative value if the session is not open.
+         */
+        public long minutesUntilClose(LocalTime now) {
+            if (!isOpen(now)) return -1;
+            if (!crossesMidnight() || !now.isBefore(close)) {
+                // Same-day session, or we are on the "before-close" side of a cross-midnight session
+                return Duration.between(now, close).toMinutes();
+            } else {
+                // We are on the "after-open" side of a cross-midnight session (e.g. now=23:30, close=02:00)
+                // Time until midnight + time from midnight to close
+                long toMidnight = Duration.between(now, LocalTime.MIDNIGHT).toMinutes();
+                long fromMidnight = Duration.between(LocalTime.MIDNIGHT, close).toMinutes();
+                // toMidnight is 0 or negative at midnight — use modulo 1440
+                return Math.floorMod(toMidnight, 1440) + fromMidnight;
+            }
         }
     }
 
@@ -63,8 +102,12 @@ public class RpEssentialsScheduleManager {
 
             for (DayOfWeek day : DayOfWeek.values()) {
                 DaySchedule s = schedules.get(day);
-                if (s == null) RpEssentials.LOGGER.info("[Schedule]   {} → CLOSED", day);
-                else           RpEssentials.LOGGER.info("[Schedule]   {} → {}–{}", day, s.open().format(FMT), s.close().format(FMT));
+                if (s == null)
+                    RpEssentials.LOGGER.info("[Schedule]   {} → CLOSED", day);
+                else if (s.crossesMidnight())
+                    RpEssentials.LOGGER.info("[Schedule]   {} → {}–{} (cross-midnight)", day, s.open().format(FMT), s.close().format(FMT));
+                else
+                    RpEssentials.LOGGER.info("[Schedule]   {} → {}–{}", day, s.open().format(FMT), s.close().format(FMT));
             }
         } catch (IllegalStateException e) {
             RpEssentials.LOGGER.debug("[Schedule] Config not built yet, skipping reload.");
@@ -89,6 +132,31 @@ public class RpEssentialsScheduleManager {
     // =========================================================================
     // API PUBLIQUE
     // =========================================================================
+
+    /**
+     * Returns the active schedule for the current moment.
+     *
+     * Priority:
+     *  1. Today's schedule, if its session is currently open.
+     *  2. Yesterday's schedule, if it crosses midnight and is still open now.
+     *  3. null — no session is active.
+     */
+    public static DaySchedule getActiveSchedule() {
+        LocalTime now   = LocalTime.now();
+        DayOfWeek today = LocalDate.now().getDayOfWeek();
+
+        // Check today first
+        DaySchedule todayS = schedules.get(today);
+        if (todayS != null && todayS.isOpen(now)) return todayS;
+
+        // Check yesterday (cross-midnight session that started the day before)
+        DayOfWeek yesterday = today.minus(1);
+        DaySchedule yesterdayS = schedules.get(yesterday);
+        if (yesterdayS != null && yesterdayS.crossesMidnight() && yesterdayS.isOpen(now))
+            return yesterdayS;
+
+        return null;
+    }
 
     public static DaySchedule getTodaySchedule() {
         return schedules.get(LocalDate.now().getDayOfWeek());
@@ -124,6 +192,10 @@ public class RpEssentialsScheduleManager {
         return ColorHelper.parseColors(msg);
     }
 
+    /**
+     * Returns true when the server is currently open.
+     * Handles cross-midnight sessions transparently via {@link #getActiveSchedule()}.
+     */
     public static boolean isServerOpen() {
         try {
             if (!ScheduleConfig.ENABLE_SCHEDULE.get()) return true;
@@ -131,10 +203,7 @@ public class RpEssentialsScheduleManager {
             return true;
         }
         if (schedules.isEmpty()) return true;
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
-        DaySchedule s   = schedules.get(today);
-        if (s == null) return false;
-        return s.isOpen(LocalTime.now());
+        return getActiveSchedule() != null;
     }
 
     public static String getTimeUntilNextEvent() {
@@ -146,15 +215,17 @@ public class RpEssentialsScheduleManager {
         }
         if (schedules.isEmpty()) return "Schedule not initialized";
 
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
-        DaySchedule s   = schedules.get(today);
-        LocalTime now   = LocalTime.now();
+        DaySchedule active = getActiveSchedule();
+        LocalTime now = LocalTime.now();
 
-        if (s != null && s.isOpen(now)) {
-            long min = Duration.between(now, s.close()).toMinutes();
-            if (min < 0) min += 24 * 60;
+        if (active != null) {
+            long min = active.minutesUntilClose(now);
+            if (min < 0) min = 0;
             return String.format("Open — closing in %dh%02d", min / 60, min % 60);
         }
+
+        // Find next opening
+        DayOfWeek today = LocalDate.now().getDayOfWeek();
         for (int i = 1; i <= 7; i++) {
             DayOfWeek next = today.plus(i);
             DaySchedule ns = schedules.get(next);
@@ -167,7 +238,7 @@ public class RpEssentialsScheduleManager {
     }
 
     // =========================================================================
-    // ACCESSEURS D'ÉTAT — utilisés par RpEssentials.onServerTick
+    // ACCESSEURS D'ÉTAT
     // =========================================================================
 
     public static boolean hasOpenedToday() { return hasOpenedToday; }
@@ -176,7 +247,7 @@ public class RpEssentialsScheduleManager {
     public static void markClosedToday()   { hasClosedToday = true; }
 
     // =========================================================================
-    // TICK MIDNIGHT — appelé toutes les 1200 ticks depuis RpEssentials
+    // TICK MIDNIGHT — reset quotidien des flags
     // =========================================================================
 
     public static void tickMidnightSweep(MinecraftServer server) {
@@ -189,19 +260,34 @@ public class RpEssentialsScheduleManager {
         if (today.equals(lastResetDay)) return;
 
         LocalTime now = LocalTime.now();
-        if (now.getHour() == 0 && now.getMinute() <= 1) {
-            lastResetDay          = today;
-            hasClosedToday        = false;
-            hasOpenedToday        = false;
-            sentWarnings.clear();
-            lastHrpSlotKey        = "";
-            lastDeathHoursSlotKey = "";
+        if (now.getHour() != 0 || now.getMinute() > 1) return;
+
+        lastResetDay          = today;
+        sentWarnings.clear();
+        lastHrpSlotKey        = "";
+        lastDeathHoursSlotKey = "";
+
+        // Only reset open/close flags if yesterday's schedule does NOT cross midnight
+        // (if it does, the session is still ongoing and we must not prematurely reset).
+        DayOfWeek yesterday = today.minus(1);
+        DaySchedule yesterdayS = schedules.get(yesterday);
+        boolean midnightSessionOngoing = yesterdayS != null
+                && yesterdayS.crossesMidnight()
+                && yesterdayS.isOpen(now);
+
+        if (!midnightSessionOngoing) {
+            hasClosedToday = false;
+            hasOpenedToday = false;
             RpEssentials.LOGGER.info("[Schedule] Daily flags reset for {}", today);
+        } else {
+            // Don't reset — the overnight session is still active.
+            // Only clear sentWarnings so closing warnings for today's close time can fire.
+            RpEssentials.LOGGER.info("[Schedule] Cross-midnight session ongoing at midnight — flags NOT reset for {}", today);
         }
     }
 
     // =========================================================================
-    // DEATH HOURS
+    // DEATH HOURS / HRP HOURS
     // =========================================================================
 
     public static boolean isDeathHour() {
@@ -213,10 +299,6 @@ public class RpEssentialsScheduleManager {
         } catch (IllegalStateException ignored) {}
         return false;
     }
-
-    // =========================================================================
-    // HRP HOURS
-    // =========================================================================
 
     public static boolean isHrpTolerated() {
         try {
@@ -239,16 +321,22 @@ public class RpEssentialsScheduleManager {
     }
 
     // =========================================================================
-    // MÉTHODES DE TICK — appelées depuis RpEssentials.onServerTick
+    // TICK MÉTHODES — appelées depuis RpEssentials.onServerTick
     // =========================================================================
 
+    /**
+     * Sends closing warnings.
+     * Uses {@code minutesUntilClose()} so it works for both normal and cross-midnight sessions.
+     */
     public static void checkWarnings(MinecraftServer server, LocalTime now, DaySchedule s) {
         try {
+            long remaining = s.minutesUntilClose(now);
+            if (remaining < 0) return;
+
             for (int minutes : ScheduleConfig.WARNING_TIMES.get()) {
-                LocalTime warnTime = s.close().minusMinutes(minutes);
-                if (now.getHour()   == warnTime.getHour()
-                        && now.getMinute() == warnTime.getMinute()
-                        && !sentWarnings.contains(minutes)) {
+                // Fire the warning when we enter the target minute
+                // (remaining is checked against a 2-minute window to tolerate tick granularity)
+                if (remaining <= minutes && remaining > minutes - 2 && !sentWarnings.contains(minutes)) {
                     sentWarnings.add(minutes);
                     String msg = (minutes == 1)
                             ? ScheduleConfig.MSG_CLOSING_IMMINENT.get()
@@ -317,7 +405,6 @@ public class RpEssentialsScheduleManager {
 
         boolean active = isDeathHour();
 
-        // Auto-toggle du global Death RP selon les death hours
         try {
             boolean currentGlobal = RpEssentialsConfig.DEATH_RP_GLOBAL_ENABLED.get();
             if (active && !currentGlobal) {
@@ -329,12 +416,8 @@ public class RpEssentialsScheduleManager {
             }
         } catch (IllegalStateException ignored) {}
 
-        if (!active) {
-            lastDeathHoursSlotKey = "";
-            return;
-        }
+        if (!active) { lastDeathHoursSlotKey = ""; return; }
 
-        // Clé = le slot actif → fire une seule fois par slot
         String currentSlot = null;
         try {
             for (String slot : ScheduleConfig.DEATH_HOURS_SLOTS.get()) {
@@ -364,7 +447,6 @@ public class RpEssentialsScheduleManager {
         boolean tolerated = isHrpTolerated();
         if (!allowed && !tolerated) { lastHrpSlotKey = ""; return; }
 
-        // Clé = le slot actif → fire une seule fois par slot
         String currentSlot = null;
         try {
             List<? extends String> slots = allowed
@@ -398,27 +480,28 @@ public class RpEssentialsScheduleManager {
     // =========================================================================
 
     private static DaySchedule getNextOpenSchedule() {
-        DayOfWeek today = LocalDate.now().getDayOfWeek();
         LocalTime now   = LocalTime.now();
-        for (int i = 0; i <= 7; i++) {
+        DayOfWeek today = LocalDate.now().getDayOfWeek();
+
+        // Check remaining days starting from tomorrow (skip today — already closed for the session)
+        for (int i = 1; i <= 7; i++) {
             DayOfWeek day = today.plus(i);
             DaySchedule s = schedules.get(day);
-            if (s == null) continue;
-            if (i == 0 && !s.open().isAfter(now)) continue;
-            return s;
+            if (s != null) return s;
         }
-        return null;
+        // Fallback: check today itself (rare edge case — server restarted during its window)
+        return schedules.get(today);
     }
 
     private static String getNextOpenDayName() {
         DayOfWeek today = LocalDate.now().getDayOfWeek();
         LocalTime now   = LocalTime.now();
-        for (int i = 0; i <= 7; i++) {
+        for (int i = 1; i <= 7; i++) {
             DayOfWeek next = today.plus(i);
             DaySchedule s  = schedules.get(next);
-            if (s == null) continue;
-            if (i == 0 && !s.open().isAfter(now)) continue;
-            return i == 0 ? "Today" : next.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+            if (s != null) {
+                return next.getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+            }
         }
         return "N/A";
     }
@@ -433,9 +516,8 @@ public class RpEssentialsScheduleManager {
         try {
             LocalTime start = LocalTime.parse(p[0].trim(), FMT);
             LocalTime end   = LocalTime.parse(p[1].trim(), FMT);
-            return end.isAfter(start)
-                    ? (!now.isBefore(start) && now.isBefore(end))
-                    : (!now.isBefore(start) || now.isBefore(end));
+            // Reuse DaySchedule logic for consistency
+            return new DaySchedule(start, end).isOpen(now);
         } catch (Exception e) {
             RpEssentials.LOGGER.warn("[Schedule] Invalid slot format: '{}'", slot);
             return false;

@@ -218,6 +218,10 @@ public class MessagesConfig {
     public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_CHAT_FORMAT;
     public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_SENT;
 
+    public static final ModConfigSpec.ConfigValue<String> LICENSE_REISSUE_STAFF;
+    public static final ModConfigSpec.ConfigValue<String> LICENSE_REISSUE_PLAYER;
+    public static final ModConfigSpec.ConfigValue<String> LICENSE_REISSUE_NOT_FOUND;
+
     static {
         // =========================================================================
         BUILDER.push("System");
@@ -720,6 +724,24 @@ public class MessagesConfig {
         LICENSE_LIST_ALL_NONE_FOR_PLAYER = BUILDER
                 .comment("Shown in the all-players list when a player has no active license.")
                 .define("listAllNoneForPlayer", "§8None");
+
+        LICENSE_REISSUE_STAFF = BUILDER
+                .comment("Staff feedback after reissuing a license item.",
+                        "Placeholders: {profession} = profession display name, {player} = player name.")
+                .define("reissueStaff",
+                        "§a[RpEssentials] Replacement license for {profession} §agiven to §f{player}§a.");
+
+        LICENSE_REISSUE_PLAYER = BUILDER
+                .comment("Notification sent to the player when a replacement license item is given.",
+                        "Placeholder: {profession} = profession display name.")
+                .define("reissuePlayer",
+                        "§aYou received a replacement {profession}§6§l License§a.");
+
+        LICENSE_REISSUE_NOT_FOUND = BUILDER
+                .comment("Error shown when the player does not have the license to reissue.",
+                        "Placeholders: {player} = player name, {profession} = profession id.")
+                .define("reissueNotFound",
+                        "§c[RpEssentials] §f{player} §cdoes not have the §f{profession} §clicense.");
 
         BUILDER.pop();
 

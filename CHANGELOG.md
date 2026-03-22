@@ -1,6 +1,88 @@
 # Changelog - Rp Essentials
 All notable changes to this project will be documented in this file.
 
+## [4.1.3]
+
+**GUI overhaul, cross-midnight schedule, tooltip fixes, license system improvements.**
+
+---
+
+### Added
+
+* **`/rpessentials license reissue <player> <profession>`:** New staff command to give a replacement license item to a player who already has the profession but lost the physical item. The profession data and restrictions are unchanged — only the item is re-created and given. The action is logged to the audit log as `REISSUE`. Requires OP level 2.
+
+* **`LicenseHelper` (new class):** Shared utility that creates and gives a physical license item to a player. Used by both `giveLicense()` in `RpEssentialsCommands` and `SetPlayerProfilePacket`, ensuring both paths produce an identical item and perform the same side-effects (tag add, cache invalidation, client restriction sync).
+
+* **Cross-midnight schedule support (`RpEssentialsScheduleManager`):** The schedule system now handles sessions that span midnight (e.g. 22:00 → 02:00). Before this fix, players were incorrectly kicked at 00:00 even if the configured closing time was 02:00.
+  - `DaySchedule.isOpen()` now handles both same-day (`open < close`) and cross-midnight (`close < open`) sessions.
+  - New `getActiveSchedule()` method: checks today's session first, then yesterday's if it crosses midnight and is still active.
+  - `minutesUntilClose()` calculates remaining time correctly across midnight.
+  - `tickMidnightSweep()` no longer resets `hasOpenedToday`/`hasClosedToday` if a cross-midnight session is still ongoing at 00:00.
+  - `checkWarnings()` is now based on `minutesUntilClose()` with a 2-minute tolerance window instead of exact clock comparison, preventing missed warnings due to tick granularity.
+  - `isInSlot()` (Death Hours, HRP Hours) reuses `DaySchedule.isOpen()` — cross-midnight support applies to those systems as well.
+
+* **Profession selector revoke button (Profile Manager GUI):** When navigating to a profession the selected player already owns, a **§c✖ Revoke license** button appears between the `◀` and `▶` arrows. Clicking it sends a revoke packet to the server, removes the license, applies the tag removal, marks the physical item as revoked, and updates the local list immediately for visual feedback.
+
+* **Full i18n for admin GUIs:** All previously hardcoded French strings in `ProfessionEditorScreen` and `PlayerProfileScreen` are now translated via the Minecraft language system (`Component.translatable` / `I18n.get`). New keys added to `en_us.json` and `fr_fr.json`:
+  - Color palette: `rpessentials.gui.color.*` (10 colors, shared between both screens)
+  - Profession editor: `rpessentials.gui.profession_editor.*`
+  - Player profile: `rpessentials.gui.player_profile.*`
+  - Shared: `rpessentials.gui.btn_more`
+
+* **Tab autocomplete for restrictions (Profession Editor GUI):** The restriction input field now supports keyboard-driven autocomplete identical to Minecraft command completion.
+  - Typing any character immediately filters the item/block registry.
+  - **Tab** cycles forward through suggestions, **Shift+Tab** cycles backward.
+  - **↓ / ↑** arrows navigate the list.
+  - **Enter** validates and adds the selected suggestion.
+  - **Escape** closes the dropdown without adding.
+  - **Click** on any line also selects it.
+  - The dropdown is rendered as an overlay after `super.render()`, so it always appears above all other widgets and is never hidden behind them.
+  - Two-pass matching: prefix matches first, then contains matches.
+
+* **Full profession list in Profile Manager GUI:** `OpenPlayerProfileGuiPacket.PlayerData` now carries `List<String> currentLicenses` (the complete license list) instead of a single `String currentLicense`. The profession selector navigates all professions; owned ones are shown in red with a `✔ Already owned` indicator. The list of active licenses is displayed below the selector. On load, the cursor starts on the first unowned profession for convenience.
+
+* **Profession save confirmation with summary (`SaveProfessionPacket`):** After saving a profession from the GUI, the admin now receives a detailed confirmation message listing the display name, color preview, and each restriction category with its entry count and the first 3 items (e.g. `Equipment: minecraft:diamond_sword, minecraft:iron_sword (2)`).
+
+---
+
+### Changed
+
+* **`ProfessionEditorScreen` — "New profession" button relocated:** The button has moved from the right-hand form area to the bottom of the left panel (the profession list), which is the more instinctive position since that is where the list of professions lives.
+
+* **`SetPlayerProfilePacket` — full license flow from GUI:** Granting a profession through the Profile Manager GUI now triggers the same complete flow as the `/license give` command: physical item created with correct name/lore/NBT, vanilla scoreboard tag added, cache invalidated, client restriction sync sent. Previously the item was never created and the tag was never set.
+
+* **`SetPlayerProfilePacket` — duplicate license guard:** If the selected player already holds the chosen profession when clicking "Apply", the server returns an informational message to the admin (`already has this license — use /license reissue to give a replacement item`) instead of silently duplicating the entry.
+
+* **`SetPlayerProfilePacket` — `revokeMode` field:** The packet now carries a `boolean revokeMode`. When `true`, the `licenseId` is revoked rather than granted. This cleanly separates the give and revoke paths in a single packet type without needing a second packet.
+
+* **`ProfessionConfig.GLOBAL_UNBREAKABLE_BLOCKS` and `CONTAINER_OPEN_RESTRICTIONS` now shown in item tooltips:** `ProfessionRestrictionEventHandler.onItemTooltip` previously only showed craft, item-use, and equipment restrictions. It now also shows:
+  - `Mining: ✘ — <profession>` for blocks in `globalUnbreakableBlocks`.
+  - `Open: ✘ — <profession>` for containers in `containerOpenRestrictions` (wildcard patterns supported).
+  - The whole method is wrapped in `try/catch (IllegalStateException)` to avoid crashes if the config is not yet loaded at tooltip render time.
+
+---
+
+### Fixed
+
+* **License item name ignoring color code from GUI:** The GUI saves profession colors as `&e`-style codes. `Component.literal()` does not parse `&` or `§` — it renders them as literal characters. `LicenseHelper` now calls `.replace("&", "§")` on the color prefix before passing it through `ColorHelper.parseColors()`, producing a correctly colored item name regardless of whether the code was entered via the GUI (`&e`) or hand-edited in the config (`§e`).
+
+* **Revoked license message displayed twice:** `TempLicenseExpirationManager.markRevokedLicenseItems()` was writing the revoke title and body directly into `DataComponents.LORE`, while `LicenseItem.appendHoverText()` was independently reading the `revoked` flag and appending the same lines at render time. Because the Minecraft tooltip system concatenates lore and `appendHoverText` output, the message appeared twice. `markRevokedLicenseItems()` now only sets the `revoked = true` flag in CUSTOM_DATA and leaves all visual rendering exclusively to `appendHoverText()`.
+
+* **Cross-midnight session players kicked at midnight:** `isServerOpen()` only checked today's `DaySchedule`, so any session defined with `close < open` (e.g. 22:00 → 02:00) would appear closed from 00:00 onwards even though it should remain open until 02:00. Fixed by `getActiveSchedule()` which additionally checks yesterday's schedule for an ongoing cross-midnight session.
+
+* **`SaveProfessionPacket` compilation error:** `String MAX_INLINE = 3;` — incompatible types (`int` assigned to `String`). Fixed to `int max = 3;`.
+
+---
+
+### Technical
+
+* **`LicenseHelper.java`** — new shared class in `net.rp.rpessentials.profession`.
+* **`OpenPlayerProfileGuiPacket.PlayerData`** — `String currentLicense` replaced by `List<String> currentLicenses`. StreamCodec updated accordingly.
+* **`RequestOpenGuiPacket.handlePlayerProfileGui()`** — now populates the full license list via `LicenseManager.getLicenses()`.
+* **`RpEssentialsScheduleManager`** — `getActiveSchedule()` added as the main entry point for all open/close checks. `DaySchedule` gains `crossesMidnight()` and `minutesUntilClose()`. `isInSlot()` refactored to delegate to `DaySchedule.isOpen()`.
+* **`RpEssentials.onServerTick()`** — schedule block updated to use `getActiveSchedule()` for warning and closing detection. Opening detection still uses `getTodaySchedule()` to fire at the correct wall-clock time.
+* **`MessagesConfig`** — three new keys: `LICENSE_REISSUE_STAFF`, `LICENSE_REISSUE_PLAYER`, `LICENSE_REISSUE_NOT_FOUND`.
+
 ## [4.1.2]
 
 **Profession & Restriction System — Complete Overhaul**
