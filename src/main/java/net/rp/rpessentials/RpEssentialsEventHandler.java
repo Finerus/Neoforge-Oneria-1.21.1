@@ -17,7 +17,9 @@ import net.rp.rpessentials.identity.NicknameManager;
 import net.rp.rpessentials.identity.RpEssentialsMessagingManager;
 import net.rp.rpessentials.moderation.LastConnectionManager;
 import net.rp.rpessentials.moderation.MuteManager;
+import net.rp.rpessentials.moderation.WarnManager;
 import net.rp.rpessentials.profession.ProfessionSyncHelper;
+import net.rp.rpessentials.profession.TempLicenseExpirationManager;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -41,7 +43,6 @@ public class RpEssentialsEventHandler {
             return;
         }
 
-        // Feature 7 — notification mute au login
         try {
             if (ModerationConfig.ENABLE_MUTE_SYSTEM.get()
                     && MuteManager.isMuted(player.getUUID())) {
@@ -85,7 +86,27 @@ public class RpEssentialsEventHandler {
             }
         } catch (IllegalStateException ignored) {}
 
-        // Welcome sound
+        TempLicenseExpirationManager.checkOnLogin(player, server);
+
+        TempLicenseExpirationManager.markRevokedLicenseItems(player);
+
+        try {
+            if (ModerationConfig.WARN_AUTO_PURGE_EXPIRED.get()) {
+                WarnManager.purgeExpiredWarns();
+            }
+        } catch (IllegalStateException ignored) {}
+
+        try {
+            if (ModerationConfig.WARN_NOTIFY_ON_JOIN.get()) {
+                int count = WarnManager.getActiveWarns(player.getUUID()).size();
+                if (count > 0) {
+                    String msg = ModerationConfig.WARN_JOIN_MESSAGE.get()
+                            .replace("{count}", String.valueOf(count));
+                    player.sendSystemMessage(ColorHelper.parseColors(msg));
+                }
+            }
+        } catch (IllegalStateException ignored) {}
+
         try {
             String soundId = ScheduleConfig.WELCOME_SOUND.get();
             if (soundId != null && !soundId.isBlank()) {

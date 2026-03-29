@@ -169,6 +169,7 @@ public class MessagesConfig {
     public static final ModConfigSpec.ConfigValue<String> LICENSE_LIST_ALL_NONE;
     public static final ModConfigSpec.ConfigValue<String> LICENSE_LIST_ALL_HEADER;
     public static final ModConfigSpec.ConfigValue<String> LICENSE_LIST_ALL_NONE_FOR_PLAYER;
+    public static final ModConfigSpec.ConfigValue<String> LICENSE_EXPIRED_RP_PLAYER;
 
     // =========================================================================
     // CATEGORY: SETROLE
@@ -762,6 +763,12 @@ public class MessagesConfig {
                         "Placeholders: {player} = player name, {profession} = profession id.")
                 .define("reissueNotFound",
                         "§c[RpEssentials] §f{player} §cdoes not have the §f{profession} §clicense.");
+
+        LICENSE_EXPIRED_RP_PLAYER = BUILDER
+                .comment("Message sent to the player when their RP license expires.",
+                        "Placeholder: {profession} = profession display name.")
+                .define("expiredRpPlayer",
+                        "§cYour §f{profession} §clicense has expired. The item remains in your inventory.");
 
         BUILDER.pop();
 

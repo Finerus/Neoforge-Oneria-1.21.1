@@ -60,5 +60,6 @@
   "rpessentials.gui.player_profile.btn_revoke":         "§c✖ Revoke license",
   "rpessentials.gui.player_profile.btn_apply":          "§a✔ Apply profile",
   "rpessentials.gui.player_profile.btn_close":          "§cClose",
-  "key.rpessentials.open_dice_gui": "Open Dice Roller"
+  "key.rpessentials.open_dice_gui": "Open Dice Roller",
+  "key.rpessentials.open_config_manager_gui": "Open Config Manager [Admin]"
 }

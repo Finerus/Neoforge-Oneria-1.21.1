@@ -22,8 +22,6 @@ import net.rp.rpessentials.profession.ProfessionRestrictionManager;
 import net.rp.rpessentials.profession.TempLicenseExpirationManager;
 import org.slf4j.Logger;
 
-import java.time.DayOfWeek;
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.EnumSet;
 
@@ -35,7 +33,6 @@ public class RpEssentials {
     private int tickCounter = 0;
 
     public RpEssentials(IEventBus modEventBus, ModContainer modContainer) {
-        ConfigMigrator.migrateIfNeeded();
 
         modContainer.registerConfig(ModConfig.Type.SERVER, RpEssentialsConfig.SPEC,     "rpessentials/rpessentials-core.toml");
         modContainer.registerConfig(ModConfig.Type.SERVER, ChatConfig.SPEC,             "rpessentials/rpessentials-chat.toml");
@@ -91,7 +88,6 @@ public class RpEssentials {
     public void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
 
-        // ── TabList blur — toutes les 40 ticks ───────────────────────────────
         if (tickCounter % 40 == 0) {
             try {
                 if (RpEssentialsConfig.ENABLE_BLUR.get()) {
@@ -103,7 +99,6 @@ public class RpEssentials {
             } catch (IllegalStateException ignored) {}
         }
 
-        // ── World Border — offset +13 pour éviter le pic au tick 0 ───────────
         int wbInterval = 40;
         try { wbInterval = RpEssentialsConfig.WORLD_BORDER_CHECK_INTERVAL.get(); }
         catch (IllegalStateException ignored) {}
@@ -111,7 +106,6 @@ public class RpEssentials {
             WorldBorderManager.tick(server);
         }
 
-        // ── Cleanup + Schedule — offset +37 ──────────────────────────────────
         if ((tickCounter + 37) % 400 == 0) {
             ProfessionRestrictionEventHandler.cleanupCaches();
             RpEssentialsPermissions.clearExpiredCache(); // Bug 12
@@ -146,7 +140,6 @@ public class RpEssentials {
             RpEssentialsScheduleManager.tickHrpNotifications(server, now);
         }
 
-        // ── Midnight sweep — offset +97 ──────────────────────────────────────
         if ((tickCounter + 97) % 1200 == 0) {
             LocalTime now = LocalTime.now();
             RpEssentialsScheduleManager.tickMidnightSweep(server);

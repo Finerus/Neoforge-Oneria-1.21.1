@@ -7,24 +7,20 @@ import net.rp.rpessentials.RpEssentials;
 
 /**
  * Définition des touches configurables dans Options > Contrôles.
- * Catégorie : "Oneria RP"
+ * Catégorie : "RP Essentials"
  *
  * Enregistrement via modEventBus.addListener() dans RpEssentials (constructeur),
- * car RegisterKeyMappingsEvent est sur le MOD bus et @EventBusSubscriber(bus = Bus.MOD)
- * est deprecated depuis NeoForge 1.21.1.
+ * car RegisterKeyMappingsEvent est sur le MOD bus.
  */
 public class RpKeyBindings {
 
     public static KeyMapping OPEN_PROFESSION_GUI;
     public static KeyMapping OPEN_PLAYER_PROFILE_GUI;
+    public static KeyMapping OPEN_CONFIG_MANAGER_GUI;
     public static KeyMapping OPEN_DICE_GUI;
 
     public static final String CATEGORY = "key.categories.rpessentials";
 
-    /**
-     * Appelé depuis RpEssentials constructeur :
-     *   modEventBus.addListener(RpKeyBindings::onRegisterKeyMappings);
-     */
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
         OPEN_PROFESSION_GUI = new KeyMapping(
                 "key.rpessentials.open_profession_gui",
@@ -32,12 +28,21 @@ public class RpKeyBindings {
                 InputConstants.UNKNOWN.getValue(),
                 CATEGORY
         );
+
         OPEN_PLAYER_PROFILE_GUI = new KeyMapping(
                 "key.rpessentials.open_player_profile_gui",
                 InputConstants.Type.KEYSYM,
                 InputConstants.UNKNOWN.getValue(),
                 CATEGORY
         );
+
+        OPEN_CONFIG_MANAGER_GUI = new KeyMapping(
+                "key.rpessentials.open_config_manager_gui",
+                InputConstants.Type.KEYSYM,
+                InputConstants.UNKNOWN.getValue(),
+                CATEGORY
+        );
+
         OPEN_DICE_GUI = new KeyMapping(
                 "key.rpessentials.open_dice_gui",
                 InputConstants.Type.KEYSYM,
@@ -47,8 +52,9 @@ public class RpKeyBindings {
 
         event.register(OPEN_PROFESSION_GUI);
         event.register(OPEN_PLAYER_PROFILE_GUI);
+        event.register(OPEN_CONFIG_MANAGER_GUI);
         event.register(OPEN_DICE_GUI);
 
-        RpEssentials.LOGGER.debug("[RPEssentials] Keybindings registered");
+        RpEssentials.LOGGER.debug("[RPEssentials] GUI keybindings registered (including Config Manager)");
     }
 }

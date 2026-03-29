@@ -43,13 +43,7 @@ import net.rp.rpessentials.moderation.*;
 import net.rp.rpessentials.network.HideNametagsPacket;
 import net.rp.rpessentials.profession.*;
 
-import java.util.Map;
-
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @EventBusSubscriber(modid = RpEssentials.MODID)
 public class RpEssentialsCommands {
@@ -108,7 +102,8 @@ public class RpEssentialsCommands {
         // =========================================================================
         // MAIN COMMAND: /rpessentials
         // =========================================================================
-        var rpessentialsRoot = Commands.literal("rpessentials");
+        var rpessentialsRoot = Commands.literal("rpessentials")
+                .requires(source -> source.hasPermission(2));
 
         // -------------------------------------------------------------------------
         // 1. MODULE: CONFIGURATION (Requires OP Level 2)
@@ -592,108 +587,114 @@ public class RpEssentialsCommands {
 
         rpessentialsRoot.then(muteNode);
 
+        rpessentialsRoot.then(Commands.literal("unmute")
+                .requires(src -> RpEssentialsPermissions.isStaff(src.getPlayer()))
+                .then(Commands.argument("player", EntityArgument.player())
+                        .executes(ctx -> {
+                            ServerPlayer target = EntityArgument.getPlayer(ctx, "player");
+                            MuteManager.unmute(target.getUUID());
+                            ctx.getSource().sendSuccess(() -> Component.literal(
+                                    MessagesConfig.get(MessagesConfig.MUTE_STAFF_REMOVED,
+                                            "player", target.getName().getString())), true);
+                            target.sendSystemMessage(Component.literal(
+                                    MessagesConfig.get(MessagesConfig.MUTE_EXPIRED)));
+                            return 1;
+                        })));
+
+        rpessentialsRoot.then(Commands.literal("inspect")
+                .requires(src -> RpEssentialsPermissions.isStaff(src.getPlayer()))
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            // Joueurs online
+                            ctx.getSource().getServer().getPlayerList().getPlayers()
+                                    .forEach(p -> builder.suggest(p.getName().getString()));
+                            // Joueurs offline connus
+                            LastConnectionManager.getAllSortedByLogin().stream()
+                                    .map(e -> e.getValue().mcName)
+                                    .filter(Objects::nonNull)
+                                    .forEach(builder::suggest);
+                            return builder.buildFuture();
+                        })
+                        .executes(RpEssentialsCommands::inspectPlayer)));
+
         rpessentialsRoot.then(Commands.literal("stats")
                 .requires(src -> RpEssentialsPermissions.isStaff(src.getPlayer()))
                 .executes(RpEssentialsCommands::showStats));
 
+
         // -------------------------------------------------------------------------
-        // 3. MODULE: WHITELIST (Requires OP Level 2)
+        // 3. BLUR TAB
         // -------------------------------------------------------------------------
-        var whitelistNode = Commands.literal("whitelist")
+        var blurtabNode = Commands.literal("blurtab")
                 .requires(source -> source.hasPermission(2));
 
-        // Add - avec autocomplétion des joueurs connectés
-        whitelistNode.then(Commands.literal("add")
+        // Whitelist
+        var blurWhitelistNode = Commands.literal("whitelist");
+        blurWhitelistNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
-                                    builder.suggest(p.getName().getString())
-                            );
+                            ctx.getSource().getServer().getPlayerList().getPlayers()
+                                    .forEach(p -> builder.suggest(p.getName().getString()));
                             return builder.buildFuture();
                         })
                         .executes(RpEssentialsCommands::addToWhitelist)));
-
-        // Remove - avec autocomplétion des joueurs dans la whitelist
-        whitelistNode.then(Commands.literal("remove")
+        blurWhitelistNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
                             RpEssentialsConfig.WHITELIST.get().forEach(builder::suggest);
                             return builder.buildFuture();
                         })
                         .executes(RpEssentialsCommands::removeFromWhitelist)));
-
-        whitelistNode.then(Commands.literal("list")
+        blurWhitelistNode.then(Commands.literal("list")
                 .executes(RpEssentialsCommands::listWhitelist));
+        blurtabNode.then(blurWhitelistNode);
 
-        rpessentialsRoot.then(whitelistNode);
-
-        // -------------------------------------------------------------------------
-        // 4. MODULE: BLACKLIST (Requires OP Level 2)
-        // -------------------------------------------------------------------------
-        var blacklistNode = Commands.literal("blacklist")
-                .requires(source -> source.hasPermission(2));
-
-        // Add - avec autocomplétion des joueurs connectés
-        blacklistNode.then(Commands.literal("add")
+        // Blacklist
+        var blurBlacklistNode = Commands.literal("blacklist");
+        blurBlacklistNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
-                                    builder.suggest(p.getName().getString())
-                            );
+                            ctx.getSource().getServer().getPlayerList().getPlayers()
+                                    .forEach(p -> builder.suggest(p.getName().getString()));
                             return builder.buildFuture();
                         })
                         .executes(RpEssentialsCommands::addToBlacklist)));
-
-        // Remove - avec autocomplétion des joueurs dans la blacklist
-        blacklistNode.then(Commands.literal("remove")
+        blurBlacklistNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
                             RpEssentialsConfig.BLACKLIST.get().forEach(builder::suggest);
                             return builder.buildFuture();
                         })
                         .executes(RpEssentialsCommands::removeFromBlacklist)));
-
-        blacklistNode.then(Commands.literal("list")
+        blurBlacklistNode.then(Commands.literal("list")
                 .executes(RpEssentialsCommands::listBlacklist));
+        blurtabNode.then(blurBlacklistNode);
 
-        rpessentialsRoot.then(blacklistNode);
-
-        // -------------------------------------------------------------------------
-        // 5. MODULE: ALWAYS VISIBLE LIST (Requires OP Level 2)
-        // -------------------------------------------------------------------------
-        var alwaysVisibleNode = Commands.literal("alwaysvisible")
-                .requires(source -> source.hasPermission(2));
-
-        // Add - avec autocomplétion des joueurs connectés
-        alwaysVisibleNode.then(Commands.literal("add")
+        // Always Visible
+        var blurAlwaysVisibleNode = Commands.literal("alwaysvisible");
+        blurAlwaysVisibleNode.then(Commands.literal("add")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
-                            ctx.getSource().getServer().getPlayerList().getPlayers().forEach(p ->
-                                    builder.suggest(p.getName().getString())
-                            );
+                            ctx.getSource().getServer().getPlayerList().getPlayers()
+                                    .forEach(p -> builder.suggest(p.getName().getString()));
                             return builder.buildFuture();
                         })
                         .executes(RpEssentialsCommands::addToAlwaysVisible)));
-
-        // Remove - avec autocomplétion des joueurs dans la always visible list
-        alwaysVisibleNode.then(Commands.literal("remove")
+        blurAlwaysVisibleNode.then(Commands.literal("remove")
                 .then(Commands.argument("player", StringArgumentType.string())
                         .suggests((ctx, builder) -> {
                             try {
-                                if (RpEssentialsConfig.ALWAYS_VISIBLE_LIST != null) {
+                                if (RpEssentialsConfig.ALWAYS_VISIBLE_LIST != null)
                                     RpEssentialsConfig.ALWAYS_VISIBLE_LIST.get().forEach(builder::suggest);
-                                }
-                            } catch (Exception e) {
-                                // Config pas chargée
-                            }
+                            } catch (Exception ignored) {}
                             return builder.buildFuture();
                         })
                         .executes(RpEssentialsCommands::removeFromAlwaysVisible)));
-
-        alwaysVisibleNode.then(Commands.literal("list")
+        blurAlwaysVisibleNode.then(Commands.literal("list")
                 .executes(RpEssentialsCommands::listAlwaysVisible));
+        blurtabNode.then(blurAlwaysVisibleNode);
 
-        rpessentialsRoot.then(alwaysVisibleNode);
+        rpessentialsRoot.then(blurtabNode);
 
         // -------------------------------------------------------------------------
         // 6. MODULE: LICENSE (Requires OP Level 2)
@@ -861,10 +862,6 @@ public class RpEssentialsCommands {
         // -------------------------------------------------------------------------
         // 9. MODULE: SCHEDULE (Public)
         // -------------------------------------------------------------------------
-        rpessentialsRoot.then(Commands.literal("schedule")
-                .executes(RpEssentialsCommands::showSchedule));
-
-        // Remplacer setOpeningTime et setClosingTime par :
         setNode.then(Commands.literal("scheduleDay")
                 .then(Commands.argument("day", StringArgumentType.word())
                         .suggests((ctx, builder) -> {
@@ -1014,14 +1011,13 @@ public class RpEssentialsCommands {
                             return RpEssentialsMessagingManager.reply(sender, msg, ctx.getSource().getServer());
                         })));
 
-        // Remplace /list vanilla
         dispatcher.getRoot().getChildren().removeIf(node -> node.getName().equals("list"));
         dispatcher.register(Commands.literal("list")
                 .executes(RpEssentialsCommands::playerList));
 
-        // /rpessentials help
         rpessentialsRoot.then(Commands.literal("help")
-                .executes(RpEssentialsCommands::showHelp));
+                .requires(src -> RpEssentialsPermissions.isStaff(src.getPlayer()))
+                .executes(ctx -> RpEssentialsCommands.showHelpPublic(ctx, true)));
 
         // -------------------------------------------------------------------------
         // MODULE: LAST CONNECTION (Requires isStaff)
@@ -2325,8 +2321,7 @@ public class RpEssentialsCommands {
         return 1;
     }
 
-    private static int showHelp(CommandContext<CommandSourceStack> ctx) {
-        boolean isStaff = RpEssentialsPermissions.isStaff(ctx.getSource().getPlayer());
+    public static int showHelpPublic(CommandContext<CommandSourceStack> ctx, boolean isStaff) {
         StringBuilder sb = new StringBuilder();
         sb.append("§6╔═══════════════════════════════════╗\n");
         sb.append(MessagesConfig.get(MessagesConfig.HELP_TITLE)).append("\n");
@@ -2649,6 +2644,90 @@ public class RpEssentialsCommands {
         return 1;
     }
 
+    private static int inspectPlayer(CommandContext<CommandSourceStack> ctx) {
+        String targetName = StringArgumentType.getString(ctx, "player");
+        MinecraftServer server = ctx.getSource().getServer();
+
+        ServerPlayer online = server.getPlayerList().getPlayerByName(targetName);
+        UUID uuid = online != null ? online.getUUID() : LastConnectionManager.findUUIDByName(targetName);
+
+        if (uuid == null) {
+            ctx.getSource().sendFailure(Component.literal("§c[Inspect] Player not found: " + targetName));
+            return 0;
+        }
+
+        List<String> licenses     = LicenseManager.getLicenses(uuid);
+        List<WarnManager.WarnEntry> activeWarns = WarnManager.getActiveWarns(uuid);
+        MuteManager.MuteEntry mute = MuteManager.getEntry(uuid);
+        String nickname            = NicknameManager.getNickname(uuid);
+        LastConnectionManager.ConnectionEntry conn = LastConnectionManager.getEntry(uuid);
+        List<NoteManager.NoteEntry> notes = NoteManager.getNotes(uuid);
+        boolean isMuted            = MuteManager.isMuted(uuid);
+        boolean isOnline           = online != null;
+
+        // Rôle
+        String role = "§8—";
+        if (online != null) {
+            try {
+                for (String entry : RpEssentialsConfig.ROLES.get()) {
+                    String roleId = entry.split(";", 2)[0].trim();
+                    if (online.getTags().contains(roleId)) { role = "§f" + roleId; break; }
+                }
+            } catch (IllegalStateException ignored) {}
+        }
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("§6╔═════ §eInspect: §f").append(targetName).append(" §6═════╗\n");
+        sb.append("§6║ §7Status   : ").append(isOnline ? "§a● Online" : "§7○ Offline").append("\n");
+        sb.append("§6║ §7Nickname : ").append(nickname != null ? nickname : "§8—").append("\n");
+        sb.append("§6║ §7Role     : ").append(role).append("\n");
+        sb.append("§6║ §7UUID     : §8").append(uuid).append("\n");
+        sb.append("§6╠═══════════════════════════════╣\n");
+
+        // Licences
+        sb.append("§6║ §eLicenses (").append(licenses.size()).append(")§7: ");
+        if (licenses.isEmpty()) sb.append("§8None");
+        else {
+            for (int i = 0; i < licenses.size(); i++) {
+                String expiry = LicenseManager.getTempExpirationDate(uuid, licenses.get(i));
+                sb.append("§f").append(licenses.get(i));
+                if (expiry != null) sb.append("§8(RP:").append(expiry).append(")");
+                if (i < licenses.size() - 1) sb.append("§7, ");
+            }
+        }
+        sb.append("\n");
+
+        // Warns
+        sb.append("§6║ §eWarns (").append(activeWarns.size()).append(" active)§7: ");
+        if (activeWarns.isEmpty()) sb.append("§aNone");
+        else activeWarns.forEach(w -> sb.append("\n§6║   §c#").append(w.id).append(" §7").append(w.reason));
+        sb.append("\n");
+
+        // Mute
+        sb.append("§6║ §eMute     : ");
+        if (isMuted && mute != null) sb.append("§c").append(mute.getFormattedExpiry()).append(" — §f").append(mute.reason);
+        else sb.append("§aNone");
+        sb.append("\n");
+
+        // Connexion
+        sb.append("§6║ §eLast seen : §f")
+                .append(conn != null && conn.lastLogin != null ? conn.lastLogin : "§8Unknown")
+                .append("\n");
+
+        // Notes
+        if (!notes.isEmpty()) {
+            sb.append("§6╠═══════════════════════════════╣\n");
+            sb.append("§6║ §eNotes (").append(notes.size()).append("):\n");
+            notes.forEach(n -> sb.append("§6║  §8#").append(n.id).append(" §7by §f").append(n.authorName)
+                    .append("§7: §f").append(n.text).append("\n"));
+        }
+
+        sb.append("§6╚═══════════════════════════════╝");
+        String msg = sb.toString();
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
+        return 1;
+    }
+
     // =========================================================================
     // LAST CONNECTION — implémentation
     // =========================================================================
@@ -2761,10 +2840,6 @@ public class RpEssentialsCommands {
         ctx.getSource().sendSuccess(() -> Component.literal(finalMsg), false);
         return 1;
     }
-
-    // =========================================================================
-    // WARN — implémentation
-    // =========================================================================
 
     // =========================================================================
     // WARN — warnSystemCheck (correction)

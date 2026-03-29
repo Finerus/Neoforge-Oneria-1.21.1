@@ -1,8 +1,12 @@
+// ─── ClientGuiOpener.java ────────────────────────────────────────────────────
+// Replace the existing file with this version that adds openConfigManagerGui()
+
 package net.rp.rpessentials.network;
 
 import net.minecraft.client.Minecraft;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.rp.rpessentials.client.gui.ConfigManagerScreen;
 import net.rp.rpessentials.client.gui.PlayerProfileScreen;
 import net.rp.rpessentials.client.gui.ProfessionEditorScreen;
 
@@ -25,5 +29,13 @@ public class ClientGuiOpener {
             List<String> professionIds,
             List<String> roles) {
         Minecraft.getInstance().setScreen(new PlayerProfileScreen(players, professionIds, roles));
+    }
+
+    /**
+     * Opens the Config Manager GUI with the given list of available config files.
+     * The screen will request individual file entries from the server on demand.
+     */
+    public static void openConfigManagerGui(List<ConfigGuiFilesPacket.FileEntry> files) {
+        Minecraft.getInstance().setScreen(new ConfigManagerScreen(files));
     }
 }

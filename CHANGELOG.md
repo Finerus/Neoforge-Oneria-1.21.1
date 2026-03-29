@@ -1,6 +1,77 @@
 # Changelog - Rp Essentials
 All notable changes to this project will be documented in this file.
 
+## [4.1.5]
+
+**Login fixes, command reorganization, Config Manager GUI, new inspect command.**
+
+---
+
+### Fixed
+
+* **Missing login triggers:** Several systems were never triggered on player login:
+  - `TempLicenseExpirationManager.checkOnLogin()` was never called — RP licenses would only expire at midnight sweep, never on login.
+  - `TempLicenseExpirationManager.markRevokedLicenseItems()` was never called on login — revoked items were not visually marked.
+  - `WARN_AUTO_PURGE_EXPIRED` was not respected on login despite being configurable.
+  - `WARN_NOTIFY_ON_JOIN` was not respected on login — players were never notified of their active warns on connection.
+* **Duplicate `NicknameNametagHandler`:** The class was still present and subscribed to the same `RenderNameTagEvent` as `ClientNametagRenderer`, causing a non-deterministic race condition on nametag display. `NicknameNametagHandler` has been removed — `ClientNametagRenderer` is now the sole handler.
+* **Hardcoded RP license expiration message:** The message sent to the player on automatic RP license expiration was hardcoded in French inside `TempLicenseExpirationManager`. It now uses `MessagesConfig.LICENSE_EXPIRED_RP_PLAYER`. Available placeholder: `{profession}`.
+* **Config Manager comment tooltip hidden behind widgets:** The ℹ comment tooltip in the Config Manager GUI was rendered before `super.render()`, causing EditBox and Button widgets to draw on top of it. Tooltip rendering is now deferred to after `super.render()` using a stored pending-tooltip state, so it always appears above all other widgets.
+
+---
+
+### Changed
+
+* **`/rpessentials` — restricted access:** The root command `/rpessentials` now requires OP level 2. It no longer appears in tab-completion for players without permission.
+* **BlurTab command reorganization:** `/rpessentials whitelist`, `/rpessentials blacklist` and `/rpessentials alwaysvisible` have been grouped under `/rpessentials blurtab`:
+  - `/rpessentials blurtab whitelist add/remove/list`
+  - `/rpessentials blurtab blacklist add/remove/list`
+  - `/rpessentials blurtab alwaysvisible add/remove/list`
+* **Schedule and help commands moved:** `/rpessentials schedule` has been removed — `/schedule` and `/horaires` standalone aliases remain unchanged. `/rpessentials help` has been moved to `/rp help`, accessible to all players (staff section only visible to staff). `/rpessentials help` optionally remains as a staff-only alias.
+* **`ConfigMigrator` removed:** The automatic migration utility has been removed entirely as all servers are expected to already be on the `rpessentials/` config and data structure.
+
+---
+
+### Added
+
+* **Config Manager GUI:** New in-game interface that exposes all six config files in a single dynamic screen, with no code changes required when adding new config entries.
+  - File panel on the left (Core, Chat, Schedule, Moderation, Professions, Messages) — click to load a file.
+  - Entries are loaded on demand (file by file) via network packets to avoid oversized payloads.
+  - Widgets auto-adapt to the value type: toggle button for BOOLEAN, numeric EditBox with range hint `[min – max]` for INT/DOUBLE/LONG, wide EditBox for STRING, comma-separated EditBox + **Edit** button (opens a sub-screen with add/remove/reorder per line) for LIST_STRING.
+  - `§8ℹ` indicator on each entry — hover to display the full comment from the config spec, word-wrapped and rendered above all widgets.
+  - `§8↺` reset-to-default button on each entry.
+  - Pending changes highlighted in yellow; unsaved count shown in the header.
+  - **Apply** sends only modified entries to the server; server validates, saves, and responds with updated values.
+  - Opened via a configurable keybinding: Options → Controls → RP Essentials → *Open Config Manager [Admin]*.
+  - Fully dynamic: adding a `ConfigValue` field to any config class automatically makes it appear in the GUI.
+
+* **`/rpessentials inspect <player>` (Staff):** New all-in-one command displaying a complete overview of a player in a single output — online status, nickname, role, UUID, active licenses (with RP expiry dates), active warns with reasons, mute status, last connection, and staff notes. Works on both online and offline players known to the last connection system.
+
+---
+
+### Technical
+
+* **New classes:**
+  - `ConfigInspector` — server-side dynamic introspection of all `ModConfigSpec` instances via Java reflection. Enumerates fields, extracts comments and defaults via Night Config `UnmodifiableConfig.get(path)`, detects value types, serializes/deserializes values. Adding new config fields requires no changes here.
+  - `ConfigGuiFilesPacket` (S→C) — sends the lightweight list of available config files.
+  - `RequestConfigFilePacket` (C→S) — client requests entries for one specific file.
+  - `ConfigFileEntriesPacket` (S→C) — response containing all entries for the requested file.
+  - `SaveConfigEntriesPacket` (C→S) — client sends `{fullPath → newValue}` map for all pending changes.
+  - `ConfigManagerScreen` — client-only `Screen` with file panel, scrollable entry list, deferred tooltip rendering, list editor sub-screen.
+* `NetworkHandler` — registered four new Config Manager packets.
+* `RequestOpenGuiPacket.GuiType` — added `CONFIG_MANAGER` variant.
+* `RpKeyBindings` — added `OPEN_CONFIG_MANAGER_GUI` keybinding.
+* `RpClientTickHandler` — handles `OPEN_CONFIG_MANAGER_GUI` key press.
+* `ClientGuiOpener` — added `openConfigManagerGui()`.
+* `RpEssentialsEventHandler.onPlayerLogin` — added calls to `TempLicenseExpirationManager.checkOnLogin()`, `markRevokedLicenseItems()`, warn auto-purge and warn join notification.
+* `NicknameNametagHandler` — class deleted.
+* `MessagesConfig` — new key `LICENSE_EXPIRED_RP_PLAYER` in the `[Licenses]` section.
+* `RpEssentialsCommands` — root node now requires OP 2. BlurTab reorganization. `inspectPlayer()` handler added.
+* `RpEssentialsRpCommands` — `/rp help` added.
+* `en_us.json` / `fr_fr.json` — new key `key.rpessentials.open_config_manager_gui`.
+
+---
+
 ## [4.1.4]
 
 **Bug blitz & RP features — proximity chat, mute system, staff notes, dice rolls, and more.**

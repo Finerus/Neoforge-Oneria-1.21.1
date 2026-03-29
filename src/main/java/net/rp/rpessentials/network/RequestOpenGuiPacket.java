@@ -8,6 +8,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+import net.rp.rpessentials.config.ConfigInspector;
 import net.rp.rpessentials.profession.LicenseManager;
 import net.rp.rpessentials.identity.NicknameManager;
 import net.rp.rpessentials.config.ProfessionConfig;
@@ -26,7 +27,7 @@ import java.util.UUID;
  */
 public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPayload {
 
-    public enum GuiType { PROFESSION, PLAYER_PROFILE }
+    public enum GuiType { PROFESSION, PLAYER_PROFILE, CONFIG_MANAGER }
 
     public static final Type<RequestOpenGuiPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(RpEssentials.MODID, "request_open_gui"));
@@ -56,8 +57,9 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
             if (!RpEssentialsPermissions.isStaff(player)) return;
 
             switch (packet.guiType()) {
-                case PROFESSION     -> handleProfessionGui(player);
-                case PLAYER_PROFILE -> handlePlayerProfileGui(player);
+                case PROFESSION      -> handleProfessionGui(player);
+                case PLAYER_PROFILE  -> handlePlayerProfileGui(player);
+                case CONFIG_MANAGER  -> handleConfigManagerGui(player);
             }
         });
     }
@@ -112,37 +114,31 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
     private static void handlePlayerProfileGui(ServerPlayer admin) {
         MinecraftServer server = admin.getServer();
 
-        // ── Liste des joueurs connectés ────────────────────────────────────────
         List<OpenPlayerProfileGuiPacket.PlayerData> players = new ArrayList<>();
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             UUID uuid     = p.getUUID();
             String mcName = p.getGameProfile().getName();
             String nick   = NicknameManager.hasNickname(uuid) ? NicknameManager.getNickname(uuid) : "";
             String role   = detectCurrentRole(p);
-            // Full license list (not just the first one)
             List<String> licenses = LicenseManager.getLicenses(uuid);
             players.add(new OpenPlayerProfileGuiPacket.PlayerData(uuid, mcName, nick, role, licenses));
         }
 
-        // ── IDs de professions disponibles ────────────────────────────────────
         List<String> professionIds = new ArrayList<>();
         try {
             for (String line : ProfessionConfig.PROFESSIONS.get()) {
                 String[] parts = line.split(";", 2);
-                if (parts.length >= 1 && !parts[0].trim().isEmpty()) {
+                if (parts.length >= 1 && !parts[0].trim().isEmpty())
                     professionIds.add(parts[0].trim());
-                }
             }
         } catch (IllegalStateException ignored) {}
 
-        // ── Rôles configurés ──────────────────────────────────────────────────
         List<String> roleIds = new ArrayList<>();
         try {
             for (String entry : RpEssentialsConfig.ROLES.get()) {
                 String[] parts = entry.split(";", 2);
-                if (parts.length >= 1 && !parts[0].trim().isEmpty()) {
+                if (parts.length >= 1 && !parts[0].trim().isEmpty())
                     roleIds.add(parts[0].trim());
-                }
             }
         } catch (IllegalStateException ignored) {}
 
@@ -161,5 +157,24 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
             }
         } catch (IllegalStateException ignored) {}
         return "";
+    }
+
+    // ── GUI Config Manager ─────────────────────────────────────────────────────
+
+    /**
+     * Sends the lightweight list of config files to the client.
+     * The client will request individual file entries on demand.
+     */
+    private static void handleConfigManagerGui(ServerPlayer player) {
+        List<ConfigInspector.FileInfo> fileInfos = ConfigInspector.getFileInfos();
+
+        List<ConfigGuiFilesPacket.FileEntry> entries = fileInfos.stream()
+                .map(fi -> new ConfigGuiFilesPacket.FileEntry(fi.id(), fi.displayName()))
+                .toList();
+
+        PacketDistributor.sendToPlayer(player, new ConfigGuiFilesPacket(entries));
+
+        RpEssentials.LOGGER.debug("[ConfigGUI] Sent {} config files to {}",
+                entries.size(), player.getName().getString());
     }
 }

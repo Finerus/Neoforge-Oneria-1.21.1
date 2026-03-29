@@ -17,14 +17,11 @@ public class NetworkHandler {
     public static void register(RegisterPayloadHandlersEvent event) {
         PayloadRegistrar registrar = event.registrar("1");
 
-        // ── Sync données nametag individuelles (nickname, prefix, profession...) ───
+        // ── Nametag sync ──────────────────────────────────────────────────────
         registrar.playToClient(
                 SyncNametagDataPacket.TYPE,
                 SyncNametagDataPacket.CODEC,
-                new DirectionalPayloadHandler<>(
-                        SyncNametagDataPacket::handle,
-                        null
-                )
+                new DirectionalPayloadHandler<>(SyncNametagDataPacket::handle, null)
         );
 
         registrar.playToClient(
@@ -37,23 +34,16 @@ public class NetworkHandler {
                 )
         );
 
-        registrar.playToServer(
-                DiceRollPacket.TYPE,
-                DiceRollPacket.STREAM_CODEC,
-                new DirectionalPayloadHandler<>(null, DiceRollPacket::handleOnServer)
-        );
-
-        // ── Restrictions métiers ──────────────────────────────────────────────────
+        // ── Profession restrictions ───────────────────────────────────────────
         registrar.playToClient(
                 SyncProfessionRestrictionsPacket.TYPE,
                 SyncProfessionRestrictionsPacket.STREAM_CODEC,
                 new DirectionalPayloadHandler<>(
-                        NetworkHandler::handleSyncProfessionRestrictions,
-                        null
+                        NetworkHandler::handleSyncProfessionRestrictions, null
                 )
         );
 
-        // ── Packets GUI admin ─────────────────────────────────────────────────────
+        // ── Admin GUI — Profession editor & Player profile ────────────────────
         registrar.playToServer(
                 RequestOpenGuiPacket.TYPE,
                 RequestOpenGuiPacket.STREAM_CODEC,
@@ -83,12 +73,49 @@ public class NetworkHandler {
                 SetPlayerProfilePacket.STREAM_CODEC,
                 new DirectionalPayloadHandler<>(null, SetPlayerProfilePacket::handleOnServer)
         );
+
+        // ── Config Manager GUI ────────────────────────────────────────────────
+        // S→C: initial file list
+        registrar.playToClient(
+                ConfigGuiFilesPacket.TYPE,
+                ConfigGuiFilesPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(ConfigGuiFilesPacket::handleOnClient, null)
+        );
+
+        // C→S: request entries for one file
+        registrar.playToServer(
+                RequestConfigFilePacket.TYPE,
+                RequestConfigFilePacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(null, RequestConfigFilePacket::handleOnServer)
+        );
+
+        registrar.playToServer(
+                DiceRollPacket.TYPE,
+                DiceRollPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(null, DiceRollPacket::handleOnServer)
+        );
+
+        // S→C: entries for one file
+        registrar.playToClient(
+                ConfigFileEntriesPacket.TYPE,
+                ConfigFileEntriesPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(ConfigFileEntriesPacket::handleOnClient, null)
+        );
+
+        // C→S: apply changes
+        registrar.playToServer(
+                SaveConfigEntriesPacket.TYPE,
+                SaveConfigEntriesPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(null, SaveConfigEntriesPacket::handleOnServer)
+        );
     }
 
-    private static void handleSyncProfessionRestrictions(SyncProfessionRestrictionsPacket packet,
-                                                         net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+    private static void handleSyncProfessionRestrictions(
+            SyncProfessionRestrictionsPacket packet,
+            net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            ClientProfessionRestrictions.updateRestrictions(packet.blockedCrafts(), packet.blockedEquipment());
+            ClientProfessionRestrictions.updateRestrictions(
+                    packet.blockedCrafts(), packet.blockedEquipment());
             RpEssentials.LOGGER.info("[Profession] Synced restrictions — {} crafts, {} equipment blocked",
                     packet.blockedCrafts().size(), packet.blockedEquipment().size());
         });

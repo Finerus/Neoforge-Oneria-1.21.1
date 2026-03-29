@@ -1,5 +1,6 @@
 package net.rp.rpessentials.profession;
 
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.rp.rpessentials.RpEssentials;
@@ -99,8 +100,8 @@ public class TempLicenseExpirationManager {
             ProfessionRestrictionManager.ProfessionData d =
                     ProfessionRestrictionManager.getProfessionData(e.profession);
             String name = d != null ? d.getFormattedName() : e.profession;
-            online.sendSystemMessage(net.minecraft.network.chat.Component.literal(
-                    "§cVotre permis de " + name + "§c a expiré. L'item reste dans votre inventaire."));
+            online.sendSystemMessage(Component.literal(
+                    MessagesConfig.get(MessagesConfig.LICENSE_EXPIRED_RP_PLAYER, "profession", name)));
         }
         LicenseManager.logActionSystem("EXPIRE_RP", e.targetName, e.targetUUID, e.profession, "Expire le " + e.expiresAt);
         RpEssentials.LOGGER.info("[TempLicenseExpiration] Expired '{}' for {}", e.profession, e.targetName);

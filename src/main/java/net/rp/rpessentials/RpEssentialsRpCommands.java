@@ -52,6 +52,12 @@ public class RpEssentialsRpCommands {
         rpRoot.then(Commands.literal("afk")
                 .executes(RpEssentialsRpCommands::executeAfk));
 
+        rpRoot.then(Commands.literal("help")
+                .executes(ctx -> {
+                    boolean isStaff = RpEssentialsPermissions.isStaff(ctx.getSource().getPlayer());
+                    return RpEssentialsCommands.showHelpPublic(ctx, isStaff);
+                }));
+
         // /rp commerce <message>
         rpRoot.then(Commands.literal("commerce")
                 .then(Commands.argument("message", StringArgumentType.greedyString())
