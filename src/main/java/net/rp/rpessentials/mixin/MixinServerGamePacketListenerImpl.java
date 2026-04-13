@@ -16,15 +16,17 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Intercepte le chat pour appliquer le formatage personnalisé.
+ *
+ * 4.1.6 : le format du spy log de proximité utilise resolveRpPlaceholders
+ * pour supporter {player}/{nick}/{real}/{nick_real}.
+ */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class MixinServerGamePacketListenerImpl {
 
-    @Shadow
-    public ServerPlayer player;
+    @Shadow public ServerPlayer player;
 
-    /**
-     * Intercepte l'envoi des messages de chat pour appliquer le formatage personnalisé
-     */
     @Inject(
             method = "broadcastChatMessage",
             at = @At("HEAD"),
@@ -39,7 +41,7 @@ public abstract class MixinServerGamePacketListenerImpl {
 
         ci.cancel();
 
-        // Feature 7 — vérification du mute
+        // Vérification mute
         if (MuteManager.isMuted(player.getUUID())) {
             MuteManager.MuteEntry entry = MuteManager.getEntry(player.getUUID());
             if (entry != null) {
@@ -50,27 +52,22 @@ public abstract class MixinServerGamePacketListenerImpl {
             return;
         }
 
-        // Feature 1 — chat de proximité
+        // Chat de proximité
         boolean proximityEnabled;
-        try {
-            proximityEnabled = ChatConfig.ENABLE_PROXIMITY_CHAT.get();
-        } catch (IllegalStateException e) {
-            proximityEnabled = false;
-        }
+        try { proximityEnabled = ChatConfig.ENABLE_PROXIMITY_CHAT.get(); }
+        catch (IllegalStateException e) { proximityEnabled = false; }
 
-        boolean isGlobal = !proximityEnabled;
-        String actualMessage = message;
+        boolean isGlobal      = !proximityEnabled;
+        String  actualMessage = message;
 
         if (proximityEnabled) {
             try {
-                String bypassPrefix = ChatConfig.PROXIMITY_CHAT_BYPASS_PREFIX.get();
-                if (message.startsWith(bypassPrefix)) {
-                    actualMessage = message.substring(bypassPrefix.length());
-                    isGlobal = true;
+                String bypass = ChatConfig.PROXIMITY_CHAT_BYPASS_PREFIX.get();
+                if (message.startsWith(bypass)) {
+                    actualMessage = message.substring(bypass.length());
+                    isGlobal      = true;
                 }
-            } catch (IllegalStateException ignored) {
-                isGlobal = true;
-            }
+            } catch (IllegalStateException ignored) { isGlobal = true; }
         }
 
         Component formatted = RpEssentialsChatFormatter.formatChatMessage(player, actualMessage, isGlobal);
@@ -78,11 +75,9 @@ public abstract class MixinServerGamePacketListenerImpl {
         if (isGlobal) {
             player.getServer().getPlayerList().broadcastSystemMessage(formatted, false);
         } else {
-            // Broadcast de proximité
             int distance;
             try { distance = ChatConfig.PROXIMITY_CHAT_DISTANCE.get(); }
             catch (IllegalStateException e) { distance = 32; }
-
             double distSq = (double) distance * distance;
 
             for (ServerPlayer p : player.getServer().getPlayerList().getPlayers()) {
@@ -92,18 +87,19 @@ public abstract class MixinServerGamePacketListenerImpl {
                 }
             }
 
-            // Staff spy — les staffs hors portée voient le message avec indicateur
-            String spyMsg = MessagesConfig.get(MessagesConfig.PROXIMITY_CHAT_SPY_FORMAT,
-                    "player", net.rp.rpessentials.identity.NicknameManager.getDisplayName(player),
-                    "msg", actualMessage,
+            // Spy staff hors portée — résolution complète des placeholders
+            String rawSpy = MessagesConfig.get(MessagesConfig.PROXIMITY_CHAT_SPY_FORMAT,
+                    "msg",      actualMessage,
                     "distance", String.valueOf(distance));
-            Component spyFormatted = ColorHelper.parseColors(spyMsg);
+            // Support {player}/{nick}/{real}/{nick_real} dans le format spy
+            rawSpy = RpEssentialsChatFormatter.resolveRpPlaceholders(rawSpy, player);
+            Component spyComp = ColorHelper.parseColors(rawSpy);
 
             for (ServerPlayer p : player.getServer().getPlayerList().getPlayers()) {
                 if (RpEssentialsPermissions.isStaff(p)
                         && !p.getUUID().equals(player.getUUID())
                         && (p.level() != player.level() || p.distanceToSqr(player) > distSq)) {
-                    p.sendSystemMessage(spyFormatted);
+                    p.sendSystemMessage(spyComp);
                 }
             }
         }

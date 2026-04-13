@@ -8,22 +8,21 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
-import net.rp.rpessentials.config.ConfigInspector;
-import net.rp.rpessentials.profession.LicenseManager;
-import net.rp.rpessentials.identity.NicknameManager;
-import net.rp.rpessentials.config.ProfessionConfig;
 import net.rp.rpessentials.RpEssentials;
-import net.rp.rpessentials.config.RpEssentialsConfig;
 import net.rp.rpessentials.RpEssentialsPermissions;
+import net.rp.rpessentials.config.ConfigInspector;
+import net.rp.rpessentials.config.ProfessionConfig;
+import net.rp.rpessentials.config.RpEssentialsConfig;
+import net.rp.rpessentials.identity.NicknameManager;
+import net.rp.rpessentials.moderation.*;
+import net.rp.rpessentials.profession.LicenseManager;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 /**
- * Packet CLIENT → SERVEUR
- * Envoyé quand l'admin appuie sur une touche de raccourci GUI.
- * Le serveur vérifie isStaff() avant de répondre.
+ * Packet CLIENT → SERVEUR : demande d'ouverture d'un GUI admin.
  */
 public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPayload {
 
@@ -68,16 +67,13 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
 
     private static void handleProfessionGui(ServerPlayer player) {
         List<OpenProfessionGuiPacket.ProfessionEntry> entries = new ArrayList<>();
-
         try {
-            List<? extends String> raw = ProfessionConfig.PROFESSIONS.get();
-            for (String line : raw) {
+            for (String line : ProfessionConfig.PROFESSIONS.get()) {
                 String[] parts = line.split(";", 3);
                 if (parts.length == 3) {
                     String id    = parts[0].trim();
                     String name  = parts[1].trim();
                     String color = parts[2].trim();
-
                     entries.add(new OpenProfessionGuiPacket.ProfessionEntry(
                             id, name, color,
                             collectForProfession(id, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get()),
@@ -90,7 +86,6 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
         } catch (IllegalStateException e) {
             RpEssentials.LOGGER.warn("[GUI] ProfessionConfig not loaded yet");
         }
-
         PacketDistributor.sendToPlayer(player, new OpenProfessionGuiPacket(entries));
     }
 
@@ -100,8 +95,8 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
             if (parts.length == 2 && parts[0].trim().equalsIgnoreCase(profId)) {
                 List<String> result = new ArrayList<>();
                 for (String item : parts[1].split(",")) {
-                    String trimmed = item.trim();
-                    if (!trimmed.isEmpty()) result.add(trimmed);
+                    String t = item.trim();
+                    if (!t.isEmpty()) result.add(t);
                 }
                 return result;
             }
@@ -109,21 +104,17 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
         return new ArrayList<>();
     }
 
-    // ── GUI Profil Joueur ──────────────────────────────────────────────────────
+    // ── GUI Profil Joueur — enrichi 4.1.6 ─────────────────────────────────────
 
     private static void handlePlayerProfileGui(ServerPlayer admin) {
         MinecraftServer server = admin.getServer();
-
         List<OpenPlayerProfileGuiPacket.PlayerData> players = new ArrayList<>();
+
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            UUID uuid     = p.getUUID();
-            String mcName = p.getGameProfile().getName();
-            String nick   = NicknameManager.hasNickname(uuid) ? NicknameManager.getNickname(uuid) : "";
-            String role   = detectCurrentRole(p);
-            List<String> licenses = LicenseManager.getLicenses(uuid);
-            players.add(new OpenPlayerProfileGuiPacket.PlayerData(uuid, mcName, nick, role, licenses));
+            players.add(buildPlayerData(p));
         }
 
+        // Professions disponibles
         List<String> professionIds = new ArrayList<>();
         try {
             for (String line : ProfessionConfig.PROFESSIONS.get()) {
@@ -133,6 +124,7 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
             }
         } catch (IllegalStateException ignored) {}
 
+        // Rôles disponibles
         List<String> roleIds = new ArrayList<>();
         try {
             for (String entry : RpEssentialsConfig.ROLES.get()) {
@@ -144,6 +136,49 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
 
         PacketDistributor.sendToPlayer(admin,
                 new OpenPlayerProfileGuiPacket(players, professionIds, roleIds));
+    }
+
+    /**
+     * Construit le snapshot complet d'un joueur pour le GUI.
+     * Collecte warns, mute, playtime, notes.
+     */
+    private static OpenPlayerProfileGuiPacket.PlayerData buildPlayerData(ServerPlayer p) {
+        UUID uuid     = p.getUUID();
+        String mcName = p.getGameProfile().getName();
+        String nick   = NicknameManager.hasNickname(uuid) ? NicknameManager.getNickname(uuid) : "";
+        String role   = detectCurrentRole(p);
+        List<String> licenses = LicenseManager.getLicenses(uuid);
+
+        // Warns actifs
+        int warnCount = 0;
+        try { warnCount = WarnManager.getActiveWarns(uuid).size(); }
+        catch (Exception ignored) {}
+
+        // Mute
+        boolean isMuted    = false;
+        String  muteExpiry = "";
+        try {
+            isMuted = MuteManager.isMuted(uuid);
+            if (isMuted) {
+                MuteManager.MuteEntry muteEntry = MuteManager.getEntry(uuid);
+                muteExpiry = muteEntry != null ? muteEntry.getFormattedExpiry() : "";
+            }
+        } catch (Exception ignored) {}
+
+        // Playtime
+        long playtimeMs = PlaytimeManager.getTotalPlaytimeMs(uuid);
+        long sessionMs  = PlaytimeManager.getCurrentSessionMs(uuid);
+
+        // Notes
+        int noteCount = 0;
+        try { noteCount = NoteManager.getNotes(uuid).size(); }
+        catch (Exception ignored) {}
+
+        return new OpenPlayerProfileGuiPacket.PlayerData(
+                uuid, mcName, nick, role, licenses,
+                warnCount, isMuted, muteExpiry,
+                playtimeMs, sessionMs, noteCount, true
+        );
     }
 
     private static String detectCurrentRole(ServerPlayer player) {
@@ -161,19 +196,12 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
 
     // ── GUI Config Manager ─────────────────────────────────────────────────────
 
-    /**
-     * Sends the lightweight list of config files to the client.
-     * The client will request individual file entries on demand.
-     */
     private static void handleConfigManagerGui(ServerPlayer player) {
         List<ConfigInspector.FileInfo> fileInfos = ConfigInspector.getFileInfos();
-
         List<ConfigGuiFilesPacket.FileEntry> entries = fileInfos.stream()
                 .map(fi -> new ConfigGuiFilesPacket.FileEntry(fi.id(), fi.displayName()))
                 .toList();
-
         PacketDistributor.sendToPlayer(player, new ConfigGuiFilesPacket(entries));
-
         RpEssentials.LOGGER.debug("[ConfigGUI] Sent {} config files to {}",
                 entries.size(), player.getName().getString());
     }

@@ -1,10 +1,14 @@
 package net.rp.rpessentials.profession;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.animal.horse.AbstractHorse;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
@@ -16,47 +20,62 @@ import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.rp.rpessentials.RpEssentials;
+import net.rp.rpessentials.RpEssentialsPatternUtils;
+import net.rp.rpessentials.config.MessagesConfig;
 import net.rp.rpessentials.config.ProfessionConfig;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Gestionnaire d'événements pour les restrictions de métiers.
+ * Gestion événementielle des restrictions de métiers.
  *
- * Craft    → MixinResultSlot      (mayPickup)
- * Armure   → MixinArmorSlot       (mayPlace) + MixinArmorItemUse (use)
- * Le reste → events NeoForge ci-dessous
+ * Restrictions couvertes :
+ *   ✅ Craft             → MixinResultSlot, MixinSmithingMenu, MixinAnvilMenu
+ *   ✅ Armure drag       → MixinArmorSlot
+ *   ✅ Armure right-click→ MixinArmorItemUse
+ *   ✅ Cassage de blocs  → onBlockBreak
+ *   ✅ Usage item (RC)   → onRightClickItem + onRightClickBlock
+ *   ✅ Outil (LC)        → onLeftClickBlock
+ *   ✅ Attaque arme      → onAttackEntity
+ *   ✅ Ouverture container → MixinServerPlayerGameMode
+ *   ✅ Placement de bloc → onBlockPlace  ← NOUVEAU
+ *   ✅ Interaction entité→ onEntityInteract ← NOUVEAU
+ *   ✅ Tooltips complets → onItemTooltip (fix item/bloc ID mismatch)
  */
 @EventBusSubscriber(modid = RpEssentials.MODID)
 public class ProfessionRestrictionEventHandler {
 
-    // Anti-spam messages (cooldown 3 secondes)
-    private static final Map<UUID, Long> lastMessageTime = new ConcurrentHashMap<>();
-    private static final long MESSAGE_COOLDOWN = 3000L;
-
-    // Anti-spam attaques (cooldown 2 secondes)
+    private static final Map<UUID, Long> lastMessageTime   = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> lastAttackWarning = new ConcurrentHashMap<>();
+    private static final long MESSAGE_COOLDOWN       = 3000L;
     private static final long ATTACK_WARNING_COOLDOWN = 2000L;
 
     // =========================================================================
     // UTILITAIRE ANTI-SPAM
     // =========================================================================
 
-    private static boolean canSendMessage(UUID playerId, Map<UUID, Long> cache, long cooldown) {
+    private static boolean canSendMessage(UUID id, Map<UUID, Long> cache, long cooldown) {
         long now = System.currentTimeMillis();
-        Long lastTime = cache.get(playerId);
-        if (lastTime == null || now - lastTime > cooldown) {
-            cache.put(playerId, now);
+        Long last = cache.get(id);
+        if (last == null || now - last > cooldown) {
+            cache.put(id, now);
             return true;
         }
         return false;
     }
 
+    private static void sendBlocked(ServerPlayer player, String message) {
+        if (canSendMessage(player.getUUID(), lastMessageTime, MESSAGE_COOLDOWN)) {
+            player.displayClientMessage(Component.literal(message), true);
+        }
+    }
+
     // =========================================================================
-    // BLOCK BREAK RESTRICTIONS
+    // BLOCK BREAK
     // =========================================================================
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -64,25 +83,43 @@ public class ProfessionRestrictionEventHandler {
         if (!(event.getPlayer() instanceof ServerPlayer player)) return;
         if (player.isCreative()) return;
 
-        Block block = event.getState().getBlock();
-        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(block);
+        ResourceLocation blockId = BuiltInRegistries.BLOCK.getKey(event.getState().getBlock());
 
         if (!ProfessionRestrictionManager.canBreakBlock(player, blockId)) {
             event.setCanceled(true);
-            if (canSendMessage(player.getUUID(), lastMessageTime, MESSAGE_COOLDOWN)) {
-                player.displayClientMessage(
-                        Component.literal(ProfessionRestrictionManager.getBlockBreakBlockedMessage(blockId)),
-                        true
-                );
-            }
-            RpEssentials.LOGGER.debug("[ProfessionRestrictions] Blocked block break for {}: {}",
-                    player.getName().getString(), blockId);
+            sendBlocked(player, ProfessionRestrictionManager.getBlockBreakBlockedMessage(blockId));
         }
     }
 
     // =========================================================================
-    // ITEM USE RESTRICTIONS (clic droit item + clic droit sur bloc)
-    // Les deux passent par le même check — helper factorisé.
+    // BLOCK PLACEMENT  (NOUVEAU)
+    // =========================================================================
+
+    /**
+     * Bloque le placement d'un bloc si l'item utilisé est dans globalBlockedItems.
+     * Exemple : empêcher de poser un TNT, un cauldron, etc.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (player.isCreative()) return;
+
+        // On vérifie l'item tenu en main (l'item placé)
+        ItemStack heldMain  = player.getItemInHand(InteractionHand.MAIN_HAND);
+        ItemStack heldOff   = player.getItemInHand(InteractionHand.OFF_HAND);
+        ItemStack held      = !heldMain.isEmpty() ? heldMain : heldOff;
+        if (held.isEmpty()) return;
+
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(held.getItem());
+
+        if (!ProfessionRestrictionManager.canUseItem(player, itemId)) {
+            event.setCanceled(true);
+            sendBlocked(player, ProfessionRestrictionManager.getItemUseBlockedMessage(itemId));
+        }
+    }
+
+    // =========================================================================
+    // ITEM USE (RIGHT CLICK)
     // =========================================================================
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -107,17 +144,12 @@ public class ProfessionRestrictionEventHandler {
 
         if (!ProfessionRestrictionManager.canUseItem(player, itemId)) {
             event.setCanceled(true);
-            if (canSendMessage(player.getUUID(), lastMessageTime, MESSAGE_COOLDOWN)) {
-                player.displayClientMessage(
-                        Component.literal(ProfessionRestrictionManager.getItemUseBlockedMessage(itemId)),
-                        true
-                );
-            }
+            sendBlocked(player, ProfessionRestrictionManager.getItemUseBlockedMessage(itemId));
         }
     }
 
     // =========================================================================
-    // LEFT-CLICK BLOCK (outil non autorisé)
+    // LEFT CLICK BLOCK (outil)
     // =========================================================================
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -125,25 +157,58 @@ public class ProfessionRestrictionEventHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.isCreative()) return;
 
-        ItemStack itemStack = player.getItemInHand(event.getHand());
-        if (itemStack.isEmpty()) return;
+        ItemStack stack = player.getItemInHand(event.getHand());
+        if (stack.isEmpty()) return;
 
-        Item item = itemStack.getItem();
-        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(item);
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(stack.getItem());
 
         if (!ProfessionRestrictionManager.canUseItem(player, itemId)) {
             event.setCanceled(true);
-            if (canSendMessage(player.getUUID(), lastMessageTime, MESSAGE_COOLDOWN)) {
-                player.displayClientMessage(
-                        Component.literal(ProfessionRestrictionManager.getItemUseBlockedMessage(itemId)),
-                        true
-                );
+            sendBlocked(player, ProfessionRestrictionManager.getItemUseBlockedMessage(itemId));
+        }
+    }
+
+    // =========================================================================
+    // ENTITY INTERACTION  (NOUVEAU)
+    // =========================================================================
+
+    /**
+     * Bloque l'interaction avec des entités si l'item tenu est restreint.
+     * Exemples : selle sur cheval, laisse, seau à lait sur vache, etc.
+     */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (player.isCreative()) return;
+
+        ItemStack held = event.getItemStack();
+        if (held.isEmpty()) return;
+
+        ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(held.getItem());
+
+        // Vérification usage item
+        if (!ProfessionRestrictionManager.canUseItem(player, itemId)) {
+            event.setCanceled(true);
+            sendBlocked(player, ProfessionRestrictionManager.getItemUseBlockedMessage(itemId));
+            return;
+        }
+
+        // Cas spécial : monter un cheval/entité si l'item principal est une arme bloquée
+        Entity target = event.getTarget();
+        if (target instanceof AbstractHorse) {
+            ItemStack mainHand = player.getItemInHand(InteractionHand.MAIN_HAND);
+            if (!mainHand.isEmpty()) {
+                ResourceLocation mainId = BuiltInRegistries.ITEM.getKey(mainHand.getItem());
+                if (!ProfessionRestrictionManager.canEquip(player, mainId)) {
+                    // On ne bloque pas le montage lui-même, mais on prévient
+                    // (comportement intentionnel : pas trop restrictif)
+                }
             }
         }
     }
 
     // =========================================================================
-    // WEAPON/TOOL ATTACK RESTRICTIONS
+    // ATTACK
     // =========================================================================
 
     @SubscribeEvent(priority = EventPriority.HIGHEST)
@@ -151,124 +216,116 @@ public class ProfessionRestrictionEventHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (player.isCreative()) return;
 
-        ItemStack weaponStack = player.getItemInHand(InteractionHand.MAIN_HAND);
-        if (weaponStack.isEmpty()) return;
+        ItemStack weapon = player.getItemInHand(InteractionHand.MAIN_HAND);
+        if (weapon.isEmpty()) return;
 
-        Item weapon = weaponStack.getItem();
-        ResourceLocation weaponId = BuiltInRegistries.ITEM.getKey(weapon);
+        ResourceLocation weaponId = BuiltInRegistries.ITEM.getKey(weapon.getItem());
 
         if (!ProfessionRestrictionManager.canEquip(player, weaponId)) {
             event.setCanceled(true);
             if (canSendMessage(player.getUUID(), lastAttackWarning, ATTACK_WARNING_COOLDOWN)) {
                 player.displayClientMessage(
-                        Component.literal(ProfessionRestrictionManager.getEquipmentBlockedMessage(weaponId)),
-                        true
-                );
+                        Component.literal(ProfessionRestrictionManager.getEquipmentBlockedMessage(weaponId)), true);
             }
-            RpEssentials.LOGGER.debug("[ProfessionRestrictions] Blocked weapon attack for {}: {}",
-                    player.getName().getString(), weaponId);
         }
     }
 
     // =========================================================================
-    // TOOLTIP INFORMATION
-    // Covers all 5 restriction types:
-    //  - globalBlockedCrafts
-    //  - globalUnbreakableBlocks  ← was missing
-    //  - globalBlockedItems
-    //  - globalBlockedEquipment
-    //  - containerOpenRestrictions ← was missing
-    // For blocks, the item resource location matches the block id for all
-    // standard blocks (minecraft:diamond_ore item == minecraft:diamond_ore block).
+    // TOOLTIP  (fix complet)
     // =========================================================================
 
+    /**
+     * Affiche les restrictions dans le tooltip des items.
+     *
+     * Fix 4.1.6 :
+     *   - Les blocs dont l'item ID ≠ block ID sont maintenant couverts
+     *     (ex: minecraft:grass_block item → minecraft:grass_block block).
+     *   - Les restrictions de containers (containerOpenRestrictions) sont affichées.
+     *   - Les restrictions de placement de blocs utilisent le block ID résolu.
+     */
     @SubscribeEvent
     public static void onItemTooltip(ItemTooltipEvent event) {
-        ItemStack itemStack = event.getItemStack();
-        if (itemStack.isEmpty()) return;
+        ItemStack stack = event.getItemStack();
+        if (stack.isEmpty()) return;
 
-        Item item = itemStack.getItem();
+        Item item = stack.getItem();
         ResourceLocation itemId = BuiltInRegistries.ITEM.getKey(item);
-        ResourceLocation blockId = itemId; // for standard blocks, item id == block id
+
+        // ── Résolution du block ID (fix) ──────────────────────────────────────
+        // Pour un BlockItem, le block ID est souvent identique à l'item ID,
+        // mais pas toujours (ex: grass_block, redstone, etc.).
+        ResourceLocation blockId = itemId; // défaut : même ID
+        if (item instanceof BlockItem bi) {
+            Block block = bi.getBlock();
+            ResourceLocation resolvedBlockId = BuiltInRegistries.BLOCK.getKey(block);
+            if (resolvedBlockId != null) blockId = resolvedBlockId;
+        }
 
         try {
             // ── Craft restriction ─────────────────────────────────────────────
-            if (ProfessionRestrictionManager.isGloballyBlocked(
-                    itemId, ProfessionConfig.GLOBAL_BLOCKED_CRAFTS.get())) {
+            if (ProfessionRestrictionManager.isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_CRAFTS.get())) {
                 String professions = ProfessionRestrictionManager.getRequiredProfessions(
                         itemId, ProfessionConfig.PROFESSION_ALLOWED_CRAFTS.get());
-                event.getToolTip().add(Component.literal("§7Craft: §c✘ §8— §7" + professions));
+                event.getToolTip().add(Component.literal("§7Craft: §c✘§8: §7" + professions));
             }
 
-            // ── Block break restriction ───────────────────────────────────────
-            // Checks using blockId (same value as itemId for standard blocks).
-            if (ProfessionRestrictionManager.isGloballyBlocked(
-                    blockId, ProfessionConfig.GLOBAL_UNBREAKABLE_BLOCKS.get())) {
+            // ── Block break restriction (utilise blockId résolu) ──────────────
+            if (ProfessionRestrictionManager.isGloballyBlocked(blockId, ProfessionConfig.GLOBAL_UNBREAKABLE_BLOCKS.get())) {
                 String professions = ProfessionRestrictionManager.getRequiredProfessions(
                         blockId, ProfessionConfig.PROFESSION_ALLOWED_BLOCKS.get());
-                event.getToolTip().add(Component.literal("§7Mining: §c✘ §8— §7" + professions));
+                event.getToolTip().add(Component.literal("§7Mining: §c✘§8: §7" + professions));
             }
 
             // ── Item use restriction ──────────────────────────────────────────
-            if (ProfessionRestrictionManager.isGloballyBlocked(
-                    itemId, ProfessionConfig.GLOBAL_BLOCKED_ITEMS.get())) {
+            if (ProfessionRestrictionManager.isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_ITEMS.get())) {
                 String professions = ProfessionRestrictionManager.getRequiredProfessions(
                         itemId, ProfessionConfig.PROFESSION_ALLOWED_ITEMS.get());
-                event.getToolTip().add(Component.literal("§7Usage: §c✘ §8— §7" + professions));
+                event.getToolTip().add(Component.literal("§7Usage: §c✘§8: §7" + professions));
             }
 
             // ── Equipment restriction ─────────────────────────────────────────
-            if (ProfessionRestrictionManager.isGloballyBlocked(
-                    itemId, ProfessionConfig.GLOBAL_BLOCKED_EQUIPMENT.get())) {
+            if (ProfessionRestrictionManager.isGloballyBlocked(itemId, ProfessionConfig.GLOBAL_BLOCKED_EQUIPMENT.get())) {
                 String professions = ProfessionRestrictionManager.getRequiredProfessions(
                         itemId, ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT.get());
-                event.getToolTip().add(Component.literal("§7Equip: §c✘ §8— §7" + professions));
+                event.getToolTip().add(Component.literal("§7Equip: §c✘§8: §7" + professions));
             }
 
-            // ── Container open restriction ────────────────────────────────────
-            // Only relevant when the item is a placeable block (has a block form).
-            // We check the container restrictions list directly since the format is
-            // block_id;profession1,profession2 rather than a simple global blocked list.
-            List<? extends String> containerRestrictions =
-                    ProfessionConfig.CONTAINER_OPEN_RESTRICTIONS.get();
+            // ── Container open restriction (utilise blockId résolu) ───────────
+            List<? extends String> containerRestrictions = ProfessionConfig.CONTAINER_OPEN_RESTRICTIONS.get();
             if (!containerRestrictions.isEmpty()) {
                 String blockIdStr = blockId.toString();
                 for (String entry : containerRestrictions) {
                     if (!entry.contains(";")) continue;
                     String[] parts = entry.split(";", 2);
-                    // Use the mod's own pattern-matching so wildcards work correctly
-                    if (!net.rp.rpessentials.RpEssentialsPatternUtils.matchesPattern(
-                            blockIdStr, parts[0].trim())) continue;
+                    if (!RpEssentialsPatternUtils.matchesPattern(blockIdStr, parts[0].trim())) continue;
 
-                    // Build the required professions display string
                     java.util.Set<String> required = new java.util.LinkedHashSet<>();
                     for (String prof : parts[1].split(",")) {
                         String profId = prof.trim();
-                        net.rp.rpessentials.profession.ProfessionRestrictionManager.ProfessionData data =
+                        ProfessionRestrictionManager.ProfessionData data =
                                 ProfessionRestrictionManager.getProfessionData(profId);
                         required.add(data != null ? data.getFormattedName() : profId);
                     }
                     String professions = required.isEmpty()
-                            ? net.rp.rpessentials.config.MessagesConfig.get(
-                            net.rp.rpessentials.config.MessagesConfig.PROFESSION_NONE_AVAILABLE)
+                            ? MessagesConfig.get(MessagesConfig.PROFESSION_NONE_AVAILABLE)
                             : String.join("§7, ", required);
-                    event.getToolTip().add(Component.literal("§7Open: §c✘ §8— §7" + professions));
-                    break; // one match is enough
+                    event.getToolTip().add(Component.literal("§7Open: §c✘§8: §7" + professions));
+                    break;
                 }
             }
 
         } catch (IllegalStateException ignored) {
-            // Config not yet loaded — skip tooltip additions silently
+            // Config pas encore chargée — on ne plante pas
         }
     }
 
     // =========================================================================
-    // NETTOYAGE DES CACHES (appelé depuis RpEssentials.onServerTick toutes les 400 ticks)
+    // NETTOYAGE DES CACHES
     // =========================================================================
 
     public static void cleanupCaches() {
         long now = System.currentTimeMillis();
-        lastMessageTime.entrySet().removeIf(entry -> now - entry.getValue() > 10000);
-        lastAttackWarning.entrySet().removeIf(entry -> now - entry.getValue() > 10000);
+        lastMessageTime.entrySet().removeIf(e -> now - e.getValue() > 10000);
+        lastAttackWarning.entrySet().removeIf(e -> now - e.getValue() > 10000);
     }
 }

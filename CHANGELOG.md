@@ -1,6 +1,77 @@
 # Changelog - Rp Essentials
 All notable changes to this project will be documented in this file.
 
+## [4.1.6]
+
+**Enriched name variables in chat, unified profile GUI with licenses, ImmersiveMessages presets, config change history, extended profession restrictions, and a playtime system.**
+
+---
+
+### Added
+
+* **$nick, $real, $nick_real variables in chat formats:** Three new variables available in `playerNameFormat`, `chatMessageFormat`, `proximityChatFormat`, `globalChatFormat` and all RP command formats. Backwards-compatible: existing configs work without modification.
+  - `$nick_real` / `{nick_real}`: displays "Nickname (RealName)" when they differ, otherwise just the effective name.
+  - `$real` / `{real}`: always the raw MC username.
+  - `$nick` / `{nick}`: alias for `$name` / `{player}`, nickname if defined, otherwise MC username.
+  - Additional variables for private messages: `{target_nick}`, `{target_real}`, `{target_nick_real}`, `{sender_nick}`, `{sender_real}`, `{sender_nick_real}`.
+  - `showRealNameInChat` toggle (default `false` in `rpessentials-chat.toml`): automatically appends "(RealName)" everywhere without modifying existing formats.
+  - Applies to chat, /msg, /rp action/commerce/incognito, join/leave messages, and proximity spy.
+
+* **Player Playtime and Uptime:** New `PlaytimeManager` that tracks play time with zero tick overhead.
+  - Session duration is calculated via `System.currentTimeMillis()` on login and logout.
+  - Total cumulative time is persisted in `lastconnection.json` (field `totalPlaytimeMs`, zero by default on old files: backwards-compatible).
+  - `/rpessentials inspect <player>`: displays total playtime and current session duration if the player is online.
+  - Human-readable format: "3h 42min", "12min 30s", etc.
+
+* **ImmersiveMessages Presets:** All display mode fields (DeathRP, WorldBorder, HRP, etc.) now accept the format `"IMMERSIVE:presetName"` in addition to existing modes `ACTION_BAR`, `TITLE`, `CHAT`.
+  - 6 configurable default presets in `rpessentials-rp.toml`: `default`, `death`, `zone`, `alert`, `hrp`, `title`.
+  - Config format: `"name;duration;fadeIn;fadeOut"` (e.g. `"death;5.0;0.5;0.5"`).
+  - Automatic fallback to `ACTION_BAR` if ImmersiveMessages is absent on the client side.
+  - New config entry `RpConfig.IMMERSIVE_PRESETS` in the `[Immersive]` section.
+
+* **Playtime and Stats in the Player Profile GUI:** The second "Stats" tab of the GUI displays the number of active warns, mute status with expiry, total playtime, current session duration, number of staff notes, and the list of held licenses.
+
+### Changed
+
+* **Player Profile GUI - reworked tabs:** Tabs are now "Profile" and "Stats" (the separate "Licences" tab has been removed). Everything related to the player is now grouped under the "Profile" tab: nickname, color palette, role, and license management.
+
+* **License management in the GUI:** Two buttons "Add" and "Revoke" appear side by side in the Profile tab. "Add" is greyed out if the player already holds the selected license, "Revoke" is greyed out if the player does not hold it. Switching tabs to manage licenses is no longer necessary.
+
+* **Player list with quick indicators:** The left-hand player list now displays `[nW]` in red for players with active warns and `[M]` in orange for muted players.
+
+* **Config and setrole change history:** Every time a staff member applies changes via the config GUI, all online staff receive a message listing the before and after values (max 5 lines). Each `/setrole` execution is also broadcast to staff and logged to the console.
+
+### Fixed
+
+* **$nick/$real variables not resolved in chatMessageFormat:** The new variables were only resolved in `playerNameFormat` but not directly in `chatMessageFormat`, `proximityChatFormat`, or `globalChatFormat`. They would display the raw text `$nick`, `$real`, `$nick_real` when used in those fields. Fixed: all variables are now resolved in every format.
+
+* **Extended profession restrictions:** Two missing categories are now checked by `ProfessionRestrictionEventHandler`: block placement (`BlockEvent.EntityPlaceEvent`) and entity interactions (`PlayerInteractEvent.EntityInteract`, e.g. saddling a horse, attaching a lead).
+
+* **Incorrect restriction tooltips for certain blocks:** Blocks whose item ID differs from their block ID (e.g. `minecraft:grass` as item vs `minecraft:grass_block` as block) were not displaying the correct restriction in the tooltip. Fixed via `Block.byItem()`. Container-opening restrictions also now appear in the tooltip.
+
+### Technical
+
+* **New classes:**
+  - `PlaytimeManager` - playtime tracker, zero overhead, zero tick.
+  - `ImmersivePresetHelper` - ImmersiveMessages preset resolution with fallback.
+  - `IRpPlayerList` - interface injected by `MixinPlayerList` to allow sending join/leave messages from `RpEssentialsEventHandler` without a direct cast to the mixin class.
+
+* **Modified classes:**
+  - `RpEssentialsChatFormatter` - `formatChatMessage()` now resolves all variables directly in the message format (no longer only in `playerNameFormat`). Refactored into `buildFormattedNameFromParts()` to avoid a double call to NicknameManager and LuckPerms.
+  - `OpenPlayerProfileGuiPacket.PlayerData` - enriched with `activeWarnCount`, `isMuted`, `muteExpiry`, `playtimeMs`, `sessionMs`, `noteCount`, `isOnline`.
+  - `LastConnectionManager.ConnectionEntry` - added `totalPlaytimeMs` (default 0, backwards-compatible JSON).
+  - `MixinPlayerList` - implements `IRpPlayerList`, exposes `rpe$sendCustomJoinLeaveMessage()` and `rpe$broadcastCustomMessage()`.
+  - `RpEssentialsEventHandler` - cast via `IRpPlayerList` for join/leave messages. Calls `PlaytimeManager.onLogin()` and `onLogout()`.
+  - `SaveConfigEntriesPacket` - before/after value snapshot, staff broadcast.
+  - `RpConfig` - new sections `[Immersive]` and `[JEI Integration]` (WIP).
+
+### Migration Notes
+
+* No breaking changes. Existing configs work without modification.
+* `lastconnection.json`: the `totalPlaytimeMs` field is absent from existing entries and will be treated as 0. Accumulation will begin from the first login/logout after the update.
+* `rpessentials-rp.toml`: a new `[Immersive]` section is generated with the 6 default presets. No existing config is modified.
+* Modified all the base config files for **new** installation so it is more simple to use the mod without modification.
+
 ## [4.1.5]
 
 **Login fixes, command reorganization, Config Manager GUI, new inspect command.**

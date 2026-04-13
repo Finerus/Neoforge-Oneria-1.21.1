@@ -24,10 +24,9 @@ import net.minecraft.core.registries.Registries;
 import net.rp.rpessentials.config.MessagesConfig;
 import net.rp.rpessentials.config.RpConfig;
 import net.rp.rpessentials.identity.NicknameManager;
+import net.rp.rpessentials.identity.RpEssentialsChatFormatter;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
 
 @EventBusSubscriber(modid = RpEssentials.MODID)
 public class RpEssentialsRpCommands {
@@ -90,18 +89,17 @@ public class RpEssentialsRpCommands {
                                         StringArgumentType.getString(ctx, "type"),
                                         StringArgumentType.getString(ctx, "message"))))));
 
+        // /roll [dice]
         dispatcher.register(Commands.literal("roll")
                 .requires(src -> src.getEntity() instanceof ServerPlayer)
                 .executes(ctx -> {
-                    // Sans argument — utilise le premier dé disponible
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     try {
-                        if (!net.rp.rpessentials.config.RpConfig.ENABLE_DICE_SYSTEM.get()) {
+                        if (!RpConfig.ENABLE_DICE_SYSTEM.get()) {
                             ctx.getSource().sendFailure(Component.literal("§c[DICE] Dice system is disabled."));
                             return 0;
                         }
                     } catch (IllegalStateException ignored) { return 0; }
-
                     List<DiceManager.DiceType> dice = DiceManager.getAvailableDice();
                     if (dice.isEmpty()) {
                         ctx.getSource().sendFailure(Component.literal("§c[DICE] No dice configured."));
@@ -118,18 +116,15 @@ public class RpEssentialsRpCommands {
                         .executes(ctx -> {
                             ServerPlayer player = ctx.getSource().getPlayerOrException();
                             String diceName = StringArgumentType.getString(ctx, "dice");
-
                             try {
-                                if (!net.rp.rpessentials.config.RpConfig.ENABLE_DICE_SYSTEM.get()) {
+                                if (!RpConfig.ENABLE_DICE_SYSTEM.get()) {
                                     ctx.getSource().sendFailure(Component.literal("§c[DICE] Dice system is disabled."));
                                     return 0;
                                 }
                             } catch (IllegalStateException ignored) { return 0; }
-
                             boolean success = DiceManager.roll(player, diceName);
                             if (!success) {
-                                ctx.getSource().sendFailure(Component.literal(
-                                        "§c[DICE] Unknown dice type: §f" + diceName));
+                                ctx.getSource().sendFailure(Component.literal("§c[DICE] Unknown dice type: §f" + diceName));
                                 return 0;
                             }
                             return 1;
@@ -161,7 +156,7 @@ public class RpEssentialsRpCommands {
         } catch (IllegalStateException ignored) {}
 
         ResourceKey<Level> dimKey = ResourceKey.create(
-                net.minecraft.core.registries.Registries.DIMENSION, ResourceLocation.parse(dimId));
+                Registries.DIMENSION, ResourceLocation.parse(dimId));
         ServerLevel level = server.getLevel(dimKey);
 
         if (level == null) {
@@ -172,19 +167,19 @@ public class RpEssentialsRpCommands {
 
         player.teleportTo(level, x, y, z, java.util.Set.of(), yaw, pitch);
         player.displayClientMessage(
-                ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_AFK_TELEPORT)),
-                false);
+                ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_AFK_TELEPORT)), false);
         return 1;
     }
 
     // =========================================================================
     // /rp commerce <message>
     // =========================================================================
+
     private static int executeCommerce(CommandContext<CommandSourceStack> ctx, String message)
             throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
 
-        // Feature 14
+        // Cooldown
         if (RpCooldownManager.isOnCooldown(player.getUUID(), "commerce")) {
             long remaining = RpCooldownManager.getRemainingSeconds(player.getUUID(), "commerce");
             player.displayClientMessage(ColorHelper.parseColors(
@@ -194,30 +189,33 @@ public class RpEssentialsRpCommands {
         }
         RpCooldownManager.setCooldown(player.getUUID(), "commerce");
 
-        // ... reste inchangé ...
         MinecraftServer server = ctx.getSource().getServer();
-        String nickname = net.rp.rpessentials.identity.NicknameManager.hasNickname(player.getUUID())
-                ? net.rp.rpessentials.identity.NicknameManager.getNickname(player.getUUID())
-                : player.getName().getString();
 
-        String formatted = net.rp.rpessentials.config.MessagesConfig.get(
-                net.rp.rpessentials.config.MessagesConfig.RP_COMMERCE_FORMAT,
-                "player", nickname, "message", message);
+        // Résolution via le helper centralisé — supporte {player}/{nick}/{real}/{nick_real}
+        String rawFormat = MessagesConfig.get(MessagesConfig.RP_COMMERCE_FORMAT, "message", message);
+        String formatted = RpEssentialsChatFormatter.resolveRpPlaceholders(rawFormat, player);
+
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             p.displayClientMessage(ColorHelper.parseColors(formatted), false);
         }
-        RpEssentials.LOGGER.info("[COMMERCE] {}: {}", nickname, message);
+
+        // Log avec real + nick pour la console
+        RpEssentials.LOGGER.info("[COMMERCE] {} ({}): {}",
+                NicknameManager.getDisplayName(player),
+                player.getName().getString(),
+                message);
         return 1;
     }
 
     // =========================================================================
     // /rp incognito <message>
     // =========================================================================
+
     private static int executeIncognito(CommandContext<CommandSourceStack> ctx, String message)
             throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
 
-        // Feature 14
+        // Cooldown
         if (RpCooldownManager.isOnCooldown(player.getUUID(), "incognito")) {
             long remaining = RpCooldownManager.getRemainingSeconds(player.getUUID(), "incognito");
             player.displayClientMessage(ColorHelper.parseColors(
@@ -227,26 +225,28 @@ public class RpEssentialsRpCommands {
         }
         RpCooldownManager.setCooldown(player.getUUID(), "incognito");
 
-        // ... reste inchangé ...
         MinecraftServer server = ctx.getSource().getServer();
-        String nickname = net.rp.rpessentials.identity.NicknameManager.hasNickname(player.getUUID())
-                ? net.rp.rpessentials.identity.NicknameManager.getNickname(player.getUUID())
-                : player.getName().getString();
 
-        String publicMsg = net.rp.rpessentials.config.MessagesConfig.get(
-                net.rp.rpessentials.config.MessagesConfig.RP_INCOGNITO_FORMAT, "message", message);
+        // Message public (pas de nom → pas de résolution de {player})
+        String rawPublic = MessagesConfig.get(MessagesConfig.RP_INCOGNITO_FORMAT, "message", message);
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-            p.displayClientMessage(ColorHelper.parseColors(publicMsg), false);
+            p.displayClientMessage(ColorHelper.parseColors(rawPublic), false);
         }
-        String staffLog = net.rp.rpessentials.config.MessagesConfig.get(
-                net.rp.rpessentials.config.MessagesConfig.RP_INCOGNITO_LOG,
-                "player", nickname, "message", message);
+
+        // Log staff : résolution complète avec nick/real
+        String rawLog = MessagesConfig.get(MessagesConfig.RP_INCOGNITO_LOG, "message", message);
+        rawLog = RpEssentialsChatFormatter.resolveRpPlaceholders(rawLog, player);
+        String finalLog = rawLog;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (RpEssentialsPermissions.isStaff(p)) {
-                p.displayClientMessage(ColorHelper.parseColors(staffLog), false);
+                p.displayClientMessage(ColorHelper.parseColors(finalLog), false);
             }
         }
-        RpEssentials.LOGGER.info("[INCOGNITO] {}: {}", nickname, message);
+
+        RpEssentials.LOGGER.info("[INCOGNITO] {} ({}): {}",
+                NicknameManager.getDisplayName(player),
+                player.getName().getString(),
+                message);
         return 1;
     }
 
@@ -258,7 +258,7 @@ public class RpEssentialsRpCommands {
             throws CommandSyntaxException {
         ServerPlayer player = ctx.getSource().getPlayerOrException();
 
-        // Feature 14 — vérification cooldown
+        // Cooldown
         if (RpCooldownManager.isOnCooldown(player.getUUID(), "action")) {
             long remaining = RpCooldownManager.getRemainingSeconds(player.getUUID(), "action");
             player.displayClientMessage(ColorHelper.parseColors(
@@ -268,27 +268,27 @@ public class RpEssentialsRpCommands {
         }
         RpCooldownManager.setCooldown(player.getUUID(), "action");
 
-        // ... reste du code inchangé ...
         MinecraftServer server = ctx.getSource().getServer();
-        String nickname = net.rp.rpessentials.identity.NicknameManager.hasNickname(player.getUUID())
-                ? net.rp.rpessentials.identity.NicknameManager.getNickname(player.getUUID())
-                : player.getName().getString();
 
         int distance = 32;
         try { distance = RpConfig.ACTION_DISTANCE.get(); }
         catch (IllegalStateException ignored) {}
 
-        String actionMsg = net.rp.rpessentials.config.MessagesConfig.get(
-                net.rp.rpessentials.config.MessagesConfig.RP_ACTION_FORMAT,
-                "player", nickname, "action", action);
-        String spyMsg = net.rp.rpessentials.config.MessagesConfig.get(
-                net.rp.rpessentials.config.MessagesConfig.RP_ACTION_SPY,
-                "player", nickname, "action", action);
+        // Résolution centralisée — {player}/{nick}/{real}/{nick_real} tous supportés
+        String rawAction = MessagesConfig.get(MessagesConfig.RP_ACTION_FORMAT, "action", action);
+        rawAction = RpEssentialsChatFormatter.resolveRpPlaceholders(rawAction, player);
+
+        String rawSpy = MessagesConfig.get(MessagesConfig.RP_ACTION_SPY, "action", action);
+        rawSpy = RpEssentialsChatFormatter.resolveRpPlaceholders(rawSpy, player);
+
+        final String actionMsg = rawAction;
+        final String spyMsg    = rawSpy;
+        final int    finalDist = distance;
 
         java.util.List<ServerPlayer> inRange = new java.util.ArrayList<>();
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (p.level() != player.level()) continue;
-            if (p.getUUID().equals(player.getUUID()) || p.distanceTo(player) <= distance) {
+            if (p.getUUID().equals(player.getUUID()) || p.distanceTo(player) <= finalDist) {
                 inRange.add(p);
                 p.displayClientMessage(ColorHelper.parseColors(actionMsg), false);
             }
@@ -299,7 +299,10 @@ public class RpEssentialsRpCommands {
             p.displayClientMessage(ColorHelper.parseColors(spyMsg), false);
         }
 
-        RpEssentials.LOGGER.info("[ACTION-RP] {}: {}", nickname, action);
+        RpEssentials.LOGGER.info("[ACTION-RP] {} ({}): {}",
+                NicknameManager.getDisplayName(player),
+                player.getName().getString(),
+                action);
         return 1;
     }
 
@@ -315,9 +318,7 @@ public class RpEssentialsRpCommands {
 
         if (!RpEssentialsPermissions.isStaff(player)) {
             player.displayClientMessage(
-                    ColorHelper.parseColors(
-                            MessagesConfig.get(MessagesConfig.RP_PERMISSION_DENIED)),
-                    false);
+                    ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_PERMISSION_DENIED)), false);
             return 0;
         }
 
@@ -328,35 +329,37 @@ public class RpEssentialsRpCommands {
             soundId   = RpConfig.ANNONCE_SOUND.get();
         } catch (IllegalStateException ignored) {}
 
-        final String finalSoundId = soundId;
-        final boolean finalPlaySound = playSound;
+        final String finalSoundId  = soundId;
+        final boolean finalPlaySnd = playSound;
 
         switch (type.toLowerCase()) {
-
             case "title" -> {
+                // Le titre lui-même n'affiche pas de nom de joueur,
+                // mais le sous-titre peut contenir {player} etc.
                 Component title    = ColorHelper.parseColors(
                         MessagesConfig.get(MessagesConfig.RP_ANNONCE_TITLE));
-                Component subtitle = ColorHelper.parseColors(
-                        MessagesConfig.get(MessagesConfig.RP_ANNONCE_SUBTITLE,
-                                "message", message));
+                String rawSubtitle = MessagesConfig.get(MessagesConfig.RP_ANNONCE_SUBTITLE,
+                        "message", message);
+                rawSubtitle = RpEssentialsChatFormatter.resolveRpPlaceholders(rawSubtitle, player);
+                Component subtitle = ColorHelper.parseColors(rawSubtitle);
 
                 for (ServerPlayer p : server.getPlayerList().getPlayers()) {
                     p.connection.send(new ClientboundSetTitleTextPacket(title));
                     p.connection.send(new ClientboundSetSubtitleTextPacket(subtitle));
                     p.connection.send(new ClientboundSetTitlesAnimationPacket(10, 60, 20));
-                    if (finalPlaySound) playAnnonceSound(p, finalSoundId);
+                    if (finalPlaySnd) playAnnonceSound(p, finalSoundId);
                 }
             }
-
             case "chat" -> {
-                String chatMsg = MessagesConfig.get(MessagesConfig.RP_ANNONCE_CHAT_FORMAT,
+                String rawChat = MessagesConfig.get(MessagesConfig.RP_ANNONCE_CHAT_FORMAT,
                         "message", message);
+                rawChat = RpEssentialsChatFormatter.resolveRpPlaceholders(rawChat, player);
+                String finalChat = rawChat;
                 for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-                    p.displayClientMessage(ColorHelper.parseColors(chatMsg), false);
-                    if (finalPlaySound) playAnnonceSound(p, finalSoundId);
+                    p.displayClientMessage(ColorHelper.parseColors(finalChat), false);
+                    if (finalPlaySnd) playAnnonceSound(p, finalSoundId);
                 }
             }
-
             default -> {
                 ctx.getSource().sendFailure(Component.literal(
                         "§c[ERROR] Unknown type: " + type + ". Use 'title' or 'chat'."));
@@ -365,10 +368,12 @@ public class RpEssentialsRpCommands {
         }
 
         player.displayClientMessage(
-                ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_ANNONCE_SENT)),
-                false);
-        RpEssentials.LOGGER.info("[ANNONCE][{}] {}: {}", type.toUpperCase(),
-                player.getName().getString(), message);
+                ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_ANNONCE_SENT)), false);
+        RpEssentials.LOGGER.info("[ANNONCE][{}] {} ({}): {}",
+                type.toUpperCase(),
+                NicknameManager.getDisplayName(player),
+                player.getName().getString(),
+                message);
         return 1;
     }
 

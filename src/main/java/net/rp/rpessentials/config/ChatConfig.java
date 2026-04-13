@@ -16,6 +16,7 @@ public class ChatConfig {
     public static final ModConfigSpec.BooleanValue MARKDOWN_ENABLED;
     public static final ModConfigSpec.BooleanValue ENABLE_COLORS_COMMAND;
     public static final ModConfigSpec.BooleanValue LOG_PRIVATE_MESSAGES;
+    public static final ModConfigSpec.BooleanValue SHOW_REAL_NAME_IN_CHAT;
 
     // === JOIN/LEAVE MESSAGES ===
     public static final ModConfigSpec.BooleanValue ENABLE_CUSTOM_JOIN_LEAVE;
@@ -30,92 +31,110 @@ public class ChatConfig {
     public static final ModConfigSpec.ConfigValue<String> GLOBAL_CHAT_FORMAT;
 
     static {
-        // ===============================================================================
-        // CATEGORY: CHAT SYSTEM
-        // ===============================================================================
         BUILDER.push("Chat System");
 
         ENABLE_CHAT_FORMAT = BUILDER
-                .comment("Enable custom chat formatting system")
+                .comment("Enable custom chat formatting system.")
                 .define("enableChatFormat", true);
 
         PLAYER_NAME_FORMAT = BUILDER
-                .comment("Player name format in chat",
-                        "Variables: $prefix, $name, $suffix",
-                        "$prefix = LuckPerms prefix",
-                        "$name = player name or nickname",
-                        "$suffix = LuckPerms suffix")
+                .comment(
+                        "Player name format in chat.",
+                        "",
+                        "BACKWARD-COMPATIBLE variables (unchanged behaviour):",
+                        "  $name    — nickname if set, otherwise MC username  (same as $nick)",
+                        "  $prefix  — LuckPerms prefix",
+                        "  $suffix  — LuckPerms suffix",
+                        "",
+                        "NEW variables (opt-in, do not affect existing configs):",
+                        "  $nick      — nickname if set, otherwise MC username (alias of $name)",
+                        "  $real      — always the Minecraft username, regardless of nickname",
+                        "  $nick_real — 'Nickname (RealName)' when they differ, otherwise just the name",
+                        "",
+                        "Examples:",
+                        "  '$prefix $name $suffix'           <- existing config, works unchanged",
+                        "  '$prefix $nick_real $suffix'      <- shows 'Aragorn (Steve)' when nick differs",
+                        "  '$prefix $nick §8($real)$suffix'  <- manual placement with custom colour"
+                )
                 .define("playerNameFormat", "$prefix $name $suffix");
 
         CHAT_MESSAGE_FORMAT = BUILDER
-                .comment("Chat message format",
-                        "Variables: $time, $name, $msg",
-                        "$time = timestamp (if enabled)",
-                        "$name = formatted player name",
-                        "$msg = player's message",
-                        "You can use color codes with §")
+                .comment(
+                        "Chat message format.",
+                        "Variables: $time, $name (or $nick / $nick_real / $real), $msg",
+                        "See playerNameFormat comment for the full variable list."
+                )
                 .define("chatMessageFormat", "[$time] $name: $msg");
 
         CHAT_MESSAGE_COLOR = BUILDER
-                .comment("Global color for chat messages",
+                .comment("Global color for chat messages.",
                         "Choose: AQUA, RED, LIGHT_PURPLE, YELLOW, WHITE, BLACK, GOLD,",
                         "GRAY, BLUE, GREEN, DARK_GRAY, DARK_AQUA, DARK_RED,",
                         "DARK_PURPLE, DARK_GREEN, DARK_BLUE")
                 .define("chatMessageColor", "WHITE");
 
         ENABLE_TIMESTAMP = BUILDER
-                .comment("Show timestamp in chat messages")
+                .comment("Show timestamp in chat messages.")
                 .define("enableTimestamp", true);
 
         TIMESTAMP_FORMAT = BUILDER
-                .comment("Timestamp format (Java SimpleDateFormat)",
-                        "Examples: HH:mm, HH:mm:ss, hh:mm a",
-                        "Read more: https://docs.oracle.com/javase/7/docs/api/java/text/SimpleDateFormat.html")
+                .comment("Timestamp format (Java SimpleDateFormat).",
+                        "Examples: HH:mm, HH:mm:ss, hh:mm a")
                 .define("timestampFormat", "HH:mm");
 
         MARKDOWN_ENABLED = BUILDER
-                .comment("Enable markdown styling in chat",
+                .comment("Enable markdown styling in chat.",
                         "**bold**, *italic*, __underline__, ~~strikethrough~~")
                 .define("markdownEnabled", true);
 
+        SHOW_REAL_NAME_IN_CHAT = BUILDER
+                .comment(
+                        "When true, the real MC username is automatically appended in parentheses",
+                        "after the nickname wherever a player has an active nickname.",
+                        "",
+                        "Applies to: chat, /msg, /rp action, /rp commerce, /rp incognito,",
+                        "            /rp annonce, join/leave messages, proximity spy log.",
+                        "",
+                        "Default: false — existing behaviour preserved.",
+                        "",
+                        "Note: you can also control placement manually with $nick_real / {nick_real}",
+                        "in the format strings instead of using this toggle."
+                )
+                .define("showRealNameInChat", false);
+
         ENABLE_PROXIMITY_CHAT = BUILDER
-                .comment("If true, chat messages are only visible to players within proximityChatDistance blocks.",
+                .comment("If true, chat messages are only visible within proximityChatDistance blocks.",
                         "Use the bypass prefix (default: !) to send a global message.")
                 .define("enableProximityChat", false);
 
         PROXIMITY_CHAT_DISTANCE = BUILDER
-                .comment("Radius in blocks within which proximity chat messages are visible.")
+                .comment("Radius in blocks for proximity chat.")
                 .defineInRange("proximityChatDistance", 32, 1, 256);
 
         PROXIMITY_CHAT_BYPASS_PREFIX = BUILDER
-                .comment("Prefix to bypass proximity chat and send a global message.",
-                        "The prefix is stripped from the message before sending.")
+                .comment("Prefix to bypass proximity chat (stripped from the message).")
                 .define("proximityChatBypassPrefix", "!");
 
         PROXIMITY_CHAT_FORMAT = BUILDER
-                .comment("Format for proximity chat messages.",
-                        "Variables: $time, $name, $msg")
+                .comment("Format for proximity chat.",
+                        "Variables: $time, $name (or $nick / $nick_real / $real), $msg")
                 .define("proximityChatFormat", "[$time] $name: $msg");
 
         GLOBAL_CHAT_FORMAT = BUILDER
-                .comment("Format for global chat messages (when using bypass prefix or proximity disabled).",
-                        "Variables: $time, $name, $msg")
+                .comment("Format for global chat (bypass prefix or proximity disabled).",
+                        "Variables: $time, $name (or $nick / $nick_real / $real), $msg")
                 .define("globalChatFormat", "[$time] §f$name§r: $msg");
 
         ENABLE_COLORS_COMMAND = BUILDER
-                .comment("Enable /colors command to show available colors")
+                .comment("Enable /colors command.")
                 .define("enableColorsCommand", true);
 
         LOG_PRIVATE_MESSAGES = BUILDER
-                .comment("If 'true', logs private messages (/msg) to the server console.",
-                        "Useful for moderation purposes.")
+                .comment("Log private messages (/msg) to console.")
                 .define("logPrivateMessages", false);
 
         BUILDER.pop();
 
-        // ===============================================================================
-        // CATEGORY: JOIN/LEAVE MESSAGES
-        // ===============================================================================
         BUILDER.push("Join and Leave Messages");
 
         ENABLE_CUSTOM_JOIN_LEAVE = BUILDER
@@ -123,14 +142,23 @@ public class ChatConfig {
                 .define("enableCustomJoinLeave", true);
 
         JOIN_MESSAGE = BUILDER
-                .comment("Join message. Variables: {player}, {nickname}",
-                        "Use 'none' to disable join messages completely.")
-                .define("joinMessage", "§e{player} §7joined the game");
+                .comment(
+                        "Join message.",
+                        "BACKWARD-COMPATIBLE: {player} = MC username, {nickname} = nick or MC username.",
+                        "NEW: {nick} = same as {nickname}, {real} = always MC username,",
+                        "     {nick_real} = 'Nick (Real)' when they differ.",
+                        "Set to 'none' to disable."
+                )
+                .define("joinMessage", "§e{player} §7woke up");
 
         LEAVE_MESSAGE = BUILDER
-                .comment("Leave message. Variables: {player}, {nickname}",
-                        "Use 'none' to disable leave messages completely.")
-                .define("leaveMessage", "§e{player} §7left the game");
+                .comment(
+                        "Leave message.",
+                        "BACKWARD-COMPATIBLE: {player} = MC username, {nickname} = nick or MC username.",
+                        "NEW: {nick}, {real}, {nick_real}.",
+                        "Set to 'none' to disable."
+                )
+                .define("leaveMessage", "§e{player} §7went to sleep");
 
         BUILDER.pop();
 

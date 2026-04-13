@@ -59,6 +59,7 @@ public class ProfessionConfig {
                 "  profession_id;item1,item2,item3",
                 "  Example: miner;minecraft:iron_pickaxe,minecraft:diamond_pickaxe",
                 "",
+                "You may use the in-game GUI to modify this as it was built to help you.",
                 "═══════════════════════════════════════════════════════════════"
         ).push("Profession System");
 

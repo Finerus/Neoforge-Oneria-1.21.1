@@ -16,15 +16,15 @@ import java.io.*;
 import java.lang.reflect.Type;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
 
 /**
- * Gestionnaire de dernières connexions.
- * Stocke le dernier login ET logout de chaque joueur dans :
- *   world/data/oneriamod/lastconnection.json
+ * Gestionnaire de dernières connexions + playtime cumulatif.
  *
- * Configurable via ModerationConfig ([Last Connection] section).
+ * Le champ {@code totalPlaytimeMs} est ajouté à {@link ConnectionEntry}.
+ * Il est rétrocompatible : les anciens fichiers JSON sans ce champ
+ * le liront comme 0 (valeur par défaut de long en Java/Gson).
  */
 public class LastConnectionManager {
 
@@ -34,15 +34,24 @@ public class LastConnectionManager {
 
     public static class ConnectionEntry {
         public String mcName;
-        public String lastLogin;   // null si jamais connecté
-        public String lastLogout;  // null si jamais déconnecté (ou tracking désactivé)
+        public String lastLogin;
+        public String lastLogout;
+        /** Playtime cumulatif en millisecondes. Ajouté en 4.1.6, défaut 0 (rétrocompat). */
+        public long totalPlaytimeMs = 0L;
 
         public ConnectionEntry() {}
 
         public ConnectionEntry(String mcName, String lastLogin, String lastLogout) {
-            this.mcName = mcName;
+            this.mcName    = mcName;
             this.lastLogin = lastLogin;
             this.lastLogout = lastLogout;
+        }
+
+        public ConnectionEntry(String mcName, String lastLogin, String lastLogout, long totalPlaytimeMs) {
+            this.mcName         = mcName;
+            this.lastLogin      = lastLogin;
+            this.lastLogout     = lastLogout;
+            this.totalPlaytimeMs = totalPlaytimeMs;
         }
     }
 
@@ -55,7 +64,7 @@ public class LastConnectionManager {
     private static File dataFile = null;
 
     // =========================================================================
-    // INITIALISATION
+    // INIT
     // =========================================================================
 
     private static synchronized void ensureInitialized() {
@@ -63,15 +72,17 @@ public class LastConnectionManager {
         try {
             File dataFolder = RpEssentialsDataPaths.getDataFolder();
             if (!dataFolder.exists()) dataFolder.mkdirs();
-
             dataFile = new File(dataFolder, "lastconnection.json");
             if (dataFile.exists()) loadFromFile();
-
             RpEssentials.LOGGER.info("[LastConnectionManager] Initialized - File: {}", dataFile.getAbsolutePath());
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[LastConnectionManager] Failed to initialize", e);
         }
     }
+
+    // =========================================================================
+    // AUTO-UNWHITELIST
+    // =========================================================================
 
     private static boolean hasDoneUnwhitelistToday = false;
     private static int     lastUnwhitelistDay       = -1;
@@ -83,13 +94,8 @@ public class LastConnectionManager {
         } catch (IllegalStateException e) { return; }
 
         int today = java.time.LocalDate.now().getDayOfYear();
-        if (today != lastUnwhitelistDay) {
-            hasDoneUnwhitelistToday = false;
-            lastUnwhitelistDay = today;
-        }
-        if (hasDoneUnwhitelistToday) return;
-        if (hour != 0 || minute > 1)  return;
-
+        if (today != lastUnwhitelistDay) { hasDoneUnwhitelistToday = false; lastUnwhitelistDay = today; }
+        if (hasDoneUnwhitelistToday || hour != 0 || minute > 1) return;
         hasDoneUnwhitelistToday = true;
         RpEssentials.LOGGER.info("[AutoUnwhitelist] Starting daily sweep...");
 
@@ -134,8 +140,7 @@ public class LastConnectionManager {
                     net.minecraft.network.chat.MutableComponent msg =
                             net.minecraft.network.chat.Component.literal(
                                     MessagesConfig.get(MessagesConfig.AUTO_UNWHITELIST_STAFF_NOTIFY,
-                                            "player", playerName,
-                                            "days",   String.valueOf(inactiveDays)));
+                                            "player", playerName, "days", String.valueOf(inactiveDays)));
                     net.minecraft.network.chat.MutableComponent undo =
                             net.minecraft.network.chat.Component.literal("§a[Annuler]")
                                     .withStyle(s -> s
@@ -144,19 +149,16 @@ public class LastConnectionManager {
                                                     "/whitelist add " + playerName))
                                             .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
                                                     net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
-                                                    net.minecraft.network.chat.Component.literal(
-                                                            "Re-whitelist " + playerName))));
+                                                    net.minecraft.network.chat.Component.literal("Re-whitelist " + playerName))));
                     staff.sendSystemMessage(msg.append(undo));
                 }
 
                 for (String cmd : extraCmds) {
                     server.getCommands().performPrefixedCommand(
                             server.createCommandSourceStack(),
-                            cmd.replace("{player}", playerName)
-                                    .replace("{uuid}",   playerUUID.toString()));
+                            cmd.replace("{player}", playerName).replace("{uuid}", playerUUID.toString()));
                 }
-                RpEssentials.LOGGER.info("[AutoUnwhitelist] Removed {} — inactive {} days",
-                        playerName, inactiveDays);
+                RpEssentials.LOGGER.info("[AutoUnwhitelist] Removed {} — inactive {} days", playerName, inactiveDays);
             });
             removed[0]++;
         }
@@ -176,7 +178,7 @@ public class LastConnectionManager {
                 entries.clear();
                 for (Map.Entry<String, ConnectionEntry> e : data.entrySet()) {
                     try {
-                        String key = e.getKey();
+                        String key     = e.getKey();
                         String uuidStr = key.contains(" ") ? key.substring(0, key.indexOf(' ')) : key;
                         entries.put(UUID.fromString(uuidStr), e.getValue());
                     } catch (IllegalArgumentException ex) {
@@ -194,35 +196,32 @@ public class LastConnectionManager {
     // SAVE (async)
     // =========================================================================
 
-
     private static void saveToFile() {
         ensureInitialized();
         if (dataFile == null) return;
 
         Map<UUID, ConnectionEntry> snapshot = new HashMap<>(entries);
-        MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
 
         Map<String, ConnectionEntry> data = new java.util.LinkedHashMap<>();
         for (Map.Entry<UUID, ConnectionEntry> e : snapshot.entrySet()) {
             UUID uuid = e.getKey();
-            ConnectionEntry entry = e.getValue();
-            String mcName = entry.mcName != null ? entry.mcName : "Unknown";
+            String mcName = e.getValue().mcName != null ? e.getValue().mcName : "Unknown";
             if (server != null) {
                 ServerPlayer online = server.getPlayerList().getPlayer(uuid);
                 if (online != null) mcName = online.getName().getString();
             }
-            data.put(uuid.toString() + " (" + mcName + ")", entry);
+            data.put(uuid.toString() + " (" + mcName + ")", e.getValue());
         }
 
         File targetFile = dataFile;
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+        CompletableFuture.runAsync(() -> {
             try {
                 File parent = targetFile.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();
                 try (java.io.FileWriter writer = new java.io.FileWriter(targetFile)) {
                     GSON.toJson(data, writer);
                 }
-                RpEssentials.LOGGER.debug("[LastConnectionManager] Saved {} entries", data.size());
             } catch (Exception e) {
                 RpEssentials.LOGGER.error("[LastConnectionManager] Failed to save", e);
             }
@@ -243,60 +242,77 @@ public class LastConnectionManager {
     }
 
     private static boolean isEnabled() {
-        try {
-            return ModerationConfig.ENABLE_LAST_CONNECTION != null
-                    && ModerationConfig.ENABLE_LAST_CONNECTION.get();
-        } catch (IllegalStateException e) {
-            return false;
-        }
+        try { return ModerationConfig.ENABLE_LAST_CONNECTION != null && ModerationConfig.ENABLE_LAST_CONNECTION.get(); }
+        catch (IllegalStateException e) { return false; }
     }
 
     // =========================================================================
-    // PUBLIC API
+    // PUBLIC API — CONNEXIONS
     // =========================================================================
 
-    /** Appelé lors du login du joueur. */
     public static void recordLogin(ServerPlayer player) {
         if (!isEnabled()) return;
         ensureInitialized();
-
         UUID uuid = player.getUUID();
         String name = player.getName().getString();
-        String now = getNow();
-
+        String now  = getNow();
         ConnectionEntry existing = entries.get(uuid);
-        String lastLogout = existing != null ? existing.lastLogout : null;
-        entries.put(uuid, new ConnectionEntry(name, now, lastLogout));
+        long prevPlaytime = existing != null ? existing.totalPlaytimeMs : 0L;
+        entries.put(uuid, new ConnectionEntry(name, now,
+                existing != null ? existing.lastLogout : null, prevPlaytime));
         saveToFile();
     }
 
-    /** Appelé lors du logout du joueur. */
     public static void recordLogout(ServerPlayer player) {
         if (!isEnabled()) return;
-        try {
-            if (!ModerationConfig.LAST_CONNECTION_TRACK_LOGOUT.get()) return;
-        } catch (IllegalStateException e) {
-            return;
-        }
+        try { if (!ModerationConfig.LAST_CONNECTION_TRACK_LOGOUT.get()) return; }
+        catch (IllegalStateException e) { return; }
         ensureInitialized();
-
         UUID uuid = player.getUUID();
         String name = player.getName().getString();
-        String now = getNow();
-
+        String now  = getNow();
         ConnectionEntry existing = entries.get(uuid);
-        String lastLogin = existing != null ? existing.lastLogin : null;
-        entries.put(uuid, new ConnectionEntry(name, lastLogin, now));
+        long prevPlaytime = existing != null ? existing.totalPlaytimeMs : 0L;
+        entries.put(uuid, new ConnectionEntry(name,
+                existing != null ? existing.lastLogin : null, now, prevPlaytime));
         saveToFile();
     }
 
-    /** Récupère l'entrée d'un joueur (null si inconnu). */
+    // =========================================================================
+    // PUBLIC API — PLAYTIME
+    // =========================================================================
+
+    /**
+     * Ajoute de la durée au playtime cumulatif d'un joueur.
+     * Appelé par {@link net.rp.rpessentials.moderation.PlaytimeManager#onLogout}.
+     */
+    public static void addPlaytime(UUID uuid, long durationMs) {
+        ensureInitialized();
+        ConnectionEntry e = entries.get(uuid);
+        if (e == null) return;
+        e.totalPlaytimeMs += durationMs;
+        saveToFile();
+    }
+
+    /**
+     * Retourne le playtime cumulatif persisté (sans la session courante).
+     * Pour le total incluant la session courante, voir {@link PlaytimeManager#getTotalPlaytimeMs}.
+     */
+    public static long getTotalPlaytimeMs(UUID uuid) {
+        ensureInitialized();
+        ConnectionEntry e = entries.get(uuid);
+        return e != null ? e.totalPlaytimeMs : 0L;
+    }
+
+    // =========================================================================
+    // PUBLIC API — LECTURE
+    // =========================================================================
+
     public static ConnectionEntry getEntry(UUID uuid) {
         ensureInitialized();
         return entries.get(uuid);
     }
 
-    /** Retourne toutes les entrées triées par lastLogin décroissant. */
     public static List<Map.Entry<UUID, ConnectionEntry>> getAllSortedByLogin() {
         ensureInitialized();
         List<Map.Entry<UUID, ConnectionEntry>> list = new ArrayList<>(entries.entrySet());
@@ -306,12 +322,11 @@ public class LastConnectionManager {
             if (la == null && lb == null) return 0;
             if (la == null) return 1;
             if (lb == null) return -1;
-            return lb.compareTo(la); // ordre décroissant
+            return lb.compareTo(la);
         });
         return list;
     }
 
-    /** Recherche par nom de joueur (case-insensitive). */
     public static UUID findUUIDByName(String name) {
         ensureInitialized();
         for (Map.Entry<UUID, ConnectionEntry> e : entries.entrySet()) {
@@ -320,7 +335,6 @@ public class LastConnectionManager {
         return null;
     }
 
-    /** Recharge les données depuis le fichier. */
     public static void reload() {
         dataFile = null;
         entries.clear();

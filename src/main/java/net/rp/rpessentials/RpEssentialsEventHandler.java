@@ -1,11 +1,9 @@
 package net.rp.rpessentials;
 
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundSource;
+import net.minecraft.server.players.PlayerList;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -15,13 +13,10 @@ import net.rp.rpessentials.config.ModerationConfig;
 import net.rp.rpessentials.config.ScheduleConfig;
 import net.rp.rpessentials.identity.NicknameManager;
 import net.rp.rpessentials.identity.RpEssentialsMessagingManager;
-import net.rp.rpessentials.moderation.LastConnectionManager;
-import net.rp.rpessentials.moderation.MuteManager;
-import net.rp.rpessentials.moderation.WarnManager;
+import net.rp.rpessentials.api.IRpPlayerList;
+import net.rp.rpessentials.moderation.*;
 import net.rp.rpessentials.profession.ProfessionSyncHelper;
 import net.rp.rpessentials.profession.TempLicenseExpirationManager;
-
-import java.util.concurrent.CompletableFuture;
 
 @EventBusSubscriber(modid = RpEssentials.MODID)
 public class RpEssentialsEventHandler {
@@ -31,6 +26,7 @@ public class RpEssentialsEventHandler {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
         LastConnectionManager.recordLogin(player);
+        PlaytimeManager.onLogin(player.getUUID());
 
         MinecraftServer server = player.getServer();
         if (server == null) return;
@@ -43,9 +39,11 @@ public class RpEssentialsEventHandler {
             return;
         }
 
+        // Message join — cast via IRpPlayerList (interface injectée par MixinPlayerList)
+        sendJoinLeaveMessage(server, player, true);
+
         try {
-            if (ModerationConfig.ENABLE_MUTE_SYSTEM.get()
-                    && MuteManager.isMuted(player.getUUID())) {
+            if (ModerationConfig.ENABLE_MUTE_SYSTEM.get() && MuteManager.isMuted(player.getUUID())) {
                 MuteManager.MuteEntry entry = MuteManager.getEntry(player.getUUID());
                 if (entry != null) {
                     player.sendSystemMessage(ColorHelper.parseColors(
@@ -56,54 +54,43 @@ public class RpEssentialsEventHandler {
             }
         } catch (IllegalStateException ignored) {}
 
-        // Sync nametag
+        // Sync nametag différé 500ms
         java.util.concurrent.CompletableFuture.runAsync(
                 () -> server.execute(() -> {
                     SyncNametagDataPacket.broadcastForPlayer(player);
                     for (ServerPlayer online : server.getPlayerList().getPlayers()) {
                         if (!online.getUUID().equals(player.getUUID())) {
-                            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(
-                                    player, SyncNametagDataPacket.from(online));
+                            PacketDistributor.sendToPlayer(player, SyncNametagDataPacket.from(online));
                         }
                     }
                 }),
                 java.util.concurrent.CompletableFuture.delayedExecutor(
-                        500, java.util.concurrent.TimeUnit.MILLISECONDS)
-        );
+                        500, java.util.concurrent.TimeUnit.MILLISECONDS));
 
-        // Welcome message
+        // Message de bienvenue
         try {
             if (ScheduleConfig.ENABLE_WELCOME != null && ScheduleConfig.ENABLE_WELCOME.get()) {
                 String playerName = player.getName().getString();
-                String nickname   = net.rp.rpessentials.identity.NicknameManager.getDisplayName(player);
+                String nickname   = NicknameManager.getDisplayName(player);
                 for (String line : ScheduleConfig.WELCOME_LINES.get()) {
-                    String formatted = line
-                            .replace("{player}",   playerName)
-                            .replace("{nickname}", nickname);
+                    String fmt = line.replace("{player}", playerName).replace("{nickname}", nickname);
                     player.sendSystemMessage(ColorHelper.parseColors(
-                            ColorHelper.translateAlternateColorCodes(formatted)));
+                            ColorHelper.translateAlternateColorCodes(fmt)));
                 }
             }
         } catch (IllegalStateException ignored) {}
 
         TempLicenseExpirationManager.checkOnLogin(player, server);
-
         TempLicenseExpirationManager.markRevokedLicenseItems(player);
 
-        try {
-            if (ModerationConfig.WARN_AUTO_PURGE_EXPIRED.get()) {
-                WarnManager.purgeExpiredWarns();
-            }
-        } catch (IllegalStateException ignored) {}
+        try { if (ModerationConfig.WARN_AUTO_PURGE_EXPIRED.get()) WarnManager.purgeExpiredWarns(); }
+        catch (IllegalStateException ignored) {}
 
         try {
             if (ModerationConfig.WARN_NOTIFY_ON_JOIN.get()) {
                 int count = WarnManager.getActiveWarns(player.getUUID()).size();
-                if (count > 0) {
-                    String msg = ModerationConfig.WARN_JOIN_MESSAGE.get()
-                            .replace("{count}", String.valueOf(count));
-                    player.sendSystemMessage(ColorHelper.parseColors(msg));
-                }
+                if (count > 0) player.sendSystemMessage(ColorHelper.parseColors(
+                        ModerationConfig.WARN_JOIN_MESSAGE.get().replace("{count}", String.valueOf(count))));
             }
         } catch (IllegalStateException ignored) {}
 
@@ -119,8 +106,7 @@ public class RpEssentialsEventHandler {
                             net.minecraft.core.Holder.direct(sound),
                             net.minecraft.sounds.SoundSource.MASTER,
                             player.getX(), player.getY(), player.getZ(),
-                            1.0f, 1.0f, player.getRandom().nextLong()
-                    ));
+                            1.0f, 1.0f, player.getRandom().nextLong()));
                 }
             }
         } catch (IllegalStateException ignored) {}
@@ -130,9 +116,34 @@ public class RpEssentialsEventHandler {
     public static void onPlayerLogout(PlayerEvent.PlayerLoggedOutEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
+        PlaytimeManager.onLogout(player.getUUID());
         LastConnectionManager.recordLogout(player);
+
+        MinecraftServer server = player.getServer();
+        if (server != null) sendJoinLeaveMessage(server, player, false);
+
         RpEssentialsPermissions.invalidateCache(player.getUUID());
-        net.rp.rpessentials.identity.RpEssentialsMessagingManager.clearCache(player.getUUID());
-        RpCooldownManager.clearAll(player.getUUID()); // Feature 14
+        RpEssentialsMessagingManager.clearCache(player.getUUID());
+        RpCooldownManager.clearAll(player.getUUID());
+    }
+
+    // =========================================================================
+    // PRIVATE
+    // =========================================================================
+
+    /**
+     * Envoie le message join/leave via l'interface IRpPlayerList.
+     * MixinPlayerList implémente IRpPlayerList, ce qui permet le cast
+     * sans référencer directement la classe de mixin.
+     */
+    private static void sendJoinLeaveMessage(MinecraftServer server, ServerPlayer player, boolean isJoin) {
+        PlayerList pl = server.getPlayerList();
+        // Cast via l'interface injectée par le mixin — ne plante jamais car
+        // MixinPlayerList implémente toujours IRpPlayerList sur PlayerList au runtime.
+        if (pl instanceof IRpPlayerList rpl) {
+            rpl.rpe$sendCustomJoinLeaveMessage(player, isJoin);
+        } else {
+            RpEssentials.LOGGER.warn("[JoinLeave] IRpPlayerList not available on PlayerList — mixin missing?");
+        }
     }
 }

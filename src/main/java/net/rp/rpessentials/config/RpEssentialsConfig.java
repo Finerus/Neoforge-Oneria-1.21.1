@@ -74,7 +74,7 @@ public class RpEssentialsConfig {
         PROXIMITY_DISTANCE = BUILDER
                 .comment("The distance (in blocks) required to see another player's name clearly.",
                         "Beyond this distance the name is replaced by '???'. Default: 8 blocks.")
-                .defineInRange("proximityDistance", 8, 1, 128);
+                .defineInRange("proximityDistance", 12, 1, 128);
 
         ENABLE_BLUR = BUILDER
                 .comment("Enables or disables the name blurring system.")
@@ -94,7 +94,7 @@ public class RpEssentialsConfig {
 
         SNEAK_PROXIMITY_DISTANCE = BUILDER
                 .comment("Distance at which sneaking players can be detected. Default: 2 blocks.")
-                .defineInRange("sneakProximityDistance", 2, 1, 32);
+                .defineInRange("sneakProximityDistance", 1, 1, 32);
 
         OPS_SEE_ALL = BUILDER
                 .comment("If true, operators and staff always see all names clearly.")
@@ -127,7 +127,7 @@ public class RpEssentialsConfig {
 
         BLUR_SPECTATORS = BUILDER
                 .comment("If true, spectators are also subject to name blurring.")
-                .define("blurSpectators", false);
+                .define("blurSpectators", true);
 
         WHITELIST_EXEMPT_PROFESSIONS = BUILDER
                 .comment("If true, whitelisted players are also exempt from profession restrictions.")
@@ -143,7 +143,7 @@ public class RpEssentialsConfig {
         STAFF_TAGS = BUILDER
                 .comment("LuckPerms tags/groups considered as staff.")
                 .defineList("staffTags",
-                        Arrays.asList("admin", "moderateur", "modo", "staff", "builder"),
+                        Arrays.asList("admin", "moderator", "staff", "builder"),
                         obj -> obj instanceof String);
 
         OP_LEVEL_BYPASS = BUILDER
@@ -173,7 +173,7 @@ public class RpEssentialsConfig {
 
         WORLD_BORDER_DISTANCE = BUILDER
                 .comment("Distance from spawn (blocks) before warning is triggered.")
-                .defineInRange("worldBorderDistance", 2000, 100, 100000);
+                .defineInRange("worldBorderDistance", 1500, 100, 100000);
 
         WORLD_BORDER_MESSAGE = BUILDER
                 .comment("Message displayed when player reaches border. Variables: {distance}, {player}")
@@ -317,7 +317,7 @@ public class RpEssentialsConfig {
                         "The vanilla tag added = roleId. The LuckPerms parent set = lpGroup.",
                         "All other role tags are removed automatically when a new role is set.")
                 .defineList("roles",
-                        java.util.Arrays.asList("admin;admin", "modo;modo", "builder;builder", "joueur;joueur"),
+                        java.util.Arrays.asList("admin;admin", "moderator;moderator", "builder;builder", "player;player"),
                         obj -> obj instanceof String && ((String) obj).contains(";"));
 
         BUILDER.pop(); // Roles

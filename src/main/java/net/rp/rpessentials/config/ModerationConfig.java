@@ -68,7 +68,7 @@ public class ModerationConfig {
 
         LOG_TO_STAFF = BUILDER
                 .comment("Notify other staff members when a silent command is used.")
-                .define("logToStaff", true);
+                .define("logToStaff", false);
 
         LOG_TO_CONSOLE = BUILDER
                 .comment("Log silent commands to the server console.")
@@ -93,7 +93,7 @@ public class ModerationConfig {
                 .comment("List of TP platforms.",
                         "Format: id;DisplayName;dimension;x;y;z",
                         "Example: spawn;The Spawn;minecraft:overworld;0;100;0")
-                .defineList("platforms", Arrays.asList("platform1;Platform 1;RpEssentials:quartier;7217;18;-1321"), obj -> obj instanceof String);
+                .defineList("platforms", Arrays.asList("platform1;Platform 1;minecraft:overworld;0;300;0"), obj -> obj instanceof String);
 
         BUILDER.pop();
 
@@ -143,7 +143,7 @@ public class ModerationConfig {
                         "If true, players are notified of their active warn count on every login.",
                         "They are also invited to type /mywarn to see the details."
                 )
-                .define("notifyOnJoin", true);
+                .define("notifyOnJoin", false);
 
         WARN_JOIN_MESSAGE = BUILDER
                 .comment(
@@ -174,7 +174,7 @@ public class ModerationConfig {
                         "Set to '' (empty string) to disable staff broadcast."
                 )
                 .define("addedBroadcastFormat",
-                        "§6[STAFF][WARN] §e{staff} §7a averti §e{player} §7(warn #{id}) — §f{reason} §7— {expiry}");
+                        "§6[STAFF][WARN] §e{staff} §7sent a warn to §e{player} §7(warn #{id})| §f{reason} §7| {expiry}");
 
         WARN_REMOVED_BROADCAST_FORMAT = BUILDER
                 .comment(
@@ -183,7 +183,7 @@ public class ModerationConfig {
                         "Set to '' (empty string) to disable staff broadcast."
                 )
                 .define("removedBroadcastFormat",
-                        "§6[STAFF][WARN] §e{staff} §7a supprimé le warn §e#{id}§7.");
+                        "§6[STAFF][WARN] §e{staff} §7has deleted the warn §e#{id}§7.");
 
         BUILDER.pop();
 

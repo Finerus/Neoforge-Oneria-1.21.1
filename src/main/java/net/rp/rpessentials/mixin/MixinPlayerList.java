@@ -2,30 +2,38 @@ package net.rp.rpessentials.mixin;
 
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.players.PlayerList;
-import net.rp.rpessentials.config.ChatConfig;
+import net.rp.rpessentials.ColorHelper;
 import net.rp.rpessentials.RpEssentials;
+import net.rp.rpessentials.api.IRpPlayerList;
+import net.rp.rpessentials.config.ChatConfig;
+import net.rp.rpessentials.identity.RpEssentialsChatFormatter;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+/**
+ * Intercepte les messages join/leave vanilla et les remplace par les
+ * messages personnalisés avec support de toutes les variables de nom.
+ *
+ * Implémente {@link IRpPlayerList} pour être accessible depuis
+ * RpEssentialsEventHandler sans cast direct sur la classe Mixin.
+ *
+ * 4.1.6 : resolveJoinLeavePlaceholders supporte
+ *   {player}, {nickname}   ← rétrocompatibles
+ *   {nick}, {real}, {nick_real} ← nouvelles
+ */
 @Mixin(PlayerList.class)
-public class MixinPlayerList {
+public abstract class MixinPlayerList implements IRpPlayerList {
 
-    /**
-     * Flag interne pour laisser passer nos propres messages custom.
-     * Toujours false sauf pendant broadcastCustomMessage().
-     */
     @Unique
     private boolean rpessentials$isSendingCustomMessage = false;
 
-    /**
-     * Intercepte les messages vanilla join/leave et les annule si le
-     * système custom est activé. L'envoi du message custom est délégué
-     * à RpEssentialsEventHandler via PlayerLoggedInEvent / PlayerLoggedOutEvent,
-     * où l'on dispose directement de l'objet ServerPlayer (Bug 13 fix).
-     */
+    // =========================================================================
+    // INTERCEPTION DU BROADCAST VANILLA
+    // =========================================================================
+
     @Inject(
             method = "broadcastSystemMessage(Lnet/minecraft/network/chat/Component;Z)V",
             at = @At("HEAD"),
@@ -33,54 +41,49 @@ public class MixinPlayerList {
             remap = false
     )
     public void onBroadcastSystemMessage(Component component, boolean bl, CallbackInfo ci) {
-        // Laisser passer nos propres messages custom (évite la récursion)
         if (rpessentials$isSendingCustomMessage) return;
 
         try {
             if (ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE == null
-                    || !ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) {
-                return; // Système désactivé → comportement vanilla
-            }
-        } catch (Exception e) {
-            return; // Config pas encore chargée → comportement vanilla
-        }
+                    || !ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) return;
+        } catch (Exception e) { return; }
 
         String text = component.getString();
+        boolean isJoin  = text.contains("joined the game")  || text.contains("a rejoint la partie");
+        boolean isLeave = text.contains("left the game")    || text.contains("a quitté la partie");
 
-        // Bug 10 fix — on ne parse plus le texte pour extraire le nom.
-        // On annule juste le message vanilla ; le custom est envoyé
-        // depuis PlayerLoggedInEvent / PlayerLoggedOutEvent.
-        boolean isJoin  = text.contains("joined the game")
-                || text.contains("a rejoint la partie");
-        boolean isLeave = text.contains("left the game")
-                || text.contains("a quitté la partie");
+        if (!isJoin && !isLeave) return;
+        ci.cancel();
 
-        if (isJoin) {
-            ci.cancel();
-            String joinMsg;
-            try { joinMsg = ChatConfig.JOIN_MESSAGE.get(); }
-            catch (Exception e) { return; }
-            // "none" = désactivé explicitement
-            if ("none".equalsIgnoreCase(joinMsg)) return;
-            // Le message est envoyé par RpEssentialsEventHandler,
-            // ici on se contente d'annuler le vanilla.
-            RpEssentials.LOGGER.debug("[JoinLeave] Vanilla join message cancelled.");
-        } else if (isLeave) {
-            ci.cancel();
-            String leaveMsg;
-            try { leaveMsg = ChatConfig.LEAVE_MESSAGE.get(); }
-            catch (Exception e) { return; }
-            if ("none".equalsIgnoreCase(leaveMsg)) return;
-            RpEssentials.LOGGER.debug("[JoinLeave] Vanilla leave message cancelled.");
+        // Le message custom est envoyé depuis RpEssentialsEventHandler
+        // qui dispose directement du ServerPlayer — on annule juste le vanilla.
+        RpEssentials.LOGGER.debug("[JoinLeave] Vanilla {} cancelled.", isJoin ? "join" : "leave");
+    }
+
+    // =========================================================================
+    // IMPLÉMENTATION IRpPlayerList
+    // =========================================================================
+
+    @Override
+    public void rpe$sendCustomJoinLeaveMessage(
+            net.minecraft.server.level.ServerPlayer player, boolean isJoin) {
+        try {
+            String raw = isJoin ? ChatConfig.JOIN_MESSAGE.get() : ChatConfig.LEAVE_MESSAGE.get();
+            if (raw == null || "none".equalsIgnoreCase(raw) || raw.isBlank()) return;
+
+            String resolved = RpEssentialsChatFormatter.resolveJoinLeavePlaceholders(raw, player);
+            Component formatted = ColorHelper.parseColors(
+                    ColorHelper.translateAlternateColorCodes(resolved));
+
+            rpe$broadcastCustomMessage(formatted);
+        } catch (Exception e) {
+            RpEssentials.LOGGER.warn("[JoinLeave] Error building {} message: {}",
+                    isJoin ? "join" : "leave", e.getMessage());
         }
     }
 
-    /**
-     * Méthode utilitaire appelée depuis RpEssentialsEventHandler pour
-     * broadcaster un message custom sans déclencher notre propre filtre.
-     */
-    @Unique
-    public void rpessentials$broadcastCustomMessage(Component message) {
+    @Override
+    public void rpe$broadcastCustomMessage(Component message) {
         rpessentials$isSendingCustomMessage = true;
         try {
             ((PlayerList)(Object)this).broadcastSystemMessage(message, false);
