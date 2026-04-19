@@ -128,7 +128,7 @@ public abstract class MixinServerCommonPacketListenerImpl {
 
             newEntries.add(new ClientboundPlayerInfoUpdatePacket.Entry(
                     entry.profileId(), entry.profile(), entry.listed(),
-                    entry.latency(), entry.gameMode(), displayName, entry.chatSession()));
+                    entry.latency(), entry.gameMode(), displayName, entry.latency(), entry.chatSession()));
         }
 
         ClientboundPlayerInfoUpdatePacket newPacket = new ClientboundPlayerInfoUpdatePacket(actions, List.of());

@@ -6,7 +6,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Gestionnaire de cooldowns pour les commandes RP.
- * Thread-safe — partagé entre le tick serveur et les handlers de commandes.
+ * Thread-safe, partagé entre le tick serveur et les handlers de commandes.
  */
 public class RpCooldownManager {
 

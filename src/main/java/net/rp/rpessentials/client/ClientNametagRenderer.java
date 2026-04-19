@@ -19,7 +19,7 @@ import java.util.UUID;
 public class ClientNametagRenderer {
 
     @SubscribeEvent
-    public static void onRenderNameTag(RenderNameTagEvent event) {
+    public static void onRenderNameTag(RenderNameTagEvent.CanRender event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 

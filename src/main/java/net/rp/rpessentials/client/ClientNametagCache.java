@@ -30,11 +30,6 @@ public class ClientNametagCache {
         return cache.containsKey(uuid);
     }
 
-    /**
-     * Amélioration 10 — Nettoie les entrées des joueurs qui ne sont plus
-     * dans la liste du serveur (déconnectés pendant que le client reste connecté).
-     * Appelé périodiquement depuis RpClientTickHandler.
-     */
     public static void evictDisconnected() {
         Minecraft mc = Minecraft.getInstance();
         if (mc.getConnection() == null) return;

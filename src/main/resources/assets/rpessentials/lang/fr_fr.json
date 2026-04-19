@@ -33,7 +33,7 @@
   "rpessentials.gui.profession_editor.tab.blocks":         "Blocs",
   "rpessentials.gui.profession_editor.tab.items":          "Items",
   "rpessentials.gui.profession_editor.tab.equipment":      "Équipement",
-  "rpessentials.gui.profession_editor.no_restriction":     "Aucune — tout est bloqué pour cette catégorie",
+  "rpessentials.gui.profession_editor.no_restriction":     "Aucune: tout est bloqué pour cette catégorie",
   "rpessentials.gui.profession_editor.restriction_label":  "Restriction",
   "rpessentials.gui.profession_editor.restriction_hint":   "§7ex: minecraft:iron_sword",
   "rpessentials.gui.profession_editor.and_more":           "§8... et %s de plus",

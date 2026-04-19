@@ -67,7 +67,7 @@ public record SyncNametagDataPacket(
 
     public static void handle(SyncNametagDataPacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            RpEssentials.LOGGER.info("[SyncNametag] CLIENT received — uuid={} displayName='{}'",
+            RpEssentials.LOGGER.info("[SyncNametag] CLIENT received: uuid={} displayName='{}'",
                     packet.targetUUID(), packet.displayName());
             net.rp.rpessentials.client.ClientNametagCache.update(packet);
         });

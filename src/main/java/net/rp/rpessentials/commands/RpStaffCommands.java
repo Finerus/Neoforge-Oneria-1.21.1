@@ -155,7 +155,7 @@ public class RpStaffCommands {
         }
         ServerPlayer executor = ctx.getSource().getPlayerOrException();
         ServerPlayer target = EntityArgument.getPlayer(ctx, "target");
-        executor.teleportTo(target.serverLevel(), target.getX(), target.getY(), target.getZ(), target.getYRot(), target.getXRot());
+        executor.teleportTo(target.serverLevel(), target.getX(), target.getY(), target.getZ(), java.util.Set.of(), target.getYRot(), target.getXRot(), true);
         logToStaff(ctx.getSource(), executor.getName().getString() + " TP'd to " + target.getName().getString());
         return 1;
     }
@@ -169,8 +169,10 @@ public class RpStaffCommands {
         ResourceLocation effectId = ResourceLocationArgument.getId(ctx, "effect");
         int duration = IntegerArgumentType.getInteger(ctx, "duration");
         int amplifier = IntegerArgumentType.getInteger(ctx, "amplifier");
-        Optional<Holder.Reference<MobEffect>> effect =
-                BuiltInRegistries.MOB_EFFECT.getHolder(ResourceKey.create(BuiltInRegistries.MOB_EFFECT.key(), effectId));
+        Optional<Holder.Reference<MobEffect>> effect = ctx.getSource().getServer()
+                .registryAccess()
+                .lookupOrThrow(net.minecraft.core.registries.Registries.MOB_EFFECT)
+                .get(effectId);
         if (effect.isPresent()) {
             target.addEffect(new MobEffectInstance(effect.get(), duration * 20, amplifier, false, false));
             String sourceName = ctx.getSource().getPlayer() != null ? ctx.getSource().getPlayer().getName().getString() : "Console";
@@ -210,11 +212,11 @@ public class RpStaffCommands {
                 if (level == null) { source.sendFailure(Component.literal("§cDimension not found: " + parts[2])); continue; }
                 Vec3 pos = new Vec3(Double.parseDouble(parts[3]), Double.parseDouble(parts[4]), Double.parseDouble(parts[5]));
                 if (target != null) {
-                    target.teleportTo(level, pos.x, pos.y, pos.z, 0, 0);
+                    target.teleportTo(level, pos.x, pos.y, pos.z, java.util.Set.of(), 0, 0, true);
                     target.sendSystemMessage(Component.literal("§e[Staff] You have been teleported to: " + parts[1]));
                     logToStaff(source, executor.getName().getString() + " TP'd " + target.getName().getString() + " to " + parts[1]);
                 } else {
-                    executor.teleportTo(level, pos.x, pos.y, pos.z, 0, 0);
+                    executor.teleportTo(level, pos.x, pos.y, pos.z, java.util.Set.of(), 0, 0, true);
                     executor.sendSystemMessage(Component.literal("§aTeleported to: " + parts[1]));
                 }
                 return 1;

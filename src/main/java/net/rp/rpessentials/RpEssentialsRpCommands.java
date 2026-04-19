@@ -165,7 +165,7 @@ public class RpEssentialsRpCommands {
             return 0;
         }
 
-        player.teleportTo(level, x, y, z, java.util.Set.of(), yaw, pitch);
+        player.teleportTo(level, x, y, z, java.util.Set.of(), yaw, pitch, true);
         player.displayClientMessage(
                 ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_AFK_TELEPORT)), false);
         return 1;
@@ -384,13 +384,10 @@ public class RpEssentialsRpCommands {
     private static void playAnnonceSound(ServerPlayer player, String soundId) {
         try {
             ResourceLocation loc = ResourceLocation.parse(soundId);
-            net.minecraft.core.Holder<net.minecraft.sounds.SoundEvent> holder =
-                    player.level().registryAccess()
-                            .registryOrThrow(Registries.SOUND_EVENT)
-                            .getHolder(loc)
-                            .orElse(null);
-            if (holder != null) {
-                player.playNotifySound(holder.value(), SoundSource.MASTER, 1.0f, 1.0f);
+            var lookup = player.level().registryAccess().lookupOrThrow(Registries.SOUND_EVENT);
+            var holder = lookup.get(ResourceKey.create(Registries.SOUND_EVENT, loc));
+            if (holder.isPresent()) {
+                player.playNotifySound(holder.get().value(), SoundSource.MASTER, 1.0f, 1.0f);
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.warn("[RP] Could not play sound '{}': {}", soundId, e.getMessage());

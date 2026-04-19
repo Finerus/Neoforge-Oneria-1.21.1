@@ -24,12 +24,12 @@ public abstract class MixinAnvilMenu extends MixinItemCombinerMenuBase {
     private static final long COOLDOWN_MS = 2000L;
 
     @Inject(
-            method = "mayPickup(Lnet/minecraft/world/entity/player/Player;Z)Z",
+            method = "mayPickup(Lnet/minecraft/world/entity/player/Player;)Z",
             at = @At("HEAD"),
             cancellable = true,
             remap = false
     )
-    private void rpessentials$blockAnvil(Player player, boolean hasStack, CallbackInfoReturnable<Boolean> cir) {
+    private void rpessentials$blockAnvil(Player player, CallbackInfoReturnable<Boolean> cir) {
         if (!(player instanceof ServerPlayer serverPlayer)) return;
         if (serverPlayer.isCreative()) return;
 

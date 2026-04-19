@@ -47,7 +47,7 @@ public class DiceManager {
                 if (type != null) result.add(type);
             }
         } catch (IllegalStateException e) {
-            // Config pas encore chargée — retourner liste vide
+            // Config pas encore chargée: retourner liste vide
         }
         return result;
     }

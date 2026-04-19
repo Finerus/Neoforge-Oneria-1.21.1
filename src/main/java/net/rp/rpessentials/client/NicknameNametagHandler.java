@@ -15,14 +15,14 @@ import java.util.UUID;
 
 /**
  * Remplace le Component du nametag par le nickname reçu du serveur via SyncNametagDataPacket.
- * Ne gère QUE la substitution du nom — la logique d'affichage (occlusion, distance, etc.)
+ * Ne gère QUE la substitution du nom: la logique d'affichage (occlusion, distance, etc.)
  * reste dans MixinEntityRenderer.
  */
 @EventBusSubscriber(modid = RpEssentials.MODID, value = Dist.CLIENT)
 public class NicknameNametagHandler {
 
     @SubscribeEvent
-    public static void onRenderNameTag(RenderNameTagEvent event) {
+    public static void onRenderNameTag(RenderNameTagEvent.CanRender event) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
 

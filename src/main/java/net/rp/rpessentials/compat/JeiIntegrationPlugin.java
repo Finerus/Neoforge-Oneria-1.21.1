@@ -4,11 +4,8 @@ import mezz.jei.api.IModPlugin;
 import mezz.jei.api.JeiPlugin;
 import mezz.jei.api.constants.RecipeTypes;
 import mezz.jei.api.runtime.IJeiRuntime;
-import net.minecraft.core.RegistryAccess;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.Recipe;
 import net.rp.rpessentials.RpEssentials;
 import net.rp.rpessentials.client.ClientProfessionRestrictions;
 import net.rp.rpessentials.config.RpConfig;
@@ -49,16 +46,36 @@ public class JeiIntegrationPlugin implements IModPlugin {
 
     private <T> void filterType(IJeiRuntime runtime, mezz.jei.api.recipe.RecipeType<T> type) {
         try {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.getConnection() == null) return;
+
             List<T> toHide = new ArrayList<>();
+
             runtime.getRecipeManager().createRecipeLookup(type).get().forEach(recipe -> {
                 try {
-                    if (!(recipe instanceof Recipe<?> r)) return;
-                    ItemStack result = r.getResultItem(RegistryAccess.EMPTY);
-                    if (result.isEmpty()) return;
-                    String id = BuiltInRegistries.ITEM.getKey(result.getItem()).toString();
-                    if (ClientProfessionRestrictions.isCraftBlocked(id)) toHide.add(recipe);
+                    if (!(recipe instanceof net.minecraft.world.item.crafting.RecipeHolder<?> holder)) return;
+
+                    // En 1.21.2+, getResultItem est remplacé par display() -> RecipeDisplay -> resultDisplay()
+                    for (net.minecraft.world.item.crafting.display.RecipeDisplay display : holder.value().display()) {
+                        net.minecraft.world.item.crafting.display.SlotDisplay result = display.result();
+                        // SlotDisplay.ItemSlotDisplay contient directement l'item
+                        if (result instanceof net.minecraft.world.item.crafting.display.SlotDisplay.ItemSlotDisplay itemDisplay) {
+                            String id = BuiltInRegistries.ITEM.getKey(itemDisplay.item().value()).toString();
+                            if (ClientProfessionRestrictions.isCraftBlocked(id)) {
+                                toHide.add(recipe);
+                                return;
+                            }
+                        } else if (result instanceof net.minecraft.world.item.crafting.display.SlotDisplay.ItemStackSlotDisplay stackDisplay) {
+                            String id = BuiltInRegistries.ITEM.getKey(stackDisplay.stack().getItem()).toString();
+                            if (ClientProfessionRestrictions.isCraftBlocked(id)) {
+                                toHide.add(recipe);
+                                return;
+                            }
+                        }
+                    }
                 } catch (Exception ignored) {}
             });
+
             if (!toHide.isEmpty()) {
                 runtime.getRecipeManager().hideRecipes(type, toHide);
             }
