@@ -169,15 +169,18 @@ public record RequestOpenGuiPacket(GuiType guiType) implements CustomPacketPaylo
         long playtimeMs = PlaytimeManager.getTotalPlaytimeMs(uuid);
         long sessionMs  = PlaytimeManager.getCurrentSessionMs(uuid);
 
-        // Notes
-        int noteCount = 0;
-        try { noteCount = NoteManager.getNotes(uuid).size(); }
-        catch (Exception ignored) {}
+        List<NoteManager.NoteEntry> rawNotes = new ArrayList<>();
+        try { rawNotes = NoteManager.getNotes(uuid); } catch (Exception ignored) {}
+        int noteCount = rawNotes.size();
+
+        List<OpenPlayerProfileGuiPacket.PlayerData.NoteEntry> noteEntries = rawNotes.stream()
+                .map(n -> new OpenPlayerProfileGuiPacket.PlayerData.NoteEntry(n.id, n.text, n.authorName, n.timestamp))
+                .collect(java.util.stream.Collectors.toList());
 
         return new OpenPlayerProfileGuiPacket.PlayerData(
                 uuid, mcName, nick, role, licenses,
                 warnCount, isMuted, muteExpiry,
-                playtimeMs, sessionMs, noteCount, true
+                playtimeMs, sessionMs, noteCount, true, noteEntries
         );
     }
 

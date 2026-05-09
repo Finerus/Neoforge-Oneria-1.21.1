@@ -74,6 +74,12 @@ public class NetworkHandler {
                 new DirectionalPayloadHandler<>(null, SetPlayerProfilePacket::handleOnServer)
         );
 
+        registrar.playToServer(
+                PlayerNoteActionPacket.TYPE,
+                PlayerNoteActionPacket.STREAM_CODEC,
+                new DirectionalPayloadHandler<>(null, PlayerNoteActionPacket::handleOnServer)
+        );
+
         // ── Config Manager GUI ────────────────────────────────────────────────
         // S→C: initial file list
         registrar.playToClient(

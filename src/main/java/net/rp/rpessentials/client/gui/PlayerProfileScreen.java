@@ -6,23 +6,20 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.rp.rpessentials.moderation.PlaytimeManager;
 import net.rp.rpessentials.network.OpenPlayerProfileGuiPacket;
+import net.rp.rpessentials.network.PlayerNoteActionPacket;
 import net.rp.rpessentials.network.SetPlayerProfilePacket;
+import net.minecraft.client.Minecraft;
+import java.time.LocalDate;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * GUI de gestion des profils RP.
- *
- * 4.1.6 : deux onglets.
- *   "Profil" : nickname + couleur + role + licences (ajout ET retrait) reunis.
- *   "Stats"  : warns, mute, playtime, session, notes.
- */
 @OnlyIn(Dist.CLIENT)
 public class PlayerProfileScreen extends Screen {
 
@@ -34,10 +31,14 @@ public class PlayerProfileScreen extends Screen {
     private int stateSelectedProf   = 0;
     private int stateNickColorIndex = 0;
     private int playerListScroll    = 0;
-    private int activeTab           = 0; // 0=Profil, 1=Stats
+    private int activeTab           = 0; // 0=Profil, 1=Stats, 2=Notes
+    private int stateNotesScroll    = 0;
 
     private String stateNick = "";
     private String stateRole = "";
+    private String stateNoteInput = "";
+    private int stateEditingNoteId = -1;
+    private int tempNoteIdCounter  = -1;
 
     private static final char[]   COLOR_CHARS = { 'f','e','6','c','a','b','9','d','7','8' };
     private static final String[] COLOR_KEYS  = {
@@ -49,8 +50,9 @@ public class PlayerProfileScreen extends Screen {
     private static final int PANEL_TOP    = 18;
     private static final int ROW_H        = 20;
     private static final int LIST_VISIBLE = 10;
+    private static final int NOTE_ROW_H   = 40; // hauteur fixe par note (meta + 2 lignes de texte)
 
-    private static final String[] TAB_LABELS = { "§eProfile", "§aStats" };
+    private static final String[] TAB_LABELS = { "§eProfile", "§aStats", "§bNotes" };
 
     public PlayerProfileScreen(List<OpenPlayerProfileGuiPacket.PlayerData> players,
                                List<String> availableProfessionIds,
@@ -93,9 +95,9 @@ public class PlayerProfileScreen extends Screen {
         int formX = LIST_W + MARGIN * 3;
         int formW = this.width - formX - MARGIN;
 
-        // Liste joueurs (gauche)
+        // ── Liste joueurs (gauche) ─────────────────────────────────────────
         if (playerListScroll > 0)
-            addRenderableWidget(Button.builder(Component.literal("a"),
+            addRenderableWidget(Button.builder(Component.literal("▲"),
                             btn -> { playerListScroll--; rebuild(); })
                     .pos(MARGIN, PANEL_TOP + 12).size(LIST_W, 13).build());
 
@@ -127,7 +129,7 @@ public class PlayerProfileScreen extends Screen {
 
         if (players.isEmpty()) return;
 
-        // Onglets
+        // ── Onglets ────────────────────────────────────────────────────────
         int tabW = (formW - 4) / TAB_LABELS.length;
         for (int i = 0; i < TAB_LABELS.length; i++) {
             final int ti = i;
@@ -143,9 +145,10 @@ public class PlayerProfileScreen extends Screen {
         switch (activeTab) {
             case 0 -> buildProfileTab(formX, formW, contentY);
             case 1 -> {} // Stats : render only
+            case 2 -> buildNotesTab(formX, formW, contentY);
         }
 
-        // Bouton Appliquer (onglet profil seulement)
+        // ── Bouton Appliquer (onglet profil seulement) ─────────────────────
         if (activeTab == 0) {
             addRenderableWidget(Button.builder(
                             Component.translatable("rpessentials.gui.player_profile.btn_apply"),
@@ -160,7 +163,7 @@ public class PlayerProfileScreen extends Screen {
     }
 
     // =========================================================================
-    // CONSTRUCTION ONGLET PROFIL (nick + role + licences reunis)
+    // ONGLET PROFIL
     // =========================================================================
 
     private void buildProfileTab(int formX, int formW, int y) {
@@ -221,7 +224,6 @@ public class PlayerProfileScreen extends Screen {
         if (!availableProfessionIds.isEmpty()) {
             y += 6;
 
-            // Fleches de navigation
             addRenderableWidget(Button.builder(Component.literal("§7<"),
                             btn -> { stateSelectedProf = Math.floorMod(stateSelectedProf - 1,
                                     availableProfessionIds.size()); rebuild(); })
@@ -232,7 +234,6 @@ public class PlayerProfileScreen extends Screen {
                                     % availableProfessionIds.size(); rebuild(); })
                     .pos(formX + 20 + 100, y).size(18, 18).build());
 
-            // Bouton Ajouter (grise si deja possedee)
             String profId = selectedProfId();
             boolean owned = selectedPlayerOwns(profId);
 
@@ -245,6 +246,97 @@ public class PlayerProfileScreen extends Screen {
                             Component.literal(owned ? "§cRevoke" : "§8Revoke"),
                             btn -> { if (owned) revokeSelectedLicense(); })
                     .pos(formX + 193, y).size(55, 18).build());
+        }
+    }
+
+    // =========================================================================
+    // ONGLET NOTES
+    // =========================================================================
+
+    private void buildNotesTab(int formX, int formW, int contentY) {
+        if (players.isEmpty()) return;
+
+        OpenPlayerProfileGuiPacket.PlayerData sel = selectedData();
+        List<OpenPlayerProfileGuiPacket.PlayerData.NoteEntry> notes = sel.notes();
+
+        int listAreaBottom = this.height - 58;
+        int listAreaHeight = listAreaBottom - contentY;
+        int maxTextW       = noteTextW();
+        int maxScroll      = Math.max(0, notes.size() - 1);
+        if (stateNotesScroll > maxScroll) stateNotesScroll = maxScroll;
+
+        // Calcul du dernier index visible (hauteurs dynamiques)
+        int first  = stateNotesScroll;
+        int last   = first - 1;
+        int totalH = 0;
+        for (int i = first; i < notes.size(); i++) {
+            int rh = noteRowH(notes.get(i), maxTextW);
+            if (totalH + rh > listAreaHeight && last >= first) break;
+            totalH += rh;
+            last = i;
+        }
+
+        if (stateNotesScroll > 0) {
+            addRenderableWidget(Button.builder(Component.literal("▲"),
+                            btn -> { stateNotesScroll = Math.max(0, stateNotesScroll - 1); rebuild(); })
+                    .pos(this.width - MARGIN - 20, contentY).size(16, 12).build());
+        }
+        if (stateNotesScroll < maxScroll) {
+            addRenderableWidget(Button.builder(Component.literal("▼"),
+                            btn -> { stateNotesScroll = Math.min(maxScroll, stateNotesScroll + 1); rebuild(); })
+                    .pos(this.width - MARGIN - 20, listAreaBottom - 12).size(16, 12).build());
+        }
+
+        int rowY = contentY;
+        for (int i = first; i <= last; i++) {
+            final OpenPlayerProfileGuiPacket.PlayerData.NoteEntry note = notes.get(i);
+            int rh   = noteRowH(note, maxTextW);
+            int btnY = rowY + rh / 2 - 8;
+
+            // Pas de boutons pour les notes temporaires (ID négatif)
+            if (note.id() >= 0) {
+                addRenderableWidget(Button.builder(Component.literal("§c✗"),
+                                btn -> deleteNote(note.id()))
+                        .pos(formX, btnY).size(14, 16).build());
+
+                boolean isEditing = stateEditingNoteId == note.id();
+                addRenderableWidget(Button.builder(
+                                Component.literal(isEditing ? "§e§l✎" : "§e✎"),
+                                btn -> {
+                                    if (stateEditingNoteId == note.id()) {
+                                        stateEditingNoteId = -1;
+                                        stateNoteInput = "";
+                                    } else {
+                                        stateEditingNoteId = note.id();
+                                        stateNoteInput = note.text();
+                                    }
+                                    rebuild();
+                                })
+                        .pos(formX + 16, btnY).size(14, 16).build());
+            }
+            rowY += rh;
+        }
+
+        int addBoxY = this.height - 50;
+        int addBoxW = Math.min(formW - 70, 280);
+
+        EditBox noteBox = new EditBox(this.font, formX, addBoxY, addBoxW, 18,
+                Component.literal("Note"));
+        noteBox.setHint(Component.literal(stateEditingNoteId != -1 ? "§7Edit note..." : "§7New note..."));
+        noteBox.setMaxLength(256);
+        noteBox.setValue(stateNoteInput);
+        noteBox.setResponder(val -> stateNoteInput = val);
+        addRenderableWidget(noteBox);
+
+        String addLabel = stateEditingNoteId != -1 ? "§aSave" : "§a+ Add";
+        addRenderableWidget(Button.builder(Component.literal(addLabel),
+                        btn -> addNote())
+                .pos(formX + addBoxW + 4, addBoxY).size(44, 18).build());
+
+        if (stateEditingNoteId != -1) {
+            addRenderableWidget(Button.builder(Component.literal("§cCancel"),
+                            btn -> { stateEditingNoteId = -1; stateNoteInput = ""; rebuild(); })
+                    .pos(formX + addBoxW + 50, addBoxY).size(46, 18).build());
         }
     }
 
@@ -282,12 +374,13 @@ public class PlayerProfileScreen extends Screen {
         g.drawCenteredString(this.font, statusDot + "§e" + sel.mcName(),
                 (LIST_W + MARGIN * 2 + this.width) / 2, PANEL_TOP + 5, 0xFFFFFF);
 
-        int contentY = PANEL_TOP + 36;
+        int contentY  = PANEL_TOP + 36;
         int formRight = this.width - MARGIN;
 
         switch (activeTab) {
             case 0 -> renderProfileTab(g, formX, contentY, sel);
             case 1 -> renderStatsTab(g, formX, formRight, contentY, sel);
+            case 2 -> renderNotesTab(g, formX, formRight, contentY, sel);
         }
 
         super.render(g, mouseX, mouseY, delta);
@@ -305,7 +398,6 @@ public class PlayerProfileScreen extends Screen {
                     formX + 110, y + 6, 0xFFFFFF, false);
         y += 44;
 
-        // Surbrillance couleur selectionnee
         int colBtnW = 56, colBtnH = 15;
         int colCols = Math.max(1, Math.min(5, (this.width - LIST_W - MARGIN * 4) / (colBtnW + 2)));
         int sc = stateNickColorIndex % colCols, sr = stateNickColorIndex / colCols;
@@ -323,7 +415,6 @@ public class PlayerProfileScreen extends Screen {
         int roleRows = availableRoles.isEmpty() ? 0 : 1;
         y += 38 + roleRows * 20;
 
-        // Section licences
         if (!availableProfessionIds.isEmpty()) {
             y += 6;
             String profId = selectedProfId();
@@ -335,7 +426,6 @@ public class PlayerProfileScreen extends Screen {
                     formX + 22, y + 5, 0xAAAAAA, false);
         }
 
-        // Liste des licences detenues
         List<String> lics = sel.currentLicenses();
         if (!lics.isEmpty()) {
             int textY = this.height - 50;
@@ -391,8 +481,98 @@ public class PlayerProfileScreen extends Screen {
                 formX, y, 0x555555, false);
     }
 
+    private void renderNotesTab(GuiGraphics g, int formX, int formRight, int contentY,
+                                OpenPlayerProfileGuiPacket.PlayerData sel) {
+        List<OpenPlayerProfileGuiPacket.PlayerData.NoteEntry> notes = sel.notes();
+
+        int listAreaBottom = this.height - 58;
+        int listAreaHeight = listAreaBottom - contentY;
+        int maxTextW       = noteTextW();
+        int textX          = formX + 32;
+
+        int first  = stateNotesScroll;
+        int last   = first - 1;
+        int totalH = 0;
+        for (int i = first; i < notes.size(); i++) {
+            int rh = noteRowH(notes.get(i), maxTextW);
+            if (totalH + rh > listAreaHeight && last >= first) break;
+            totalH += rh;
+            last = i;
+        }
+
+        if (notes.isEmpty()) {
+            g.drawString(this.font, "§8No notes for this player.",
+                    textX, contentY + 6, 0x555555, false);
+        } else {
+            int rowY = contentY;
+            for (int i = first; i <= last; i++) {
+                OpenPlayerProfileGuiPacket.PlayerData.NoteEntry n = notes.get(i);
+                int rh        = noteRowH(n, maxTextW);
+                boolean isEd  = stateEditingNoteId == n.id();
+                boolean isPending = n.id() < 0;
+
+                g.fill(formX, rowY, formRight - MARGIN - 24, rowY + rh - 2,
+                        isEd ? 0x33FFFF00 : isPending ? 0x1100FFFF : 0x22FFFFFF);
+
+                String meta = isPending
+                        ? "§8(pending) §7by §f" + n.authorName()
+                        : "§e#" + n.id() + " §8[" + n.timestamp() + "] §7by §f" + n.authorName();
+                g.drawString(this.font, meta, textX, rowY + 3, 0xAAAAAA, false);
+
+                List<FormattedCharSequence> wrapped = this.font.split(
+                        Component.literal("§f" + n.text()), maxTextW);
+                int textLineY = rowY + 14;
+                for (int li = 0; li < wrapped.size(); li++) {
+                    g.drawString(this.font, wrapped.get(li), textX, textLineY + li * 10, 0xFFFFFF, false);
+                }
+                rowY += rh;
+            }
+
+            if (stateNotesScroll > 0) {
+                g.drawString(this.font, "§8▲ " + stateNotesScroll + " more",
+                        textX, contentY - 1, 0x444444, false);
+            }
+            int below = notes.size() - 1 - last;
+            if (below > 0) {
+                g.drawString(this.font, "§8▼ " + below + " more",
+                        textX, listAreaBottom - 9, 0x444444, false);
+            }
+        }
+
+        g.fill(formX, this.height - 56, formRight - MARGIN, this.height - 55, 0xFF333333);
+        String footerLabel = stateEditingNoteId != -1
+                ? "§7Edit note #" + stateEditingNoteId + ":"
+                : "§7New note:";
+        g.drawString(this.font, footerLabel, formX, this.height - 52, 0x888888, false);
+    }
+
     @Override
     public void renderBackground(GuiGraphics g, int mx, int my, float partial) {}
+
+    // =========================================================================
+    // SCROLL MOLETTE
+    // =========================================================================
+
+    @Override
+    public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+        int formX = LIST_W + MARGIN * 3;
+
+        if (mx < LIST_W + MARGIN * 2) {
+            int max = Math.max(0, players.size() - LIST_VISIBLE);
+            playerListScroll = (int) Math.max(0, Math.min(max, playerListScroll - sy));
+            rebuild();
+            return true;
+        }
+
+        if (activeTab == 2 && mx >= formX) {
+            int maxScroll = Math.max(0, selectedData().notes().size() - 1);
+            stateNotesScroll = (int) Math.max(0, Math.min(maxScroll, stateNotesScroll - sy));
+            rebuild();
+            return true;
+        }
+
+        return super.mouseScrolled(mx, my, sx, sy);
+    }
 
     // =========================================================================
     // LOGIQUE
@@ -400,6 +580,8 @@ public class PlayerProfileScreen extends Screen {
 
     private void loadPlayerState(int idx) {
         stateSelectedPlayer = idx;
+        stateNotesScroll    = 0;
+        stateEditingNoteId  = -1;
         OpenPlayerProfileGuiPacket.PlayerData p = players.get(idx);
         String rawNick = p.currentNick();
         stateNickColorIndex = 0;
@@ -409,12 +591,12 @@ public class PlayerProfileScreen extends Screen {
                 if (COLOR_CHARS[i] == c) { stateNickColorIndex = i; rawNick = rawNick.substring(2); break; }
             }
         }
-        stateNick = rawNick;
-        stateRole = p.currentRole();
+        stateNick  = rawNick;
+        stateRole  = p.currentRole();
         stateSelectedProf = 0;
+        stateNoteInput    = "";
     }
 
-    /** Applique nick + role au joueur selectionne. */
     private void applyProfile() {
         if (players.isEmpty()) return;
         OpenPlayerProfileGuiPacket.PlayerData target = selectedData();
@@ -429,11 +611,10 @@ public class PlayerProfileScreen extends Screen {
                 target.uuid(), target.mcName(), finalNick, stateRole.trim(),
                 target.currentLicenses(), target.activeWarnCount(), target.isMuted(),
                 target.muteExpiry(), target.playtimeMs(), target.sessionMs(),
-                target.noteCount(), target.isOnline()));
+                target.noteCount(), target.isOnline(), target.notes()));
         rebuild();
     }
 
-    /** Accorde la licence selectionnee au joueur. */
     private void grantSelectedLicense() {
         if (players.isEmpty()) return;
         String profId = selectedProfId();
@@ -448,11 +629,11 @@ public class PlayerProfileScreen extends Screen {
         players.set(stateSelectedPlayer, new OpenPlayerProfileGuiPacket.PlayerData(
                 target.uuid(), target.mcName(), target.currentNick(), target.currentRole(),
                 updated, target.activeWarnCount(), target.isMuted(), target.muteExpiry(),
-                target.playtimeMs(), target.sessionMs(), target.noteCount(), target.isOnline()));
+                target.playtimeMs(), target.sessionMs(), target.noteCount(), target.isOnline(),
+                target.notes()));
         rebuild();
     }
 
-    /** Retire la licence selectionnee du joueur. */
     private void revokeSelectedLicense() {
         if (players.isEmpty()) return;
         String profId = selectedProfId();
@@ -467,7 +648,73 @@ public class PlayerProfileScreen extends Screen {
         players.set(stateSelectedPlayer, new OpenPlayerProfileGuiPacket.PlayerData(
                 target.uuid(), target.mcName(), target.currentNick(), target.currentRole(),
                 updated, target.activeWarnCount(), target.isMuted(), target.muteExpiry(),
-                target.playtimeMs(), target.sessionMs(), target.noteCount(), target.isOnline()));
+                target.playtimeMs(), target.sessionMs(), target.noteCount(), target.isOnline(),
+                target.notes()));
+        rebuild();
+    }
+
+    private void addNote() {
+        if (players.isEmpty() || stateNoteInput.trim().isEmpty()) return;
+        OpenPlayerProfileGuiPacket.PlayerData target = selectedData();
+        String text   = stateNoteInput.trim();
+        String author = Minecraft.getInstance().player != null
+                ? Minecraft.getInstance().player.getName().getString() : "you";
+        String now    = LocalDate.now().toString();
+
+        if (stateEditingNoteId != -1) {
+            int oldId = stateEditingNoteId;
+            PacketDistributor.sendToServer(new PlayerNoteActionPacket(target.uuid(), true, oldId, ""));
+            PacketDistributor.sendToServer(new PlayerNoteActionPacket(target.uuid(), false, 0, text));
+
+            List<OpenPlayerProfileGuiPacket.PlayerData.NoteEntry> updated = new ArrayList<>();
+            for (OpenPlayerProfileGuiPacket.PlayerData.NoteEntry n : target.notes()) {
+                if (n.id() == oldId)
+                    updated.add(new OpenPlayerProfileGuiPacket.PlayerData.NoteEntry(
+                            tempNoteIdCounter--, author, now, text));
+                else
+                    updated.add(n);
+            }
+            players.set(stateSelectedPlayer, new OpenPlayerProfileGuiPacket.PlayerData(
+                    target.uuid(), target.mcName(), target.currentNick(), target.currentRole(),
+                    target.currentLicenses(), target.activeWarnCount(), target.isMuted(),
+                    target.muteExpiry(), target.playtimeMs(), target.sessionMs(),
+                    target.noteCount(), target.isOnline(), updated));
+            stateEditingNoteId = -1;
+        } else {
+            PacketDistributor.sendToServer(new PlayerNoteActionPacket(target.uuid(), false, 0, text));
+
+            List<OpenPlayerProfileGuiPacket.PlayerData.NoteEntry> updated = new ArrayList<>(target.notes());
+            updated.add(new OpenPlayerProfileGuiPacket.PlayerData.NoteEntry(
+                    tempNoteIdCounter--, author, now, text));
+            players.set(stateSelectedPlayer, new OpenPlayerProfileGuiPacket.PlayerData(
+                    target.uuid(), target.mcName(), target.currentNick(), target.currentRole(),
+                    target.currentLicenses(), target.activeWarnCount(), target.isMuted(),
+                    target.muteExpiry(), target.playtimeMs(), target.sessionMs(),
+                    target.noteCount() + 1, target.isOnline(), updated));
+            stateNotesScroll = updated.size() - 1;
+        }
+
+        stateNoteInput = "";
+        rebuild();
+    }
+
+    private void deleteNote(int noteId) {
+        if (players.isEmpty()) return;
+        OpenPlayerProfileGuiPacket.PlayerData target = selectedData();
+        PacketDistributor.sendToServer(new PlayerNoteActionPacket(
+                target.uuid(), true, noteId, ""));
+
+        // Suppression locale immédiate (l'ID est connu)
+        List<OpenPlayerProfileGuiPacket.PlayerData.NoteEntry> updated = new ArrayList<>();
+        for (OpenPlayerProfileGuiPacket.PlayerData.NoteEntry n : target.notes()) {
+            if (n.id() != noteId) updated.add(n);
+        }
+        players.set(stateSelectedPlayer, new OpenPlayerProfileGuiPacket.PlayerData(
+                target.uuid(), target.mcName(), target.currentNick(), target.currentRole(),
+                target.currentLicenses(), target.activeWarnCount(), target.isMuted(),
+                target.muteExpiry(), target.playtimeMs(), target.sessionMs(),
+                Math.max(0, target.noteCount() - 1), target.isOnline(), updated));
+        stateNotesScroll = Math.max(0, stateNotesScroll - 1);
         rebuild();
     }
 
@@ -476,15 +723,17 @@ public class PlayerProfileScreen extends Screen {
         return s;
     }
 
-    @Override
-    public boolean mouseScrolled(double mx, double my, double sx, double sy) {
-        if (mx < LIST_W + MARGIN * 2) {
-            int max = Math.max(0, players.size() - LIST_VISIBLE);
-            playerListScroll = (int) Math.max(0, Math.min(max, playerListScroll - sy));
-            rebuild();
-            return true;
-        }
-        return super.mouseScrolled(mx, my, sx, sy);
+    private int noteTextW() {
+        int formX = LIST_W + MARGIN * 3;
+        // textX = formX + 32 (2 boutons), 24 = marge scroll
+        return (this.width - MARGIN) - MARGIN - (formX + 32) - 24;
+    }
+
+    private int noteRowH(OpenPlayerProfileGuiPacket.PlayerData.NoteEntry n, int maxTextW) {
+        List<FormattedCharSequence> wrapped = this.font.split(
+                Component.literal("§f" + n.text()), maxTextW);
+        // 14 = meta, 10px/ligne, 6 = padding bas
+        return 14 + Math.max(1, wrapped.size()) * 10 + 6;
     }
 
     @Override public boolean isPauseScreen() { return false; }

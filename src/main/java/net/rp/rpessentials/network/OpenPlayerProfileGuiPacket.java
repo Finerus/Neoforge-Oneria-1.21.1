@@ -41,21 +41,22 @@ public record OpenPlayerProfileGuiPacket(
     public record PlayerData(
             UUID   uuid,
             String mcName,
-            String currentNick,           // "" si pas de nickname
-            String currentRole,           // "" si aucun rôle détecté
-            List<String> currentLicenses, // liste des licences actives
-            // ── Nouveau en 4.1.6 ─────────────────────────────────────────────
-            int    activeWarnCount,       // nombre de warns actifs (non expirés)
-            boolean isMuted,              // joueur muté ?
-            String muteExpiry,            // "" si non muté, sinon durée restante formatée
-            long   playtimeMs,            // playtime cumulatif total (persisté + session)
-            long   sessionMs,             // durée de la session courante uniquement
-            int    noteCount,             // nombre de notes staff
-            boolean isOnline              // connecté au moment du snapshot
+            String currentNick,
+            String currentRole,
+            List<String> currentLicenses,
+            int    activeWarnCount,
+            boolean isMuted,
+            String muteExpiry,
+            long   playtimeMs,
+            long   sessionMs,
+            int    noteCount,
+            boolean isOnline,
+            List<NoteEntry> notes  // NOUVEAU
     ) {
-        // Constructeur de compatibilité pour les cas sans nouveaux champs
+        public record NoteEntry(int id, String text, String authorName, String timestamp) {}
+
         public static PlayerData simple(UUID uuid, String mcName, String nick, String role, List<String> licenses) {
-            return new PlayerData(uuid, mcName, nick, role, licenses, 0, false, "", 0L, 0L, 0, true);
+            return new PlayerData(uuid, mcName, nick, role, licenses, 0, false, "", 0L, 0L, 0, true, List.of());
         }
     }
 
@@ -88,8 +89,18 @@ public record OpenPlayerProfileGuiPacket(
                         long    session     = buf.readLong();
                         int     notes       = buf.readVarInt();
                         boolean online      = buf.readBoolean();
+                        int noteListCount = buf.readVarInt();
+                        List<PlayerData.NoteEntry> notesList = new ArrayList<>(noteListCount);
+                        for (int k = 0; k < noteListCount; k++) {
+                            notesList.add(new PlayerData.NoteEntry(
+                                    buf.readVarInt(),
+                                    buf.readUtf(),
+                                    buf.readUtf(),
+                                    buf.readUtf()
+                            ));
+                        }
                         players.add(new PlayerData(uuid, mcName, nick, role, lics,
-                                warns, muted, muteExpiry, playtime, session, notes, online));
+                                warns, muted, muteExpiry, playtime, session, notes, online, notesList));
                     }
                     int profCount = buf.readVarInt();
                     List<String> profIds = new ArrayList<>(profCount);
@@ -118,6 +129,13 @@ public record OpenPlayerProfileGuiPacket(
                         buf.writeLong(p.sessionMs());
                         buf.writeVarInt(p.noteCount());
                         buf.writeBoolean(p.isOnline());
+                        buf.writeVarInt(p.notes().size());
+                        for (PlayerData.NoteEntry n : p.notes()) {
+                            buf.writeVarInt(n.id());
+                            buf.writeUtf(n.text());
+                            buf.writeUtf(n.authorName());
+                            buf.writeUtf(n.timestamp());
+                        }
                     }
                     buf.writeVarInt(packet.availableProfessionIds().size());
                     for (String id : packet.availableProfessionIds()) buf.writeUtf(id);

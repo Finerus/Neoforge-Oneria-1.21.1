@@ -49,7 +49,7 @@ public class NoteManager {
     private static final Map<UUID, List<NoteEntry>> notes = new HashMap<>();
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static File notesDir = null;
-    private static final AtomicInteger idCounter = new AtomicInteger(1);
+    private static final Map<UUID, String> playerNames = new HashMap<>();
 
     // =========================================================================
     // INIT
@@ -73,39 +73,46 @@ public class NoteManager {
 
     private static void loadAll() {
         if (notesDir == null) return;
-        File[] files = notesDir.listFiles((d, name) -> name.endsWith(".json"));
+        File[] files = notesDir.listFiles((d, n) -> n.endsWith(".json"));
         if (files == null) return;
-        int maxId = 0;
         for (File file : files) {
             try (FileReader reader = new FileReader(file)) {
-                String name = file.getName().replace(".json", "");
-                String uuidStr = name.contains("_") ? name.substring(0, name.indexOf('_')) : name;
+                String fname   = file.getName().replace(".json", "");
+                String uuidStr = fname.contains(" - ")
+                        ? fname.substring(fname.lastIndexOf(" - ") + 3)
+                        : fname;
                 UUID uuid = UUID.fromString(uuidStr);
+                if (fname.contains(" - "))
+                    playerNames.put(uuid, fname.substring(0, fname.lastIndexOf(" - ")));
                 Type type = new TypeToken<List<NoteEntry>>(){}.getType();
                 List<NoteEntry> list = GSON.fromJson(reader, type);
                 if (list != null) {
+                    list.sort(Comparator.comparingInt(e -> e.id));
                     notes.put(uuid, new ArrayList<>(list));
-                    for (NoteEntry e : list) if (e.id > maxId) maxId = e.id;
                 }
             } catch (Exception e) {
                 RpEssentials.LOGGER.warn("[NoteManager] Could not load file: {}", file.getName());
             }
         }
-        idCounter.set(maxId + 1);
         RpEssentials.LOGGER.info("[NoteManager] Loaded notes for {} players", notes.size());
     }
 
     private static void saveForPlayer(UUID uuid) {
         if (notesDir == null) return;
         List<NoteEntry> list = notes.getOrDefault(uuid, List.of());
-        File targetFile = new File(notesDir, uuid.toString() + ".json");
+        String name     = playerNames.get(uuid);
+        String baseName = (name != null ? name + " - " : "") + uuid;
+        File targetFile = new File(notesDir, baseName + ".json");
 
         CompletableFuture.runAsync(() -> {
             try {
-                if (list.isEmpty()) {
-                    targetFile.delete();
-                    return;
+                // Migration : supprimer l'ancien fichier UUID-only si on a le nom
+                if (name != null) {
+                    File oldFile = new File(notesDir, uuid + ".json");
+                    if (oldFile.exists() && !oldFile.getCanonicalPath().equals(targetFile.getCanonicalPath()))
+                        oldFile.delete();
                 }
+                if (list.isEmpty()) { targetFile.delete(); return; }
                 try (FileWriter writer = new FileWriter(targetFile)) {
                     GSON.toJson(list, writer);
                 }
@@ -119,11 +126,16 @@ public class NoteManager {
     // PUBLIC API
     // =========================================================================
 
-    public static int addNote(UUID targetUUID, String authorName, String authorUUID, String text) {
+    public static int addNote(UUID targetUUID, String targetName, String authorName, String authorUUID, String text) {
         ensureInitialized();
-        int id = idCounter.getAndIncrement();
-        notes.computeIfAbsent(targetUUID, k -> new ArrayList<>())
-                .add(new NoteEntry(id, text, authorName, authorUUID));
+        playerNames.put(targetUUID, targetName);
+        List<NoteEntry> list = notes.computeIfAbsent(targetUUID, k -> new ArrayList<>());
+        Set<Integer> usedIds = new HashSet<>();
+        for (NoteEntry e : list) usedIds.add(e.id);
+        int id = 1;
+        while (usedIds.contains(id)) id++;
+        list.add(new NoteEntry(id, text, authorName, authorUUID));
+        list.sort(Comparator.comparingInt(e -> e.id));
         saveForPlayer(targetUUID);
         return id;
     }

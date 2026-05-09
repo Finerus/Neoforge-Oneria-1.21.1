@@ -1,6 +1,59 @@
 # Changelog - Rp Essentials
 All notable changes to this project will be documented in this file.
 
+## [4.1.8]
+
+**Notes panel in the Player Profile GUI, note system improvements.**
+
+---
+
+### Added
+
+* **Notes tab in the Player Profile GUI:** A third "Notes" tab has been added to the staff player profile manager, alongside "Profile" and "Stats".
+  - Lists all staff notes for the selected player with author, timestamp, and full text.
+  - Delete button (§c✗) on each note for immediate removal.
+  - Input field pinned at the bottom of the panel to add a new note without scrolling.
+  - Scrollable note list via scroll wheel or ▲/▼ buttons; the add area is always visible regardless of note count.
+  - Note text wraps to multiple lines — row height is calculated dynamically per note, no truncation.
+  - Newly added notes appear immediately in the list with a "§8new" indicator in place of the ID; the real ID is shown on the next GUI open.
+  - Edit button (§7✎) on each note loads its content into the input field; confirming the edit replaces the note server-side while preserving its position in the list.
+  - Cancel button appears while an edit is in progress.
+
+* **`PlayerNoteActionPacket` (Client → Server):** New packet handling add, delete, and edit note actions from the GUI. Validates staff permission server-side before any write.
+
+* **Notes sent with player data:** `OpenPlayerProfileGuiPacket.PlayerData` now carries the full note list (`List<NoteEntry>`) instead of just a count, so the GUI can display note content without a separate request.
+
+---
+
+### Changed
+
+* **Note JSON filenames:** Files are now named `PlayerName - UUID.json` instead of bare `UUID.json`. Existing files are migrated automatically on the next write.
+* **Note sorting:** Notes are sorted by ID in ascending order both in memory and in JSON files.
+
+---
+
+### Fixed
+
+* **Note text overflow:** Note rows now expand to fit their content. Text is word-wrapped using `Font.split()` and the row height is computed from the wrapped line count; nothing is ever truncated.
+* **Newly added notes not appearing:** Notes added via the GUI now appear immediately with a temporary "new" label. Previously the GUI had to be closed and reopened to see the addition.
+* **ID gap after deletion:** Note IDs are now reassigned to fill gaps after a deletion, so the next note takes the smallest available ID instead of always incrementing from the previous maximum.
+
+---
+
+### Technical
+
+* `OpenPlayerProfileGuiPacket.PlayerData` — `noteCount: Int` complemented by `notes: List<NoteEntry>` (new inner record: `id`, `text`, `authorName`, `timestamp`). StreamCodec updated accordingly.
+* `RequestOpenGuiPacket.buildPlayerData()` — loads full note list from `NoteManager` and maps it to `NoteEntry` records.
+* `NetworkHandler` — registers `PlayerNoteActionPacket`.
+* `PlayerProfileScreen` — third tab, dynamic row heights, scroll by note index with pixel-accurate rendering, add/edit/delete flows, local optimistic updates.
+
+---
+
+### Migration Notes
+
+* No config changes required.
+* Existing `UUID.json` note files in `world/data/rpessentials/notes/` are renamed automatically on the next write for each player.
+
 ---
 
 ## [4.1.7]

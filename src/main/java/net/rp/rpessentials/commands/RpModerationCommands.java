@@ -155,7 +155,7 @@ public class RpModerationCommands {
                                     ServerPlayer author = ctx.getSource().getPlayer();
                                     String authorName = author != null ? author.getName().getString() : "Console";
                                     String authorUUID = author != null ? author.getUUID().toString() : "console";
-                                    int id = NoteManager.addNote(target.getUUID(), authorName, authorUUID, text);
+                                    int id = NoteManager.addNote(target.getUUID(), target.getName().getString(), authorName, authorUUID, text);
                                     ctx.getSource().sendSuccess(() -> Component.literal(
                                             MessagesConfig.get(MessagesConfig.NOTE_ADDED,
                                                     "player", target.getName().getString(), "id", String.valueOf(id))), false);
