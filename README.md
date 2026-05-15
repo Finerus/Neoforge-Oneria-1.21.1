@@ -2,19 +2,20 @@
 
 **Rp Essentials** is a comprehensive server-side utility mod built for immersive Roleplay servers running Minecraft 1.21.1 on NeoForge. It provides a complete suite of RP tools: proximity-based name obfuscation, a profession and license system, a warn system, connection tracking, private messaging, schedule automation, staff moderation tools, advanced chat formatting, world border warnings, named zones, Death RP, and deep LuckPerms integration. All configurable in real-time without restarts.
 
-> Current version: **4.1.6**: See [CHANGELOG](https://modrinth.com/mod/rp-essentials/changelog) for the full history.
+> Current version: **4.1.9**: See [CHANGELOG](https://modrinth.com/mod/rp-essentials/changelog) for the full history.
 
 ---
 
 ## Requirements
 
-| Dependency | Version | Side | Required |
-|:-----------|:--------|:-----|:---------|
-| Minecraft | 1.21.1 | Both | ✅ |
-| NeoForge | 21.1.219+ | Both | ✅ |
-| LuckPerms | Any | Server | ⬜ Optional |
-| ImmersiveMessages | neoforge-1.21.1:1.0.18 | Client | ⬜ Optional |
-| TxniLib | neoforge-1.21.1:1.0.24 | Client | ⬜ Optional |
+| Dependency        |Version                |Side   |Required   |
+| ----------------- |---------------------- |------ |---------- |
+| Minecraft         |1.21.1                 |Both   |✅          |
+| NeoForge          |21.1.219+              |Both   |✅          |
+| <a href="https://www.curseforge.com/minecraft/mc-mods/rpimmersion" target="_blank" rel="nofollow">RpImmersion</a> |1.0.0                  |Both   |⬜ Optional |
+| LuckPerms         |Any                    |Server |⬜ Optional |
+| ImmersiveMessages |neoforge-1.21.1:1.0.18 |Client |⬜ Optional |
+| TxniLib           |neoforge-1.21.1:1.0.24 |Client |⬜ Optional |
 
 > ImmersiveMessages and TxniLib are only required on the **client** if you use `zoneMessageMode = IMMERSIVE`. The server runs fine without them.
 
@@ -584,7 +585,7 @@ LuckPerms is **optional**. The mod works fully without it, with graceful fallbac
 |:------|:------|
 | Mod ID | `rpessentials` |
 | Group ID | `net.rp.rpessentials` |
-| Version | 4.1.6 |
+| Version | 4.1.9 |
 | MC Version | 1.21.1 |
 | NeoForge | 21.1.219+ |
 | Java | 21 |
