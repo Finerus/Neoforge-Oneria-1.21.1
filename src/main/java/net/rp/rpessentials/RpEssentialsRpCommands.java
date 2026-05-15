@@ -75,6 +75,14 @@ public class RpEssentialsRpCommands {
                         .executes(ctx -> executeAction(ctx,
                                 StringArgumentType.getString(ctx, "action")))));
 
+        // /rp selfnick [nickname]
+        rpRoot.then(Commands.literal("selfnick")
+                .requires(src -> src.getEntity() instanceof ServerPlayer)
+                .executes(ctx -> executeSelfNick(ctx, ""))
+                .then(Commands.argument("nickname", StringArgumentType.greedyString())
+                        .executes(ctx -> executeSelfNick(ctx,
+                                StringArgumentType.getString(ctx, "nickname")))));
+
         // /rp annonce <title|chat> <message>
         rpRoot.then(Commands.literal("annonce")
                 .requires(src -> RpEssentialsPermissions.isStaff(src.getPlayer()))
@@ -303,6 +311,69 @@ public class RpEssentialsRpCommands {
                 NicknameManager.getDisplayName(player),
                 player.getName().getString(),
                 action);
+        return 1;
+    }
+
+    private static int executeSelfNick(CommandContext<CommandSourceStack> ctx, String nickname)
+            throws CommandSyntaxException {
+        ServerPlayer player = ctx.getSource().getPlayerOrException();
+
+        try {
+            if (!RpConfig.ENABLE_SELF_NICK.get()) {
+                player.displayClientMessage(
+                        ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_SELFNICK_DISABLED)), false);
+                return 0;
+            }
+        } catch (IllegalStateException ignored) { return 0; }
+
+        if (RpCooldownManager.isOnCooldown(player.getUUID(), "selfnick")) {
+            long remaining = RpCooldownManager.getRemainingSeconds(player.getUUID(), "selfnick");
+            player.displayClientMessage(ColorHelper.parseColors(
+                    MessagesConfig.get(MessagesConfig.RP_COOLDOWN_MESSAGE,
+                            "command", "rp selfnick", "seconds", String.valueOf(remaining))), true);
+            return 0;
+        }
+
+        if (nickname.isBlank()) {
+            NicknameManager.removeNickname(player.getUUID());
+            player.displayClientMessage(
+                    ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_SELFNICK_RESET)), false);
+            RpCooldownManager.setCooldown(player.getUUID(), "selfnick");
+            return 1;
+        }
+
+        boolean allowColors = false;
+        try { allowColors = RpConfig.SELF_NICK_ALLOW_COLORS.get(); } catch (IllegalStateException ignored) {}
+
+        if (!allowColors && (nickname.contains("§") || nickname.contains("&"))) {
+            player.displayClientMessage(
+                    ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_SELFNICK_COLORS_DISABLED)), false);
+            return 0;
+        }
+
+        String finalNick = allowColors ? nickname.replace("&", "§") : nickname;
+
+        int maxLen = 24;
+        try { maxLen = RpConfig.SELF_NICK_MAX_LENGTH.get(); } catch (IllegalStateException ignored) {}
+        String stripped = finalNick.replaceAll("§[0-9a-fk-orA-FK-OR]", "").trim();
+        if (stripped.isEmpty()) return 0;
+        if (stripped.length() > maxLen) {
+            final int max = maxLen;
+            player.displayClientMessage(
+                    ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_SELFNICK_TOO_LONG,
+                            "max", String.valueOf(max))), false);
+            return 0;
+        }
+
+        NicknameManager.setNickname(player.getUUID(), finalNick);
+        RpCooldownManager.setCooldown(player.getUUID(), "selfnick");
+
+        String displayNick = finalNick;
+        player.displayClientMessage(
+                ColorHelper.parseColors(MessagesConfig.get(MessagesConfig.RP_SELFNICK_SET,
+                        "nick", displayNick)), false);
+        RpEssentials.LOGGER.info("[SELFNICK] {} set nickname to '{}'",
+                player.getName().getString(), finalNick);
         return 1;
     }
 

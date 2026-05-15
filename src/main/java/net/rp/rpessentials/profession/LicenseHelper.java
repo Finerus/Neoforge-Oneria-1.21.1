@@ -77,6 +77,8 @@ public class LicenseHelper {
 
         CompoundTag tag = new CompoundTag();
         tag.putString("professionId", professionId);
+        tag.putString("holderName",   displayName);
+        tag.putString("issueDate",    dateStr);
         license.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 
         // ── Give to player ────────────────────────────────────────────────────

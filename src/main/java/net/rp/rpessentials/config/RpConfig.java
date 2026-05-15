@@ -52,12 +52,20 @@ public class RpConfig {
     public static final ModConfigSpec.IntValue INCOGNITO_COOLDOWN_SECONDS;
 
     // =========================================================================
-    // IMMERSIVE PRESETS  (nouveau en 4.1.6)
+    // SELF NICK
+    // =========================================================================
+    public static final ModConfigSpec.BooleanValue ENABLE_SELF_NICK;
+    public static final ModConfigSpec.IntValue     SELF_NICK_COOLDOWN_SECONDS;
+    public static final ModConfigSpec.BooleanValue SELF_NICK_ALLOW_COLORS;
+    public static final ModConfigSpec.IntValue     SELF_NICK_MAX_LENGTH;
+
+    // =========================================================================
+    // IMMERSIVE PRESETS
     // =========================================================================
     public static final ModConfigSpec.ConfigValue<List<? extends String>> IMMERSIVE_PRESETS;
 
     // =========================================================================
-    // MOD COMPAT — JEI / REI / EMI  (nouveau en 4.1.6)
+    // MOD COMPAT — JEI / REI / EMI
     // =========================================================================
     /**
      * Mode d'intégration JEI/REI/EMI pour les restrictions de licences.
@@ -106,6 +114,22 @@ public class RpConfig {
         ACTION_COOLDOWN_SECONDS    = BUILDER.comment("Cooldown for /rp action and /me (0=disabled).").defineInRange("actionCooldownSeconds",    0, 0, 300);
         COMMERCE_COOLDOWN_SECONDS  = BUILDER.comment("Cooldown for /rp commerce (0=disabled).").defineInRange("commerceCooldownSeconds",  0, 0, 300);
         INCOGNITO_COOLDOWN_SECONDS = BUILDER.comment("Cooldown for /rp incognito (0=disabled).").defineInRange("incognitoCooldownSeconds", 0, 0, 300);
+        BUILDER.pop();
+
+        // ── SELF NICK ─────────────────────────────────────────────────────
+        BUILDER.push("Self Nick");
+        ENABLE_SELF_NICK = BUILDER
+                .comment("Allow players to set their own nickname via /rp selfnick.")
+                .define("enableSelfNick", false);
+        SELF_NICK_COOLDOWN_SECONDS = BUILDER
+                .comment("Cooldown for /rp selfnick in seconds (0 = disabled).")
+                .defineInRange("selfNickCooldownSeconds", 300, 0, 86400);
+        SELF_NICK_ALLOW_COLORS = BUILDER
+                .comment("Allow color codes (& and §) in self-assigned nicknames.")
+                .define("selfNickAllowColors", false);
+        SELF_NICK_MAX_LENGTH = BUILDER
+                .comment("Maximum nickname length (excluding color codes).")
+                .defineInRange("selfNickMaxLength", 24, 1, 64);
         BUILDER.pop();
 
         // ── ANNONCE ───────────────────────────────────────────────────────────

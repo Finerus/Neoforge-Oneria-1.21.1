@@ -72,6 +72,7 @@ public class RpCooldownManager {
                 case "action"    -> net.rp.rpessentials.config.RpConfig.ACTION_COOLDOWN_SECONDS.get() * 1000;
                 case "commerce"  -> net.rp.rpessentials.config.RpConfig.COMMERCE_COOLDOWN_SECONDS.get() * 1000;
                 case "incognito" -> net.rp.rpessentials.config.RpConfig.INCOGNITO_COOLDOWN_SECONDS.get() * 1000;
+                case "selfnick"  -> net.rp.rpessentials.config.RpConfig.SELF_NICK_COOLDOWN_SECONDS.get() * 1000;
                 default          -> 0;
             };
         } catch (IllegalStateException e) {

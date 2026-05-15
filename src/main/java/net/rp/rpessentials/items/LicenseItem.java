@@ -5,15 +5,33 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.neoforged.neoforge.client.extensions.common.IClientItemExtensions;
 import net.rp.rpessentials.config.MessagesConfig;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
+import java.util.function.Consumer;
 
 public class LicenseItem extends Item {
 
     public LicenseItem(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public void initializeClient(Consumer<IClientItemExtensions> consumer) {
+        consumer.accept(new net.neoforged.neoforge.client.extensions.common.IClientItemExtensions() {
+            @Override
+            public boolean applyForgeHandTransform(com.mojang.blaze3d.vertex.PoseStack poseStack,
+                                                   net.minecraft.client.player.LocalPlayer player,
+                                                   net.minecraft.world.entity.HumanoidArm arm,
+                                                   net.minecraft.world.item.ItemStack stack,
+                                                   float partialTick, float equipProgress, float swingProgress) {
+                net.rp.rpessentials.client.LicenseCardRenderer.applyCardTransform(
+                        poseStack, arm, equipProgress, swingProgress);
+                return true;
+            }
+        });
     }
 
     @Override

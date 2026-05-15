@@ -219,6 +219,12 @@ public class MessagesConfig {
     public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_CHAT_FORMAT;
     public static final ModConfigSpec.ConfigValue<String> RP_ANNONCE_SENT;
 
+    public static final ModConfigSpec.ConfigValue<String> RP_SELFNICK_SET;
+    public static final ModConfigSpec.ConfigValue<String> RP_SELFNICK_RESET;
+    public static final ModConfigSpec.ConfigValue<String> RP_SELFNICK_DISABLED;
+    public static final ModConfigSpec.ConfigValue<String> RP_SELFNICK_COLORS_DISABLED;
+    public static final ModConfigSpec.ConfigValue<String> RP_SELFNICK_TOO_LONG;
+
     public static final ModConfigSpec.ConfigValue<String> LICENSE_REISSUE_STAFF;
     public static final ModConfigSpec.ConfigValue<String> LICENSE_REISSUE_PLAYER;
     public static final ModConfigSpec.ConfigValue<String> LICENSE_REISSUE_NOT_FOUND;
@@ -769,6 +775,22 @@ public class MessagesConfig {
                         "Placeholder: {profession} = profession display name.")
                 .define("expiredRpPlayer",
                         "§cYour §f{profession} §clicense has expired. The item remains in your inventory.");
+
+        RP_SELFNICK_SET = BUILDER
+                .comment("Message shown when a player sets their own nickname. Placeholder: {nick}")
+                .define("selfNickSet", "§aYour nickname has been set to: {nick}");
+        RP_SELFNICK_RESET = BUILDER
+                .comment("Message shown when a player resets their own nickname.")
+                .define("selfNickReset", "§aYour nickname has been reset.");
+        RP_SELFNICK_DISABLED = BUILDER
+                .comment("Message shown when self-nick is disabled.")
+                .define("selfNickDisabled", "§c[RP] Self-nick is disabled on this server.");
+        RP_SELFNICK_COLORS_DISABLED = BUILDER
+                .comment("Message shown when color codes are not allowed in self-nicks.")
+                .define("selfNickColorsDisabled", "§c[RP] Color codes are not allowed in self-assigned nicknames.");
+        RP_SELFNICK_TOO_LONG = BUILDER
+                .comment("Message shown when the nickname exceeds the max length. Placeholder: {max}")
+                .define("selfNickTooLong", "§c[RP] Nickname too long (max {max} characters).");
 
         BUILDER.pop();
 

@@ -1,6 +1,86 @@
 # Changelog - Rp Essentials
 All notable changes to this project will be documented in this file.
 
+## [4.1.9]
+
+**Self-assigned nickname system via `/rp selfnick` with configurable restrictions and cooldown management. License card visual overhaul with physical in-hand rendering and a dedicated inspection screen.**
+
+---
+
+### Added
+
+* **Command `/rp selfnick [nickname]`:** New command allowing players to manage their own display name.
+  - Executing without arguments resets the nickname to the original player name.
+  - Integration with `NicknameManager` for persistent storage and display across the server.
+  - Command logging: Every nickname change is logged to the console via `RpEssentials.LOGGER` with the format `[SELFNICK] {player} set nickname to '{nick}'`.
+
+* **Configuration Section [Self Nick]:** Added a dedicated category in `RpConfig.java` for fine-grained control:
+  - `enableSelfNick`: Boolean to toggle the feature globally.
+  - `selfNickCooldownSeconds`: Integer to define the delay between two nickname changes (default: 300s).
+  - `selfNickAllowColors`: Boolean to allow or forbid the use of `&` or `§` formatting codes.
+  - `selfNickMaxLength`: Integer to limit the length of the chosen nickname (default: 24).
+
+* **New Message Keys:** Added 5 configurable entries in `MessagesConfig.java`:
+  - `selfNickSet`: Success message (placeholder: `{nick}`).
+  - `selfNickReset`: Confirmation message when clearing the nickname.
+  - `selfNickDisabled`: Error message when the feature is toggled off.
+  - `selfNickColorsDisabled`: Error message when a player tries to use color codes illegally.
+  - `selfNickTooLong`: Error message for exceeding the character limit (placeholder: `{max}`).
+
+* **License Card — Physical in-hand rendering:** The license item now renders as a physical card held in first-person, replacing the default 3D item model.
+  - `LicenseCardRenderer`: new class that renders the card background texture (`textures/item/license_card.png`) and overlays all text fields in world space: profession, holder name, issue date, optional expiry date, and a valid/revoked status line at the bottom.
+  - `MixinItemInHandRenderer`: injects into `renderHandsWithItems` to fully replace the vanilla first-person render when a `LicenseItem` is held. Preserves vanilla head-bob and pitch tilt, renders both player arms using the existing `PlayerRenderer`, then delegates card drawing to `LicenseCardRenderer`.
+  - `LicenseItem.initializeClient`: registers a `IClientItemExtensions` that hooks `applyForgeHandTransform`, delegating to `LicenseCardRenderer.applyCardTransform` for a map-like hand positioning (slight tilt, centered in front of the player).
+
+* **License Card — Inspection screen:** Right-clicking a license item in the main hand opens a dedicated full-screen GUI.
+  - `LicenseScreen`: draws the same `license_card.png` texture as a large background (280x200 px), then overlays all metadata fields with the same layout as the in-hand renderer. Shows the revoked/valid banner at the bottom. A single Close button dismisses the screen.
+  - `LicenseClientHandler`: listens to `PlayerInteractEvent.RightClickItem` client-side and opens `LicenseScreen` when a `LicenseItem` is detected in the main hand.
+
+---
+
+### Fixed
+
+* **Server crash on player logout:** `RpEssentialsMessagingManager.clearCache(player.getUUID())` was called in `onPlayerLogout` but the method did not exist under that signature. Renamed/aligned the call to match the actual method, preventing a `NoSuchMethodError` on every player disconnect.
+
+---
+
+### Technical
+
+* **`RpCooldownManager` integration:** Added `selfnick` case to the `getCooldownMs()` switch block, mapped to the new `RpConfig.SELF_NICK_COOLDOWN_SECONDS` value. Command execution is blocked if `isOnCooldown` returns true, displaying the standard remaining-time message.
+
+* **Nickname validation logic:**
+  - **Color stripping:** Length validation uses `finalNick.replaceAll("§[0-9a-fk-orA-FK-OR]", "")` to prevent bypassing `selfNickMaxLength` with hidden formatting characters.
+  - **Color conversion:** `&` codes are converted to `§` only when `selfNickAllowColors` is enabled.
+  - **Empty check:** Setting a nickname that consists solely of color codes or whitespace is rejected.
+
+* **Robustness:** Config getters are wrapped in `try-catch (IllegalStateException)` to prevent crashes during early startup or config reload phases. The `/rp selfnick` command requires `src.getEntity() instanceof ServerPlayer` to block console execution.
+
+* **New classes:**
+  - `LicenseCardRenderer` — world-space card rendering, reused by both the in-hand mixin and the GUI screen.
+  - `LicenseClientHandler` — client-side event subscriber that opens `LicenseScreen` on right-click.
+  - `LicenseScreen` — full-screen license inspection GUI.
+  - `MixinItemInHandRenderer` — first-person render override for `LicenseItem`.
+
+* **Modified classes:**
+  - `LicenseItem` — added `initializeClient` override to register `IClientItemExtensions` for the hand transform hook.
+  - `RpConfig` — new `[Self Nick]` section with four config values.
+  - `MessagesConfig` — five new `[Self Nick]` message keys.
+  - `RpCooldownManager` — `selfnick` case added to `getCooldownMs()`.
+  - `RpEssentialsRpCommands` — `/rp selfnick` subcommand registered.
+
+* **New mixin:** `MixinItemInHandRenderer` registered in `rpessentials.mixin.json` under `client`.
+
+---
+
+### Migration Notes
+
+* No breaking changes.
+* `rpessentials-rp.toml` gains a new `[Self Nick]` section on first launch — existing files are unchanged.
+* `rpessentials-messages.toml` gains five new keys in a new `[Self Nick]` section — existing keys are unaffected.
+* `textures/item/license_card.png` must be present in the mod JAR for the card renderer to display correctly. If absent, a missing-texture magenta checkerboard is shown instead.
+* Clients connecting to a 4.1.9 server must also run 4.1.9 — `MixinItemInHandRenderer` is a client-only mixin that alters render behavior.
+* The license rendering is still in a test phase, but this should not affect anything!
+
 ## [4.1.8]
 
 **Notes panel in the Player Profile GUI, note system improvements.**

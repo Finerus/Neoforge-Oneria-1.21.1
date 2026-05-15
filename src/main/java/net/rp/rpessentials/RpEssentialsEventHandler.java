@@ -123,7 +123,7 @@ public class RpEssentialsEventHandler {
         if (server != null) sendJoinLeaveMessage(server, player, false);
 
         RpEssentialsPermissions.invalidateCache(player.getUUID());
-        RpEssentialsMessagingManager.clearCache(player.getUUID());
+        net.rp.rpessentials.identity.RpEssentialsMessagingManager.clearCache(player.getUUID());
         RpCooldownManager.clearAll(player.getUUID());
     }
 
