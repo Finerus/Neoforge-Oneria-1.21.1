@@ -109,6 +109,21 @@ public class PlaytimeManager {
         return min + "m";
     }
 
+    public static void flush() {
+        if (sessionStart.isEmpty()) return;
+        long now = System.currentTimeMillis();
+        boolean anyUpdate = false;
+        for (Map.Entry<UUID, Long> entry : new java.util.HashMap<>(sessionStart).entrySet()) {
+            long elapsed = now - entry.getValue();
+            if (elapsed > 0) {
+                LastConnectionManager.addPlaytimeSilent(entry.getKey(), elapsed);
+                sessionStart.put(entry.getKey(), now);
+                anyUpdate = true;
+            }
+        }
+        if (anyUpdate) LastConnectionManager.flushToDisk();
+    }
+
     // =========================================================================
     // NETTOYAGE
     // =========================================================================

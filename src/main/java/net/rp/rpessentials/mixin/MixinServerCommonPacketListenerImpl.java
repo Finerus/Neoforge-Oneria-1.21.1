@@ -26,24 +26,20 @@ public abstract class MixinServerCommonPacketListenerImpl {
             remap = false
     )
     private Packet modifyPacket(Packet packet) {
+        // Le check instanceof en premier : comparaison pure, aucun verrou
+        if (!(packet instanceof ClientboundPlayerInfoUpdatePacket infoPacket)) return packet;
+
         try {
-            if (!RpEssentialsConfig.ENABLE_BLUR.get()) {
-                return packet;
-            }
+            if (!RpEssentialsConfig.ENABLE_BLUR.get()) return packet;
         } catch (IllegalStateException e) {
             return packet;
         }
 
         Object self = this;
-        if (!(self instanceof ServerGamePacketListenerImpl)) return packet;
+        if (!(self instanceof ServerGamePacketListenerImpl gameListener)) return packet;
 
-        ServerGamePacketListenerImpl gameListener = (ServerGamePacketListenerImpl) self;
         ServerPlayer receiver = gameListener.player;
         if (receiver == null) return packet;
-
-        if (!(packet instanceof ClientboundPlayerInfoUpdatePacket)) return packet;
-
-        ClientboundPlayerInfoUpdatePacket infoPacket = (ClientboundPlayerInfoUpdatePacket) packet;
 
         boolean isWhitelisted = RpEssentialsConfig.WHITELIST.get().contains(receiver.getGameProfile().getName());
 

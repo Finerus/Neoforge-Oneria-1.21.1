@@ -188,14 +188,6 @@ public class RpNicknameCommands {
                         .replaceAll("§[0-9a-fk-orA-FK-OR]", "")
                         .replaceAll("&[0-9a-fk-orA-FK-OR]", "");
                 if (!cleanNick.equalsIgnoreCase(searchNick)) continue;
-                List<NoteManager.NoteEntry> notes = NoteManager.getNotes(entry.getKey());
-                if (!notes.isEmpty()) {
-                    ctx.getSource().sendSuccess(() -> Component.literal("§6§l[" + notes.size() + " staff note(s)]"), false);
-                    for (NoteManager.NoteEntry n : notes) {
-                        ctx.getSource().sendSuccess(() -> Component.literal(
-                                "§8  #" + n.id + " §7[" + n.timestamp + "] §fby §e" + n.authorName + "§7: §f" + n.text), false);
-                    }
-                }
                 break;
             }
         }

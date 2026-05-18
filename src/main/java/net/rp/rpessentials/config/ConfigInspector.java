@@ -39,6 +39,9 @@ public class ConfigInspector {
             new ConfigClassInfo("rp",    "RP",                RpConfig.class,            RpConfig.SPEC)
     );
 
+    private static final Map<Class<?>, Map<String, ModConfigSpec.ConfigValue<?>>> VALUE_MAP_CACHE =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
     // =========================================================================
     // PUBLIC API
     // =========================================================================
@@ -61,14 +64,38 @@ public class ConfigInspector {
 
         ConfigClassInfo info = opt.get();
         Map<String, ModConfigSpec.ConfigValue<?>> valueMap = buildValueMap(info.clazz());
+
+        // Pré-calcul des entryData pour la validation de range
+        Map<String, EntryData> entryDataMap = getEntries(fileId).stream()
+                .filter(e -> !e.isSection())
+                .collect(java.util.stream.Collectors.toMap(EntryData::fullPath, e -> e));
+
         int applied = 0;
 
         for (Map.Entry<String, String> change : changes.entrySet()) {
             ModConfigSpec.ConfigValue<?> cv = valueMap.get(change.getKey());
             if (cv == null) {
-                RpEssentials.LOGGER.warn("[ConfigInspector] Unknown path '{}' in file '{}'", change.getKey(), fileId);
+                RpEssentials.LOGGER.warn("[ConfigInspector] Unknown path '{}' in file '{}'",
+                        change.getKey(), fileId);
                 continue;
             }
+
+            EntryData entry = entryDataMap.get(change.getKey());
+            if (entry != null && entry.hasRange()) {
+                try {
+                    double val = Double.parseDouble(change.getValue().trim());
+                    if (val < entry.rangeMin() || val > entry.rangeMax()) {
+                        RpEssentials.LOGGER.warn("[ConfigInspector] Value {} out of range [{}, {}] for '{}'",
+                                val, entry.rangeMin(), entry.rangeMax(), change.getKey());
+                        continue;
+                    }
+                } catch (NumberFormatException e) {
+                    RpEssentials.LOGGER.warn("[ConfigInspector] Invalid numeric value '{}' for '{}'",
+                            change.getValue(), change.getKey());
+                    continue;
+                }
+            }
+
             ValueType type = detectType(cv);
             if (applyValue(cv, type, change.getValue())) applied++;
         }
@@ -135,18 +162,20 @@ public class ConfigInspector {
     }
 
     static Map<String, ModConfigSpec.ConfigValue<?>> buildValueMap(Class<?> clazz) {
-        Map<String, ModConfigSpec.ConfigValue<?>> map = new LinkedHashMap<>();
-        for (Field field : clazz.getDeclaredFields()) {
-            if (!Modifier.isStatic(field.getModifiers())) continue;
-            if (!ModConfigSpec.ConfigValue.class.isAssignableFrom(field.getType())) continue;
-            try {
-                field.setAccessible(true);
-                ModConfigSpec.ConfigValue<?> cv = (ModConfigSpec.ConfigValue<?>) field.get(null);
-                if (cv == null) continue;
-                map.put(String.join(".", cv.getPath()), cv);
-            } catch (Exception ignored) {}
-        }
-        return map;
+        return VALUE_MAP_CACHE.computeIfAbsent(clazz, c -> {
+            Map<String, ModConfigSpec.ConfigValue<?>> map = new LinkedHashMap<>();
+            for (Field field : c.getDeclaredFields()) {
+                if (!Modifier.isStatic(field.getModifiers())) continue;
+                if (!ModConfigSpec.ConfigValue.class.isAssignableFrom(field.getType())) continue;
+                try {
+                    field.setAccessible(true);
+                    ModConfigSpec.ConfigValue<?> cv = (ModConfigSpec.ConfigValue<?>) field.get(null);
+                    if (cv == null) continue;
+                    map.put(String.join(".", cv.getPath()), cv);
+                } catch (Exception ignored) {}
+            }
+            return map;
+        });
     }
 
     // =========================================================================
@@ -155,11 +184,11 @@ public class ConfigInspector {
 
     /**
      * Retrieves the NeoForge ValueSpec stored inside ModConfigSpec for the given path.
-     *
+     * -
      * ModConfigSpec extends Night Config's UnmodifiableConfig.
      * The Builder stores ValueSpec objects as leaves of the spec config tree.
      * So ((UnmodifiableConfig) spec).get(path) returns the ValueSpec.
-     *
+     * -
      * Three strategies tried in order:
      *   1. Cast to UnmodifiableConfig and call get(path)          [NeoForge 21.1 primary]
      *   2. Reflect on fields of ModConfigSpec looking for a Map   [fallback]

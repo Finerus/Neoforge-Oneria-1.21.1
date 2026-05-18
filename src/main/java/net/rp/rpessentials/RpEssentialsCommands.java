@@ -12,9 +12,7 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.rp.rpessentials.commands.*;
 import net.rp.rpessentials.config.MessagesConfig;
-import net.rp.rpessentials.identity.NicknameManager;
 import net.rp.rpessentials.identity.RpEssentialsMessagingManager;
-import net.rp.rpessentials.moderation.WarnManager;
 import net.rp.rpessentials.moderation.LastConnectionManager;
 
 import java.util.UUID;

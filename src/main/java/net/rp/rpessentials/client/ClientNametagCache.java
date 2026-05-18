@@ -1,7 +1,6 @@
 package net.rp.rpessentials.client;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import net.rp.rpessentials.SyncNametagDataPacket;
 
 import java.util.Map;

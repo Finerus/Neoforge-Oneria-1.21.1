@@ -28,33 +28,28 @@ public record SyncNametagDataPacket(
             new Type<>(ResourceLocation.fromNamespaceAndPath(RpEssentials.MODID, "sync_nametag_data"));
 
     public static final StreamCodec<FriendlyByteBuf, SyncNametagDataPacket> CODEC =
-            StreamCodec.composite(
-                    new StreamCodec<>() {
-                        @Override public UUID decode(FriendlyByteBuf buf) { return buf.readUUID(); }
-                        @Override public void encode(FriendlyByteBuf buf, UUID v) { buf.writeUUID(v); }
-                    }, SyncNametagDataPacket::targetUUID,
-                    new StreamCodec<>() {
-                        @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
-                        @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
-                    }, SyncNametagDataPacket::displayName,
-                    new StreamCodec<>() {
-                        @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
-                        @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
-                    }, SyncNametagDataPacket::prefix,
-                    new StreamCodec<>() {
-                        @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
-                        @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
-                    }, SyncNametagDataPacket::suffix,
-                    new StreamCodec<>() {
-                        @Override public String decode(FriendlyByteBuf buf) { return buf.readUtf(); }
-                        @Override public void encode(FriendlyByteBuf buf, String v) { buf.writeUtf(v); }
-                    }, SyncNametagDataPacket::profession,
-                    new StreamCodec<>() {
-                        @Override public Boolean decode(FriendlyByteBuf buf) { return buf.readBoolean(); }
-                        @Override public void encode(FriendlyByteBuf buf, Boolean v) { buf.writeBoolean(v); }
-                    }, SyncNametagDataPacket::isStaff,
-                    SyncNametagDataPacket::new
-            );
+            new StreamCodec<>() {
+                @Override
+                public SyncNametagDataPacket decode(FriendlyByteBuf buf) {
+                    return new SyncNametagDataPacket(
+                            buf.readUUID(),
+                            buf.readUtf(),
+                            buf.readUtf(),
+                            buf.readUtf(),
+                            buf.readUtf(),
+                            buf.readBoolean()
+                    );
+                }
+                @Override
+                public void encode(FriendlyByteBuf buf, SyncNametagDataPacket p) {
+                    buf.writeUUID(p.targetUUID());
+                    buf.writeUtf(p.displayName());
+                    buf.writeUtf(p.prefix());
+                    buf.writeUtf(p.suffix());
+                    buf.writeUtf(p.profession());
+                    buf.writeBoolean(p.isStaff());
+                }
+            };
 
     @Override
     public Type<? extends CustomPacketPayload> type() {
@@ -67,8 +62,6 @@ public record SyncNametagDataPacket(
 
     public static void handle(SyncNametagDataPacket packet, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
-            RpEssentials.LOGGER.info("[SyncNametag] CLIENT received — uuid={} displayName='{}'",
-                    packet.targetUUID(), packet.displayName());
             net.rp.rpessentials.client.ClientNametagCache.update(packet);
         });
     }
@@ -101,8 +94,6 @@ public record SyncNametagDataPacket(
 
     public static void broadcastForPlayer(ServerPlayer target) {
         SyncNametagDataPacket packet = from(target);
-        RpEssentials.LOGGER.info("[SyncNametag] SERVER broadcasting for '{}' — displayName='{}'",
-                target.getName().getString(), packet.displayName());
         net.neoforged.neoforge.network.PacketDistributor.sendToAllPlayers(packet);
     }
 }

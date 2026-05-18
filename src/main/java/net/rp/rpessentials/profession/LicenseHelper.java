@@ -21,8 +21,8 @@ import java.util.List;
  * Utility class shared by RpEssentialsCommands.giveLicense() and SetPlayerProfilePacket
  * to create and give a physical license item to a player.
  *
- * Centralising the logic here ensures both entry points produce identical items
- * and perform the same side-effects (tag, cache invalidation, sync, audit log).
+ * Centralizing the logic here ensures both entry points produce identical items
+ * and perform the same side effects (tag, cache invalidation, sync, audit log).
  */
 public class LicenseHelper {
 
@@ -61,7 +61,7 @@ public class LicenseHelper {
 
         // colorCode may be stored as "&e" (from the GUI) or "§e" (from hand-edited config).
         // Component.literal() does NOT parse either -- we must translate first.
-        String colorPrefix = profData.colorCode.replace("&", "\u00a7");
+        String colorPrefix = profData.colorCode.replace("&", "§");
         license.set(DataComponents.CUSTOM_NAME,
                 net.rp.rpessentials.ColorHelper.parseColors(
                         colorPrefix

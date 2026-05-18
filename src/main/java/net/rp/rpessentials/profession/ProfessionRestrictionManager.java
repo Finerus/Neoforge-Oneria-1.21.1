@@ -19,7 +19,6 @@ public class ProfessionRestrictionManager {
     // CACHES
     // =========================================================================
 
-    private static final Map<UUID, Set<String>> playerProfessionsCache = new ConcurrentHashMap<>();
     private static final Map<String, ProfessionData> professionDataCache = new ConcurrentHashMap<>();
     private static final Map<String, Pattern> compiledPatterns = new ConcurrentHashMap<>();
 
@@ -30,6 +29,7 @@ public class ProfessionRestrictionManager {
     private static long lastCacheUpdate = 0;
     private static final long CACHE_DURATION = 30000L;
     private static boolean isInitialized = false;
+    private static final Map<UUID, Map<String, Boolean>> actionCache = new ConcurrentHashMap<>();
 
     // =========================================================================
     // DATA CLASS
@@ -57,9 +57,9 @@ public class ProfessionRestrictionManager {
 
     public static void reloadCache() {
         professionDataCache.clear();
-        playerProfessionsCache.clear();
         compiledPatterns.clear();
         craftMessageCooldown.clear();
+        actionCache.clear();
         isInitialized = false;
 
         try {
@@ -71,7 +71,14 @@ public class ProfessionRestrictionManager {
                 String[] parts = entry.split(";");
                 if (parts.length == 3) {
                     String id = parts[0].toLowerCase().trim();
+                    if (id.isEmpty()) {
+                        RpEssentials.LOGGER.warn("[ProfessionRestrictions] Empty profession id in entry: '{}'", entry);
+                        continue;
+                    }
                     professionDataCache.put(id, new ProfessionData(id, parts[1].trim(), parts[2].trim()));
+                } else {
+                    RpEssentials.LOGGER.warn(
+                            "[ProfessionRestrictions] Malformed entry (expected id;name;color): '{}'", entry);
                 }
             }
             lastCacheUpdate = System.currentTimeMillis();
@@ -113,13 +120,22 @@ public class ProfessionRestrictionManager {
     // =========================================================================
 
     private static boolean canPerformAction(ServerPlayer player, ResourceLocation id,
+                                            String cachePrefix,
                                             Supplier<List<? extends String>> globalList,
                                             Supplier<List<? extends String>> allowedList) {
         if (!ensureInitialized()) return true;
         if (isExemptFromProfessionRestrictions(player)) return true;
+
+        UUID uuid = player.getUUID();
+        String cacheKey = cachePrefix + ":" + id.toString();
+        Boolean cached = actionCache.computeIfAbsent(uuid, k -> new ConcurrentHashMap<>()).get(cacheKey);
+        if (cached != null) return cached;
+
         try {
-            if (!isGloballyBlocked(id, globalList.get())) return true;
-            return hasPermission(LicenseManager.getLicenses(player.getUUID()), id, allowedList.get());
+            boolean result = !isGloballyBlocked(id, globalList.get())
+                    || hasPermission(LicenseManager.getLicenses(uuid), id, allowedList.get());
+            actionCache.get(uuid).put(cacheKey, result);
+            return result;
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[ProfessionRestrictions] Error checking action: {}", e.getMessage());
             return true;
@@ -131,25 +147,25 @@ public class ProfessionRestrictionManager {
     // =========================================================================
 
     public static boolean canCraft(ServerPlayer player, ResourceLocation itemId) {
-        return canPerformAction(player, itemId,
+        return canPerformAction(player, itemId, "craft",
                 ProfessionConfig.GLOBAL_BLOCKED_CRAFTS::get,
                 ProfessionConfig.PROFESSION_ALLOWED_CRAFTS::get);
     }
 
     public static boolean canBreakBlock(ServerPlayer player, ResourceLocation blockId) {
-        return canPerformAction(player, blockId,
+        return canPerformAction(player, blockId, "break",
                 ProfessionConfig.GLOBAL_UNBREAKABLE_BLOCKS::get,
                 ProfessionConfig.PROFESSION_ALLOWED_BLOCKS::get);
     }
 
     public static boolean canUseItem(ServerPlayer player, ResourceLocation itemId) {
-        return canPerformAction(player, itemId,
+        return canPerformAction(player, itemId, "use",
                 ProfessionConfig.GLOBAL_BLOCKED_ITEMS::get,
                 ProfessionConfig.PROFESSION_ALLOWED_ITEMS::get);
     }
 
     public static boolean canEquip(ServerPlayer player, ResourceLocation itemId) {
-        return canPerformAction(player, itemId,
+        return canPerformAction(player, itemId, "equip",
                 ProfessionConfig.GLOBAL_BLOCKED_EQUIPMENT::get,
                 ProfessionConfig.PROFESSION_ALLOWED_EQUIPMENT::get);
     }
@@ -358,15 +374,15 @@ public class ProfessionRestrictionManager {
     // =========================================================================
 
     public static void invalidatePlayerCache(UUID playerUUID) {
-        playerProfessionsCache.remove(playerUUID);
         craftMessageCooldown.remove(playerUUID);
+        actionCache.remove(playerUUID);
     }
 
     public static void clearCache() {
-        playerProfessionsCache.clear();
         professionDataCache.clear();
         compiledPatterns.clear();
         craftMessageCooldown.clear();
+        actionCache.clear();
         lastCacheUpdate = 0;
         isInitialized = false;
     }

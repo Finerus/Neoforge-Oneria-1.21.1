@@ -5,14 +5,13 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.rp.rpessentials.config.RpEssentialsConfig;
-import net.rp.rpessentials.moderation.PlaytimeManager;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Gestion des avertissements de bordure de monde et des zones nommées.
- *
+ * -
  * 4.1.6 : sendMessage() délègue à {@link ImmersivePresetHelper}
  * pour supporter les modes IMMERSIVE:zone, IMMERSIVE:alert, etc.
  */
@@ -84,17 +83,39 @@ public class WorldBorderManager {
             String[] parts = zoneDef.split(";");
             if (parts.length < 5) continue;
             try {
-                String zoneName = parts[0].trim();
-                double cx       = Double.parseDouble(parts[1].trim());
-                double cz       = Double.parseDouble(parts[2].trim());
-                double radius   = Double.parseDouble(parts[3].trim());
-                String msgEnter = parts[4].trim();
-                String msgExit  = parts.length >= 6 ? parts[5].trim() : "";
+                String zoneName  = parts[0].trim();
+                double cx        = Double.parseDouble(parts[1].trim());
+                double cz        = Double.parseDouble(parts[2].trim());
+                double radius    = Double.parseDouble(parts[3].trim());
 
-                double dx = player.getX() - cx;
-                double dz = player.getZ() - cz;
-                boolean inZone  = (dx * dx + dz * dz) <= (radius * radius);
-                boolean wasIn   = current.contains(zoneName);
+                // Format ancien : name;cx;cz;radius;enterMsg[;exitMsg]
+                // Format nouveau : name;cx;cz;radius;dimension;enterMsg[;exitMsg]
+                String dimension = null;
+                String msgEnter, msgExit;
+                if (parts.length >= 6 && parts[4].contains(":")) {
+                    dimension = parts[4].trim();
+                    msgEnter  = parts[5].trim();
+                    msgExit   = parts.length >= 7 ? parts[6].trim() : "";
+                } else {
+                    msgEnter = parts[4].trim();
+                    msgExit  = parts.length >= 6 ? parts[5].trim() : "";
+                }
+
+                if (dimension != null) {
+                    String playerDim = player.level().dimension().location().toString();
+                    if (!playerDim.equals(dimension)) {
+                        if (current.contains(zoneName)) {
+                            current.remove(zoneName);
+                            if (!msgExit.isEmpty()) sendZoneMessage(player, msgExit);
+                        }
+                        continue;
+                    }
+                }
+
+                double dx     = player.getX() - cx;
+                double dz     = player.getZ() - cz;
+                boolean inZone = (dx * dx + dz * dz) <= (radius * radius);
+                boolean wasIn  = current.contains(zoneName);
 
                 if (inZone && !wasIn) {
                     current.add(zoneName);

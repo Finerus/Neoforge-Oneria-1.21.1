@@ -11,11 +11,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.rp.rpessentials.RpEssentials;
 import net.rp.rpessentials.RpEssentialsPermissions;
 import net.rp.rpessentials.config.ConfigInspector;
-import net.rp.rpessentials.config.MessagesConfig;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Packet CLIENT → SERVEUR : application des modifications de config depuis le GUI.
@@ -70,20 +70,41 @@ public record SaveConfigEntriesPacket(String fileId, Map<String, String> changes
                 return;
             }
 
-            // ── Snapshot des anciennes valeurs avant application ──────────────
-            Map<String, String> oldValues = snapshotCurrentValues(packet.fileId(), packet.changes().keySet());
+// Validation : paths connus uniquement, valeurs non surdimensionnées
+            Set<String> knownPaths = ConfigInspector.getEntries(packet.fileId()).stream()
+                    .filter(e -> !e.isSection())
+                    .map(ConfigInspector.EntryData::fullPath)
+                    .collect(java.util.stream.Collectors.toSet());
 
-            // ── Application ──────────────────────────────────────────────────
-            int applied = ConfigInspector.applyAndSave(packet.fileId(), packet.changes());
+            Map<String, String> validatedChanges = new java.util.LinkedHashMap<>();
+            for (Map.Entry<String, String> change : packet.changes().entrySet()) {
+                if (!knownPaths.contains(change.getKey())) {
+                    RpEssentials.LOGGER.warn("[ConfigGUI] {} tried to set unknown path '{}'",
+                            player.getName().getString(), change.getKey());
+                    continue;
+                }
+                if (change.getValue().length() > 2048) {
+                    RpEssentials.LOGGER.warn("[ConfigGUI] {} sent oversized value for '{}'",
+                            player.getName().getString(), change.getKey());
+                    continue;
+                }
+                validatedChanges.put(change.getKey(), change.getValue());
+            }
+
+            if (validatedChanges.isEmpty()) {
+                player.sendSystemMessage(Component.literal("§c[Config] No valid changes to apply."));
+                return;
+            }
+
+            Map<String, String> oldValues = snapshotCurrentValues(packet.fileId(), validatedChanges.keySet());
+            int applied = ConfigInspector.applyAndSave(packet.fileId(), validatedChanges);
 
             if (applied > 0) {
                 RpEssentials.LOGGER.info("[ConfigGUI] {} applied {} change(s) to '{}'",
                         player.getName().getString(), applied, packet.fileId());
 
-                // ── Broadcast au staff ────────────────────────────────────────
-                broadcastChangesToStaff(player, packet.fileId(), packet.changes(), oldValues);
+                broadcastChangesToStaff(player, packet.fileId(), validatedChanges, oldValues);
 
-                // ── Retour des entrées mises à jour ───────────────────────────
                 List<ConfigInspector.EntryData> entries = ConfigInspector.getEntries(packet.fileId());
                 PacketDistributor.sendToPlayer(player,
                         ConfigFileEntriesPacket.from(packet.fileId(), entries));

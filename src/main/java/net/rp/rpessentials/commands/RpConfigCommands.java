@@ -11,11 +11,12 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.rp.rpessentials.RpEssentialsPermissions;
-import net.rp.rpessentials.RpEssentialsScheduleManager;
+import net.rp.rpessentials.*;
 import net.rp.rpessentials.config.*;
 import net.rp.rpessentials.identity.NicknameManager;
+import net.rp.rpessentials.moderation.WarnManager;
 import net.rp.rpessentials.network.HideNametagsPacket;
+import net.rp.rpessentials.profession.ProfessionRestrictionManager;
 
 public class RpConfigCommands {
 
@@ -54,10 +55,18 @@ public class RpConfigCommands {
                         .executes(ctx -> updateConfigBool(ctx, RpEssentialsConfig.DEBUG_SELF_BLUR, "Debug Self Blur"))));
         set.then(Commands.literal("enableSchedule")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, ScheduleConfig.ENABLE_SCHEDULE, "Schedule System"))));
+                        .executes(ctx -> {
+                            int r = updateConfigBool(ctx, ScheduleConfig.ENABLE_SCHEDULE, "Schedule System");
+                            RpEssentialsScheduleManager.reload();
+                            return r;
+                        })));
         set.then(Commands.literal("kickNonStaff")
                 .then(Commands.argument("value", BoolArgumentType.bool())
-                        .executes(ctx -> updateConfigBool(ctx, ScheduleConfig.KICK_NON_STAFF, "Kick Non-Staff"))));
+                        .executes(ctx -> {
+                            int r = updateConfigBool(ctx, ScheduleConfig.KICK_NON_STAFF, "Kick Non-Staff");
+                            RpEssentialsScheduleManager.reload();
+                            return r;
+                        })));
         set.then(Commands.literal("enableWelcome")
                 .then(Commands.argument("value", BoolArgumentType.bool())
                         .executes(ctx -> updateConfigBool(ctx, ScheduleConfig.ENABLE_WELCOME, "Welcome Message"))));
@@ -245,23 +254,51 @@ public class RpConfigCommands {
     // =========================================================================
     // HANDLERS
     // =========================================================================
-
     static int reloadConfig(CommandContext<CommandSourceStack> ctx) {
+        // Schedules et caches dérivés
         RpEssentialsScheduleManager.reload();
+        WarnManager.reload();
+        ProfessionRestrictionManager.reloadCache();
+        RpEssentialsPatternUtils.clearCache();
+        ImmersivePresetHelper.clearCache();
         RpEssentialsPermissions.clearCache();
+
+        // Données persistantes (rechargement depuis fichier)
         NicknameManager.reload();
+        net.rp.rpessentials.profession.LicenseManager.reload();
+        net.rp.rpessentials.moderation.MuteManager.reload();
+        net.rp.rpessentials.moderation.LastConnectionManager.reload();
+        net.rp.rpessentials.moderation.WarnManager.reload();
+
+        // Sync client
         try {
             boolean hideNametags = RpEssentialsConfig.HIDE_NAMETAGS.get();
             ctx.getSource().getServer().getPlayerList().getPlayers().forEach(player ->
                     PacketDistributor.sendToPlayer(player, new HideNametagsPacket(hideNametags)));
         } catch (IllegalStateException ignored) {}
-        ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] Configuration reloaded!"), true);
+
+        // Re-sync des restrictions de profession pour tous les joueurs connectés
+        try {
+            for (net.minecraft.server.level.ServerPlayer player :
+                    ctx.getSource().getServer().getPlayerList().getPlayers()) {
+                net.rp.rpessentials.profession.ProfessionSyncHelper.syncToPlayer(player);
+            }
+        } catch (Exception ignored) {}
+
+        ctx.getSource().sendSuccess(() -> Component.literal("§a[RpEssentials] Configuration reloaded."), true);
+        String dataFolder = RpEssentialsDataPaths.getDataFolder().getAbsolutePath();
+        RpEssentials.LOGGER.info("[RPEssentials] Data layer ready — {} nickname(s), {} license(s), {} warn(s), {} mute(s). Data folder: {}",
+                NicknameManager.count(),
+                net.rp.rpessentials.profession.LicenseManager.getAllLicenses().size(),
+                net.rp.rpessentials.moderation.WarnManager.getAll().size(),
+                net.rp.rpessentials.moderation.MuteManager.getAllMutes().size(),
+                dataFolder);
         return 1;
     }
 
     private static int showStatus(CommandContext<CommandSourceStack> ctx) {
         try {
-            final java.util.function.Function<java.util.function.Supplier<?>, String> safe = (supplier) -> {
+            final java.util.function.Function<java.util.function.Supplier<?>, String> safe = supplier -> {
                 try {
                     Object val = supplier.get();
                     return val != null ? val.toString() : "N/A";
@@ -274,42 +311,42 @@ public class RpConfigCommands {
 
             String statusMessage =
                     "§6╔═══════════════════════════════════╗\n" +
-                    "§6║  §e§lRPESSENTIALS - STATUS§r         §6║\n" +
-                    "§6╠═══════════════════════════════════╣\n" +
-                    "§6║ §7Obfuscation\n" +
-                    "§6║  §eBlur: §f" + safe.apply(() -> RpEssentialsConfig.ENABLE_BLUR.get()) + "\n" +
-                    "§6║  §eProximity: §f" + safe.apply(() -> RpEssentialsConfig.PROXIMITY_DISTANCE.get()) + " blocks\n" +
-                    "§6║  §eObfuscate Prefix: §f" + safe.apply(() -> RpEssentialsConfig.OBFUSCATE_PREFIX.get()) + "\n" +
-                    "§6║  §eOPs See All: §f" + safe.apply(() -> RpEssentialsConfig.OPS_SEE_ALL.get()) + "\n" +
-                    "§6║  §eHide Nametags: §f" + safe.apply(() -> RpEssentialsConfig.HIDE_NAMETAGS.get()) + "\n" +
-                    "§6║  §eSneak Stealth: §f" + safe.apply(() -> RpEssentialsConfig.ENABLE_SNEAK_STEALTH.get()) + "\n" +
-                    "§6║  §eSneak Distance: §f" + safe.apply(() -> RpEssentialsConfig.SNEAK_PROXIMITY_DISTANCE.get()) + " blocks\n" +
-                    "§6║  §eAlways Visible: §f" + safe.apply(() -> RpEssentialsConfig.ALWAYS_VISIBLE_LIST.get().size()) + " players\n" +
-                    "§6║\n" +
-                    "§6║ §7Schedule: " + scheduleStatus + "\n" +
-                    "§6║\n" +
-                    "§6║ §7Death RP\n" +
-                    "§6║  §eGlobal enabled    : §f" + safe.apply(() -> RpEssentialsConfig.DEATH_RP_GLOBAL_ENABLED.get()) + "\n" +
-                    "§6║  §eWhitelist removal : §f" + safe.apply(() -> RpEssentialsConfig.DEATH_RP_WHITELIST_REMOVE.get()) + "\n" +
-                    "§6║  §eDeath sound       : §f" + safe.apply(() -> RpEssentialsConfig.DEATH_RP_DEATH_SOUND.get()) + "\n" +
-                    "§6║\n" +
-                    "§6║ §7Chat System\n" +
-                    "§6║  §eChat Format: §f" + safe.apply(() -> ChatConfig.ENABLE_CHAT_FORMAT.get()) + "\n" +
-                    "§6║  §eTimestamp: §f" + safe.apply(() -> ChatConfig.ENABLE_TIMESTAMP.get()) + "\n" +
-                    "§6║  §eMarkdown: §f" + safe.apply(() -> ChatConfig.MARKDOWN_ENABLED.get()) + "\n" +
-                    "§6║  §eMessage Color: §f" + safe.apply(() -> ChatConfig.CHAT_MESSAGE_COLOR.get()) + "\n" +
-                    "§6║\n" +
-                    "§6║ §7Join/Leave: §f" + safe.apply(() -> ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE.get()) + "\n" +
-                    "§6║\n" +
-                    "§6║ §7World Border\n" +
-                    "§6║  §eEnabled: §f" + safe.apply(() -> RpEssentialsConfig.ENABLE_WORLD_BORDER_WARNING.get()) + "\n" +
-                    "§6║  §eDistance: §f" + safe.apply(() -> RpEssentialsConfig.WORLD_BORDER_DISTANCE.get()) + " blocks\n" +
-                    "§6║\n" +
-                    "§6║ §7Moderation\n" +
-                    "§6║  §eSilent Commands: §f" + safe.apply(() -> ModerationConfig.ENABLE_SILENT_COMMANDS.get()) + "\n" +
-                    "§6║  §ePlatforms: §f" + safe.apply(() -> ModerationConfig.ENABLE_PLATFORMS.get()) + "\n" +
-                    "§6║  §eWelcome Message: §f" + safe.apply(() -> ScheduleConfig.ENABLE_WELCOME.get()) + "\n" +
-                    "§6╚═══════════════════════════════════╝";
+                            "§6║  §e§lRPESSENTIALS - STATUS§r         §6║\n" +
+                            "§6╠═══════════════════════════════════╣\n" +
+                            "§6║ §7Obfuscation\n" +
+                            "§6║  §eBlur: §f" + safe.apply(RpEssentialsConfig.ENABLE_BLUR) + "\n" +
+                            "§6║  §eProximity: §f" + safe.apply(RpEssentialsConfig.PROXIMITY_DISTANCE) + " blocks\n" +
+                            "§6║  §eObfuscate Prefix: §f" + safe.apply(RpEssentialsConfig.OBFUSCATE_PREFIX) + "\n" +
+                            "§6║  §eOPs See All: §f" + safe.apply(RpEssentialsConfig.OPS_SEE_ALL) + "\n" +
+                            "§6║  §eHide Nametags: §f" + safe.apply(RpEssentialsConfig.HIDE_NAMETAGS) + "\n" +
+                            "§6║  §eSneak Stealth: §f" + safe.apply(RpEssentialsConfig.ENABLE_SNEAK_STEALTH) + "\n" +
+                            "§6║  §eSneak Distance: §f" + safe.apply(RpEssentialsConfig.SNEAK_PROXIMITY_DISTANCE) + " blocks\n" +
+                            "§6║  §eAlways Visible: §f" + safe.apply(() -> RpEssentialsConfig.ALWAYS_VISIBLE_LIST.get().size()) + " players\n" +
+                            "§6║\n" +
+                            "§6║ §7Schedule: " + scheduleStatus + "\n" +
+                            "§6║\n" +
+                            "§6║ §7Death RP\n" +
+                            "§6║  §eGlobal enabled    : §f" + safe.apply(RpEssentialsConfig.DEATH_RP_GLOBAL_ENABLED) + "\n" +
+                            "§6║  §eWhitelist removal : §f" + safe.apply(RpEssentialsConfig.DEATH_RP_WHITELIST_REMOVE) + "\n" +
+                            "§6║  §eDeath sound       : §f" + safe.apply(RpEssentialsConfig.DEATH_RP_DEATH_SOUND) + "\n" +
+                            "§6║\n" +
+                            "§6║ §7Chat System\n" +
+                            "§6║  §eChat Format: §f" + safe.apply(ChatConfig.ENABLE_CHAT_FORMAT) + "\n" +
+                            "§6║  §eTimestamp: §f" + safe.apply(ChatConfig.ENABLE_TIMESTAMP) + "\n" +
+                            "§6║  §eMarkdown: §f" + safe.apply(ChatConfig.MARKDOWN_ENABLED) + "\n" +
+                            "§6║  §eMessage Color: §f" + safe.apply(ChatConfig.CHAT_MESSAGE_COLOR) + "\n" +
+                            "§6║\n" +
+                            "§6║ §7Join/Leave: §f" + safe.apply(ChatConfig.ENABLE_CUSTOM_JOIN_LEAVE) + "\n" +
+                            "§6║\n" +
+                            "§6║ §7World Border\n" +
+                            "§6║  §eEnabled: §f" + safe.apply(RpEssentialsConfig.ENABLE_WORLD_BORDER_WARNING) + "\n" +
+                            "§6║  §eDistance: §f" + safe.apply(RpEssentialsConfig.WORLD_BORDER_DISTANCE) + " blocks\n" +
+                            "§6║\n" +
+                            "§6║ §7Moderation\n" +
+                            "§6║  §eSilent Commands: §f" + safe.apply(ModerationConfig.ENABLE_SILENT_COMMANDS) + "\n" +
+                            "§6║  §ePlatforms: §f" + safe.apply(ModerationConfig.ENABLE_PLATFORMS) + "\n" +
+                            "§6║  §eWelcome Message: §f" + safe.apply(ScheduleConfig.ENABLE_WELCOME) + "\n" +
+                            "§6╚═══════════════════════════════════╝";
 
             ctx.getSource().sendSuccess(() -> Component.literal(statusMessage), false);
             return 1;

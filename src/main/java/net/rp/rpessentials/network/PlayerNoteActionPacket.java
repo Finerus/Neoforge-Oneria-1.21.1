@@ -1,8 +1,6 @@
 package net.rp.rpessentials.network;
 
-import io.netty.buffer.ByteBuf;
 import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -70,13 +68,17 @@ public record PlayerNoteActionPacket(
                         .get(packet.targetUuid())
                         .map(p -> p.getName())
                         .orElse(packet.targetUuid().toString());
-                NoteManager.addNote(
+                int newId = NoteManager.addNote(
                         packet.targetUuid(),
                         targetName,
                         staff.getName().getString(),
                         staff.getUUID().toString(),
                         text
                 );
+                if (newId < 0) {
+                    staff.sendSystemMessage(net.minecraft.network.chat.Component.literal(
+                            "§c[NOTE] Note limit reached for this player."));
+                }
                 RpEssentials.LOGGER.info("[Notes] {} added note for {}: {}",
                         staff.getName().getString(), packet.targetUuid(), text);
             }

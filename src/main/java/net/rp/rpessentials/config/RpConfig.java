@@ -40,8 +40,6 @@ public class RpConfig {
     // =========================================================================
     public static final ModConfigSpec.BooleanValue                          ENABLE_DICE_SYSTEM;
     public static final ModConfigSpec.ConfigValue<List<? extends String>>   DICE_TYPES;
-    public static final ModConfigSpec.ConfigValue<String>                   DICE_ROLL_FORMAT;
-    public static final ModConfigSpec.ConfigValue<String>                   DICE_ROLL_SPY_FORMAT;
     public static final ModConfigSpec.IntValue                              DICE_ROLL_DISTANCE;
 
     // =========================================================================
@@ -104,8 +102,6 @@ public class RpConfig {
                 .defineList("diceTypes",
                         Arrays.asList("d4;4","d6;6","d8;8","d10;10","d12;12","d20;20","d100;100"),
                         obj -> obj instanceof String && ((String)obj).contains(";"));
-        DICE_ROLL_FORMAT     = BUILDER.comment("Format. Placeholders: {player}, {dice}, {result}").define("diceRollFormat",    "§8[🎲] §e{player} §7rolled §6{dice} §7and got §a§l{result}§7!");
-        DICE_ROLL_SPY_FORMAT = BUILDER.comment("Staff spy format.").define("diceRollSpyFormat", "§7[DICE-SPY] §e{player} §7rolled §6{dice}§7: §f{result}");
         DICE_ROLL_DISTANCE   = BUILDER.comment("Radius (-1 = global).").defineInRange("diceRollDistance", 32, -1, 256);
         BUILDER.pop();
 

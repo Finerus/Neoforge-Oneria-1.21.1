@@ -7,7 +7,6 @@ import me.shedaniel.rei.api.client.registry.entry.EntryRegistry;
 import me.shedaniel.rei.api.common.entry.EntryIngredient;
 import me.shedaniel.rei.api.common.entry.EntryStack;
 import me.shedaniel.rei.api.common.entry.type.VanillaEntryTypes;
-import java.util.Optional;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -26,11 +25,6 @@ public class ReiIntegrationPlugin implements REIClientPlugin {
 
     @Override
     public void registerEntries(EntryRegistry registry) {
-        // Optionnel : masque les items eux-mêmes de l'index REI.
-        // Commenté par défaut car trop agressif — les items bloqués seraient
-        // invisibles partout dans REI, pas seulement dans les recettes.
-        // Décommenter si le mode HIDE_BLOCKED doit aussi masquer les items.
-        /*
         if (!"SHOW_ALL".equals(getMode())) {
             registry.removeEntryIf(entry -> {
                 if (entry.getType() != VanillaEntryTypes.ITEM) return false;
@@ -42,7 +36,6 @@ public class ReiIntegrationPlugin implements REIClientPlugin {
                 } catch (Exception e) { return false; }
             });
         }
-        */
     }
 
     @Override

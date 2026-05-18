@@ -26,7 +26,7 @@ public class RpEssentialsScheduleManager {
 
         /**
          * Returns true if {@code now} falls within this schedule's session.
-         *
+         * -
          * Two cases:
          *  - Normal    (open < close): 20:00 → 23:59  →  open ≤ now < close
          *  - Cross-midnight (close < open): 22:00 → 02:00  →  now ≥ open  OR  now < close
@@ -84,7 +84,6 @@ public class RpEssentialsScheduleManager {
     // =========================================================================
     // RELOAD
     // =========================================================================
-
     public static void reload() {
         schedules.clear();
         sentWarnings.clear();
@@ -152,7 +151,6 @@ public class RpEssentialsScheduleManager {
     // =========================================================================
     // API PUBLIQUE
     // =========================================================================
-
     /**
      * Returns the active schedule for the current moment.
      *
@@ -264,6 +262,13 @@ public class RpEssentialsScheduleManager {
     public static boolean hasOpenedToday() { return hasOpenedToday; }
     public static boolean hasClosedToday() { return hasClosedToday; }
     public static void markOpenedToday()   { hasOpenedToday = true; }
+
+    public static void resetDailyFlags() {
+        hasClosedToday = false;
+        hasOpenedToday = false;
+        sentWarnings.clear();
+    }
+
     public static void markClosedToday()   { hasClosedToday = true; }
 
     // =========================================================================

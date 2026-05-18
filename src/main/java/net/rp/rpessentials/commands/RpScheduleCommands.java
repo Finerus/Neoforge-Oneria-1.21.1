@@ -27,6 +27,12 @@ public class RpScheduleCommands {
     public static void registerAliases(com.mojang.brigadier.CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("schedule").executes(RpScheduleCommands::showSchedule));
         dispatcher.register(Commands.literal("horaires").executes(RpScheduleCommands::showSchedule));
+        dispatcher.register(Commands.literal("opennow")
+                .requires(src -> src.hasPermission(2))
+                .executes(RpScheduleCommands::forceOpen));
+        dispatcher.register(Commands.literal("closenow")
+                .requires(src -> src.hasPermission(2))
+                .executes(RpScheduleCommands::forceClose));
     }
 
     public static LiteralArgumentBuilder<CommandSourceStack> buildSetRole() {
@@ -53,8 +59,20 @@ public class RpScheduleCommands {
                                     .forEach(builder::suggest);
                             return builder.buildFuture();
                         })
-                        .then(Commands.literal("open").then(Commands.argument("time", StringArgumentType.word()).executes(ctx -> setDayTime(ctx, "open"))))
-                        .then(Commands.literal("close").then(Commands.argument("time", StringArgumentType.word()).executes(ctx -> setDayTime(ctx, "close"))))
+                        .then(Commands.literal("open").then(Commands.argument("time", StringArgumentType.string())
+                                .suggests((ctx, builder) -> {
+                                    builder.suggest("08:00").suggest("18:00").suggest("19:00")
+                                            .suggest("20:00").suggest("22:00").suggest("23:59");
+                                    return builder.buildFuture();
+                                })
+                                .executes(ctx -> setDayTime(ctx, "open"))))
+                        .then(Commands.literal("close").then(Commands.argument("time", StringArgumentType.string())
+                                .suggests((ctx, builder) -> {
+                                    builder.suggest("22:00").suggest("23:00").suggest("23:59")
+                                            .suggest("01:00").suggest("02:00");
+                                    return builder.buildFuture();
+                                })
+                                .executes(ctx -> setDayTime(ctx, "close"))))
                         .then(Commands.literal("enabled").then(Commands.argument("value", BoolArgumentType.bool()).executes(RpScheduleCommands::setDayEnabled)))));
 
         set.then(Commands.literal("deathHoursEnabled").then(Commands.argument("value", BoolArgumentType.bool())
@@ -262,6 +280,34 @@ public class RpScheduleCommands {
         } catch (IllegalStateException e) {
             ctx.getSource().sendFailure(Component.literal(MessagesConfig.get(MessagesConfig.SYSTEM_CONFIG_NOT_LOADED)));
         }
+        return 1;
+    }
+
+    private static int forceOpen(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        RpEssentialsScheduleManager.resetDailyFlags();
+        RpEssentialsScheduleManager.markOpenedToday();
+        try {
+            String msg = ScheduleConfig.MSG_SERVER_OPENED.get()
+                    .replace("{open}",  "now")
+                    .replace("{close}", "—")
+                    .replace("{day}",   java.time.LocalDate.now()
+                            .getDayOfWeek()
+                            .getDisplayName(java.time.format.TextStyle.FULL, java.util.Locale.ENGLISH));
+            server.getPlayerList().broadcastSystemMessage(
+                    net.rp.rpessentials.ColorHelper.parseColors(msg), false);
+        } catch (IllegalStateException ignored) {}
+        ctx.getSource().sendSuccess(() -> net.minecraft.network.chat.Component.literal(
+                "§a[Schedule] Server forcibly opened."), true);
+        return 1;
+    }
+
+    private static int forceClose(CommandContext<CommandSourceStack> ctx) {
+        MinecraftServer server = ctx.getSource().getServer();
+        RpEssentialsScheduleManager.markClosedToday();
+        RpEssentialsScheduleManager.closeServer(server);
+        ctx.getSource().sendSuccess(() -> net.minecraft.network.chat.Component.literal(
+                "§c[Schedule] Server forcibly closed."), true);
         return 1;
     }
 }

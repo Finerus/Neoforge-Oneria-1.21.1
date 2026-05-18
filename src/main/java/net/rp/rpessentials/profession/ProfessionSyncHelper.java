@@ -29,8 +29,6 @@ public class ProfessionSyncHelper {
         SyncProfessionRestrictionsPacket packet = new SyncProfessionRestrictionsPacket(blockedCrafts, blockedEquipment);
         PacketDistributor.sendToPlayer(player, packet);
 
-        RpEssentials.LOGGER.info("[ProfessionSync] Sent restrictions to {} - {} crafts, {} equipment blocked",
-                player.getName().getString(), blockedCrafts.size(), blockedEquipment.size());
     }
 
     private static Set<String> calculateBlockedCrafts(List<String> playerLicenses) {

@@ -25,6 +25,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
  *   {nick}, {real}, {nick_real} ← nouvelles
  */
 @Mixin(PlayerList.class)
+@org.spongepowered.asm.mixin.Implements(
+        @org.spongepowered.asm.mixin.Interface(
+                iface = net.rp.rpessentials.api.IRpPlayerList.class,
+                prefix = "rpe$"
+        )
+)
 public abstract class MixinPlayerList implements IRpPlayerList {
 
     @Unique

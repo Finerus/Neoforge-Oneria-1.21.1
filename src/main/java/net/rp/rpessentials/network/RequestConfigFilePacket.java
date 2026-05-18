@@ -13,6 +13,8 @@ import net.rp.rpessentials.RpEssentialsPermissions;
 import net.rp.rpessentials.config.ConfigInspector;
 
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Packet CLIENT → SERVER
@@ -32,6 +34,9 @@ public record RequestConfigFilePacket(String fileId) implements CustomPacketPayl
                     RequestConfigFilePacket::new
             );
 
+    private static final Map<UUID, Long> lastRequestTime = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long REQUEST_COOLDOWN_MS = 1000L;
+
     @Override
     public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
@@ -49,6 +54,16 @@ public record RequestConfigFilePacket(String fileId) implements CustomPacketPayl
                         player.getName().getString(), packet.fileId());
                 return;
             }
+
+            // Rate-limit : 1 requête par seconde par joueur
+            long now = System.currentTimeMillis();
+            Long last = lastRequestTime.get(player.getUUID());
+            if (last != null && now - last < REQUEST_COOLDOWN_MS) {
+                RpEssentials.LOGGER.debug("[ConfigGUI] Rate-limited config request from {}",
+                        player.getName().getString());
+                return;
+            }
+            lastRequestTime.put(player.getUUID(), now);
 
             // Load entries for this file
             List<ConfigInspector.EntryData> entries = ConfigInspector.getEntries(packet.fileId());

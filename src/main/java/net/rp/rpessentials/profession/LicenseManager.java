@@ -7,6 +7,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.rp.rpessentials.RpEssentials;
 import net.rp.rpessentials.RpEssentialsDataPaths;
+import net.rp.rpessentials.RpEssentialsIO;
 import net.rp.rpessentials.SyncNametagDataPacket;
 
 import java.io.File;
@@ -105,7 +106,6 @@ public class LicenseManager {
             if (auditFile.exists())   loadAuditFromFile();
             if (tempFile.exists())    loadTempFromFile();
 
-            RpEssentials.LOGGER.info("[LicenseManager] Initialized - Folder: {}", dataFolder.getAbsolutePath());
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[LicenseManager] Failed to initialize", e);
         }
@@ -134,7 +134,6 @@ public class LicenseManager {
                         RpEssentials.LOGGER.warn("[LicenseManager] Invalid UUID in key: {}", entry.getKey());
                     }
                 }
-                RpEssentials.LOGGER.info("[LicenseManager] Loaded {} player licenses", playerLicenses.size());
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[LicenseManager] Failed to load licenses", e);
@@ -148,7 +147,6 @@ public class LicenseManager {
             if (data != null) {
                 auditLog.clear();
                 auditLog.addAll(data);
-                RpEssentials.LOGGER.info("[LicenseManager] Loaded {} audit entries", auditLog.size());
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[LicenseManager] Failed to load audit log", e);
@@ -162,7 +160,6 @@ public class LicenseManager {
             if (data != null) {
                 tempLicenses.clear();
                 tempLicenses.addAll(data);
-                RpEssentials.LOGGER.info("[LicenseManager] Loaded {} temp licenses", tempLicenses.size());
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[LicenseManager] Failed to load temp licenses", e);
@@ -197,7 +194,7 @@ public class LicenseManager {
         }
 
         File targetFile = licenseFile;
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+        RpEssentialsIO.submit(() -> {
             try {
                 File parent = targetFile.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();
@@ -217,7 +214,7 @@ public class LicenseManager {
         List<AuditEntry> snapshot = new ArrayList<>(auditLog);
         File targetFile = auditFile;
 
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+        RpEssentialsIO.submit(() -> {
             try {
                 File parent = targetFile.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();
@@ -238,7 +235,7 @@ public class LicenseManager {
         List<TempLicenseEntry> snapshot = new ArrayList<>(tempLicenses);
         File targetFile = tempFile;
 
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+        RpEssentialsIO.submit(() -> {
             try {
                 File parent = targetFile.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();
@@ -259,7 +256,9 @@ public class LicenseManager {
 
     public static void addLicense(UUID playerUUID, String profession) {
         ensureInitialized();
-        playerLicenses.computeIfAbsent(playerUUID, k -> new ArrayList<>()).add(profession);
+        List<String> licenses = playerLicenses.computeIfAbsent(playerUUID, k -> new ArrayList<>());
+        if (licenses.contains(profession)) return;
+        licenses.add(profession);
         saveToFile();
         MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
         if (server != null) {

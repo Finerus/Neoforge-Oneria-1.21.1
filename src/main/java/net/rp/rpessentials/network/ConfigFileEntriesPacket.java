@@ -16,10 +16,10 @@ import java.util.List;
 
 /**
  * Packet SERVER → CLIENT
- *
+ * -
  * Response to RequestConfigFilePacket.
  * Contains all config entries for one file, serialized as EntryTransfer objects.
- *
+ * -
  * The ValueType is encoded as a byte to keep the packet compact.
  * Comments may be long but are bounded per-entry.
  */

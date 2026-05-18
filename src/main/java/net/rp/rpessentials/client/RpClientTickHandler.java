@@ -15,13 +15,23 @@ import net.rp.rpessentials.network.RequestOpenGuiPacket;
 @EventBusSubscriber(modid = RpEssentials.MODID, value = Dist.CLIENT)
 public class RpClientTickHandler {
 
+    private static int evictTick = 0;
+
     @SubscribeEvent
     public static void onClientTick(ClientTickEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
 
+        // Éviction périodique du cache des joueurs déconnectés (~toutes les 10s)
+        if (mc.level != null && mc.getConnection() != null) {
+            evictTick++;
+            if (evictTick >= 200) {
+                evictTick = 0;
+                ClientNametagCache.evictDisconnected();
+            }
+        }
+
         if (mc.player == null || mc.screen != null) return;
 
-        // ── Touche GUI Profession ─────────────────────────────────────────────
         while (RpKeyBindings.OPEN_PROFESSION_GUI != null
                 && RpKeyBindings.OPEN_PROFESSION_GUI.consumeClick()) {
             PacketDistributor.sendToServer(
@@ -29,7 +39,6 @@ public class RpClientTickHandler {
             RpEssentials.LOGGER.debug("[RPEssentials] Sent PROFESSION GUI request to server");
         }
 
-        // ── Touche GUI Profil Joueur ──────────────────────────────────────────
         while (RpKeyBindings.OPEN_PLAYER_PROFILE_GUI != null
                 && RpKeyBindings.OPEN_PLAYER_PROFILE_GUI.consumeClick()) {
             PacketDistributor.sendToServer(
@@ -46,7 +55,6 @@ public class RpClientTickHandler {
             } catch (IllegalStateException ignored) {}
         }
 
-        // ── Touche GUI Config Manager ─────────────────────────────────────────
         while (RpKeyBindings.OPEN_CONFIG_MANAGER_GUI != null
                 && RpKeyBindings.OPEN_CONFIG_MANAGER_GUI.consumeClick()) {
             PacketDistributor.sendToServer(

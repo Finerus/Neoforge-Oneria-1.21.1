@@ -128,14 +128,22 @@ public class RpEssentialsChatFormatter {
         String display  = nick != null ? nick : realName;
         String nickReal = buildNickRealStr(nick, realName);
 
-        // Nouvelles variables en premier (évite double-remplacement)
         format = format.replace("{nick_real}", nickReal);
         format = format.replace("{real}",      realName);
         format = format.replace("{nick}",      display);
+        format = format.replace("{player}",    buildPlayerValue(display, realName));
+        return format;
+    }
 
-        // {player} — rétrocompat, applique showRealName si actif
-        format = format.replace("{player}", buildPlayerValue(display, realName));
+    public static String resolveRpPlaceholders(String format, ServerPlayer player, String precomputedNick) {
+        String realName = player.getName().getString();
+        String display  = precomputedNick != null ? precomputedNick : realName;
+        String nickReal = buildNickRealStr(precomputedNick, realName);
 
+        format = format.replace("{nick_real}", nickReal);
+        format = format.replace("{real}",      realName);
+        format = format.replace("{nick}",      display);
+        format = format.replace("{player}",    buildPlayerValue(display, realName));
         return format;
     }
 

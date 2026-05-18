@@ -20,7 +20,7 @@ import java.util.*;
 
 /**
  * Dynamic Config Manager GUI.
- *
+ * <p>
  * Layout:
  *  ┌──────────────┬──────────────────────────────────────────────┐
  *  │ File panel   │ Entries panel (scrollable)                   │
@@ -32,10 +32,10 @@ import java.util.*;
  *  │ Professions  │ ─────────────────────────────────────────────│
  *  │ Messages     │  [Apply Changes]  [Discard]  [↑/↓ scroll]   │
  *  └──────────────┴──────────────────────────────────────────────┘
- *
+ * <p>
  * Scrolling: managed by scrollOffset (entry index).
  * Rebuilds widgets on scroll, file switch, or after server response.
- *
+ * <p>
  * Pending changes are stored in a Map<path, newValue> and highlighted in yellow.
  * "Apply" sends SaveConfigEntriesPacket; server responds with updated entries.
  */
@@ -185,13 +185,7 @@ public class ConfigManagerScreen extends Screen {
         int firstVisible   = visibleRange[0];
         int lastVisible    = visibleRange[1];
 
-        // Le premier élément affiché doit COMMENCER en haut.
         int y = startY;
-
-        // SUPPRIME CETTE BOUCLE QUI POUSSAIT TOUT VERS LE BAS :
-        // for (int i = 0; i < firstVisible; i++) {
-        //     y += rowHeight(currentEntries.get(i));
-        // }
 
         for (int i = firstVisible; i <= lastVisible && i < currentEntries.size(); i++) {
             ConfigFileEntriesPacket.EntryTransfer entry = currentEntries.get(i);

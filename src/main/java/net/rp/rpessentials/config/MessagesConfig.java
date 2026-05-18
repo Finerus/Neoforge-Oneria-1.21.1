@@ -320,19 +320,21 @@ public class MessagesConfig {
                 .comment("Message sent to a player when they receive a permanent warn.",
                         "Placeholders: {id} = warn ID, {reason} = reason.")
                 .define("receivedPermanent",
-                        "§c⚠ §lYou have received a warning §r§c(warn #{id})!\n" +
-                                "§7Reason  : §f{reason}\n" +
-                                "§7Duration: §fPermanent\n" +
-                                "§7Type §l/mywarn §r§7to view all your warnings.");
+                        """
+                                §c⚠ §lYou have received a warning §r§c(warn #{id})!
+                                §7Reason  : §f{reason}
+                                §7Duration: §fPermanent
+                                §7Type §l/mywarn §r§7to view all your warnings.""");
 
         WARN_RECEIVED_TEMP = BUILDER
                 .comment("Message sent to a player when they receive a temporary warn.",
                         "Placeholders: {id} = warn ID, {reason} = reason, {duration} = formatted duration.")
                 .define("receivedTemporary",
-                        "§c⚠ §lYou have received a temporary warning §r§c(warn #{id})!\n" +
-                                "§7Reason  : §f{reason}\n" +
-                                "§7Duration: §f{duration}\n" +
-                                "§7Type §l/mywarn §r§7to view all your warnings.");
+                        """
+                                §c⚠ §lYou have received a temporary warning §r§c(warn #{id})!
+                                §7Reason  : §f{reason}
+                                §7Duration: §f{duration}
+                                §7Type §l/mywarn §r§7to view all your warnings.""");
 
         WARN_NOT_FOUND = BUILDER
                 .comment("Message shown when a warn ID cannot be found. Placeholder: {id}.")

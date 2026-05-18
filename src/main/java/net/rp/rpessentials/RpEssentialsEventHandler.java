@@ -1,9 +1,12 @@
 package net.rp.rpessentials;
 
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
+import net.minecraft.world.level.Level;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
@@ -12,7 +15,6 @@ import net.rp.rpessentials.config.MessagesConfig;
 import net.rp.rpessentials.config.ModerationConfig;
 import net.rp.rpessentials.config.ScheduleConfig;
 import net.rp.rpessentials.identity.NicknameManager;
-import net.rp.rpessentials.identity.RpEssentialsMessagingManager;
 import net.rp.rpessentials.api.IRpPlayerList;
 import net.rp.rpessentials.moderation.*;
 import net.rp.rpessentials.profession.ProfessionSyncHelper;
@@ -125,6 +127,35 @@ public class RpEssentialsEventHandler {
         RpEssentialsPermissions.invalidateCache(player.getUUID());
         net.rp.rpessentials.identity.RpEssentialsMessagingManager.clearCache(player.getUUID());
         RpCooldownManager.clearAll(player.getUUID());
+    }
+
+    @SubscribeEvent
+    public static void onServerStarted(net.neoforged.neoforge.event.server.ServerStartedEvent event) {
+        // Initialisation anticipée pour éviter le lag au premier login
+        NicknameManager.reload();
+        net.rp.rpessentials.profession.LicenseManager.reload();
+        net.rp.rpessentials.moderation.WarnManager.reload();
+        net.rp.rpessentials.moderation.MuteManager.reload();
+        net.rp.rpessentials.moderation.LastConnectionManager.reload();
+
+        // Validation dimension AFK
+        try {
+            String dimId = net.rp.rpessentials.config.RpConfig.AFK_DIMENSION.get();
+            net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> dimKey =
+                    net.minecraft.resources.ResourceKey.create(
+                            net.minecraft.core.registries.Registries.DIMENSION,
+                            net.minecraft.resources.ResourceLocation.parse(dimId));
+            if (event.getServer().getLevel(dimKey) == null)
+                RpEssentials.LOGGER.warn("[RPEssentials] AFK dimension '{}' does not exist.", dimId);
+        } catch (IllegalStateException ignored) {}
+
+        String dataFolder = RpEssentialsDataPaths.getDataFolder().getAbsolutePath();
+        RpEssentials.LOGGER.info("[RPEssentials] Data layer ready — {} nickname(s), {} license(s), {} warn(s), {} mute(s). Data folder: {}",
+                NicknameManager.count(),
+                net.rp.rpessentials.profession.LicenseManager.getAllLicenses().size(),
+                net.rp.rpessentials.moderation.WarnManager.getAll().size(),
+                net.rp.rpessentials.moderation.MuteManager.getAllMutes().size(),
+                dataFolder);
     }
 
     // =========================================================================

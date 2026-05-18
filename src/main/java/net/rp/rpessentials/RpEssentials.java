@@ -7,6 +7,7 @@ import net.luckperms.api.model.user.User;
 import net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
@@ -25,6 +26,8 @@ import org.slf4j.Logger;
 
 import java.time.LocalTime;
 import java.util.EnumSet;
+import java.util.Map;
+import java.util.UUID;
 
 @Mod("rpessentials")
 public class RpEssentials {
@@ -32,6 +35,7 @@ public class RpEssentials {
     public static final String MODID = "rpessentials";
     public static final Logger LOGGER = LogUtils.getLogger();
     private int tickCounter = 0;
+    private final Map<UUID, Vec3> lastBlurPositions = new java.util.concurrent.ConcurrentHashMap<>();
 
     public RpEssentials(IEventBus modEventBus, ModContainer modContainer) {
 
@@ -48,10 +52,9 @@ public class RpEssentials {
         NeoForge.EVENT_BUS.register(this);
 
         modEventBus.addListener((net.neoforged.fml.event.config.ModConfigEvent.Loading event) -> {
-            if (event.getConfig().getType() == ModConfig.Type.SERVER) {
+            if (event.getConfig().getType() == ModConfig.Type.SERVER && event.getConfig().getSpec() == ProfessionConfig.SPEC) {
                 RpEssentialsScheduleManager.reload();
                 ProfessionRestrictionManager.reloadCache();
-                // Invalider le cache des presets Immersive au reload de config
                 ImmersivePresetHelper.clearCache();
                 LOGGER.info("[RPEssentials] Config loaded: schedule, professions & immersive presets initialized.");
             }
@@ -90,6 +93,26 @@ public class RpEssentials {
     // SERVER TICK
     // =========================================================================
 
+    private boolean blurNeedsUpdate(java.util.List<ServerPlayer> players) {
+        // Déclenche une mise à jour si un joueur a bougé de plus de 2 blocs
+        // ou si la liste des connectés a changé.
+        boolean needsUpdate = false;
+        for (ServerPlayer p : players) {
+            net.minecraft.world.phys.Vec3 last = lastBlurPositions.get(p.getUUID());
+            net.minecraft.world.phys.Vec3 pos  = p.position();
+            if (last == null || pos.distanceToSqr(last) > 4.0) {
+                lastBlurPositions.put(p.getUUID(), pos);
+                needsUpdate = true;
+            }
+        }
+        java.util.Set<UUID> online = players.stream()
+                .map(ServerPlayer::getUUID)
+                .collect(java.util.stream.Collectors.toSet());
+        if (lastBlurPositions.keySet().removeIf(id -> !online.contains(id)))
+            needsUpdate = true;
+        return needsUpdate;
+    }
+
     @SubscribeEvent
     public void onServerTick(ServerTickEvent.Post event) {
         MinecraftServer server = event.getServer();
@@ -97,7 +120,7 @@ public class RpEssentials {
         // Toutes les 40 ticks (2s) : mise à jour TabList blur
         if (tickCounter % 40 == 0) {
             try {
-                if (RpEssentialsConfig.ENABLE_BLUR.get()) {
+                if (RpEssentialsConfig.ENABLE_BLUR.get() && blurNeedsUpdate(server.getPlayerList().getPlayers())) {
                     ClientboundPlayerInfoUpdatePacket packet = new ClientboundPlayerInfoUpdatePacket(
                             EnumSet.of(ClientboundPlayerInfoUpdatePacket.Action.UPDATE_DISPLAY_NAME),
                             server.getPlayerList().getPlayers());
@@ -154,8 +177,12 @@ public class RpEssentials {
         if ((tickCounter + 97) % 1200 == 0) {
             LocalTime now = LocalTime.now();
             RpEssentialsScheduleManager.tickMidnightSweep(server);
+            PlaytimeManager.flush();
             TempLicenseExpirationManager.tickMidnightSweep(server, now.getHour(), now.getMinute());
             LastConnectionManager.tickAutoUnwhitelist(server, now.getHour(), now.getMinute());
+            if (now.getHour() == 3 && now.getMinute() == 0) {
+                net.rp.rpessentials.moderation.DeathRPManager.purgeOldHistory();
+            }
         }
 
         tickCounter++;
@@ -173,6 +200,8 @@ public class RpEssentials {
         RpEssentialsScheduleManager.reload();
         ImmersivePresetHelper.clearCache();
         PlaytimeManager.clearAll();
+        lastBlurPositions.clear();
+        RpEssentialsIO.shutdown();
         LOGGER.info("[RPEssentials] Static caches cleared on server stop. Bye! - Finerus");
     }
 }

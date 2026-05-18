@@ -6,13 +6,11 @@ import com.google.gson.reflect.TypeToken;
 import net.minecraft.server.level.ServerPlayer;
 import net.rp.rpessentials.RpEssentials;
 import net.rp.rpessentials.RpEssentialsDataPaths;
-import net.rp.rpessentials.config.MessagesConfig;
 
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.lang.reflect.Type;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CompletableFuture;
@@ -87,7 +85,6 @@ public class MuteManager {
             if (!dataFolder.exists()) dataFolder.mkdirs();
             dataFile = new File(dataFolder, "mutes.json");
             if (dataFile.exists()) loadFromFile();
-            RpEssentials.LOGGER.info("[MuteManager] Initialized - File: {}", dataFile.getAbsolutePath());
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[MuteManager] Failed to initialize", e);
         }
@@ -113,7 +110,6 @@ public class MuteManager {
                         RpEssentials.LOGGER.warn("[MuteManager] Invalid UUID: {}", e.getKey());
                     }
                 }
-                RpEssentials.LOGGER.info("[MuteManager] Loaded {} mutes", mutes.size());
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[MuteManager] Failed to load", e);

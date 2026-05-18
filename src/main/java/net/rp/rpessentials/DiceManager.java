@@ -16,7 +16,6 @@ public class DiceManager {
     // =========================================================================
     // DICE TYPES
     // =========================================================================
-
     public record DiceType(String name, int maxValue, List<String> customFaces) {
 
         /** Retourne true si ce dé a des faces personnalisées (ex: Pile/Face) */
@@ -38,7 +37,6 @@ public class DiceManager {
     // =========================================================================
     // PARSING CONFIG
     // =========================================================================
-
     public static List<DiceType> getAvailableDice() {
         List<DiceType> result = new ArrayList<>();
         try {
@@ -64,7 +62,6 @@ public class DiceManager {
             return new DiceType(name, 0, faces);
         }
 
-        // Numérique : "d20;20"
         try {
             int max = Integer.parseInt(value);
             return new DiceType(name, max, null);
@@ -84,7 +81,6 @@ public class DiceManager {
     // =========================================================================
     // ROLL
     // =========================================================================
-
     /**
      * Effectue un lancer et diffuse le résultat aux joueurs proches.
      * @param player  le joueur qui lance
@@ -127,9 +123,4 @@ public class DiceManager {
         RpEssentials.LOGGER.info("[DICE] {} rolled {} and got {}", playerName, diceName, result);
         return true;
     }
-
-    // =========================================================================
-    // AJOUTER dans MessagesConfig (références)
-    // =========================================================================
-    // MessagesConfig.DICE_ROLL_FORMAT — défini dans RpConfig.DICE_ROLL_FORMAT (redirection)
 }

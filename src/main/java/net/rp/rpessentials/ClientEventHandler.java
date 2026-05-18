@@ -5,7 +5,6 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.rp.rpessentials.client.ClientNametagCache;
-import net.rp.rpessentials.client.NametagOcclusionCache;
 
 @EventBusSubscriber(modid = RpEssentials.MODID, value = Dist.CLIENT)
 public class ClientEventHandler {
@@ -13,7 +12,6 @@ public class ClientEventHandler {
     @SubscribeEvent
     public static void onClientDisconnect(ClientPlayerNetworkEvent.LoggingOut event) {
         ClientNametagCache.reset();
-        NametagOcclusionCache.reset();
-        RpEssentials.LOGGER.info("[RPEssentials] Nametag caches reset on disconnect");
+        RpEssentials.LOGGER.info("[RPEssentials] Nametag cache reset on disconnect");
     }
 }

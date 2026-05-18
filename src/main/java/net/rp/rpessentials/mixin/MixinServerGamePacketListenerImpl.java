@@ -7,6 +7,7 @@ import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.rp.rpessentials.ColorHelper;
 import net.rp.rpessentials.RpEssentialsPermissions;
 import net.rp.rpessentials.config.MessagesConfig;
+import net.rp.rpessentials.identity.NicknameManager;
 import net.rp.rpessentials.identity.RpEssentialsChatFormatter;
 import net.rp.rpessentials.config.ChatConfig;
 import net.rp.rpessentials.moderation.MuteManager;
@@ -87,12 +88,11 @@ public abstract class MixinServerGamePacketListenerImpl {
                 }
             }
 
-            // Spy staff hors portée — résolution complète des placeholders
+            String nickForSpy = NicknameManager.getNickname(player.getUUID());
             String rawSpy = MessagesConfig.get(MessagesConfig.PROXIMITY_CHAT_SPY_FORMAT,
                     "msg",      actualMessage,
                     "distance", String.valueOf(distance));
-            // Support {player}/{nick}/{real}/{nick_real} dans le format spy
-            rawSpy = RpEssentialsChatFormatter.resolveRpPlaceholders(rawSpy, player);
+            rawSpy = RpEssentialsChatFormatter.resolveRpPlaceholders(rawSpy, player, nickForSpy);
             Component spyComp = ColorHelper.parseColors(rawSpy);
 
             for (ServerPlayer p : player.getServer().getPlayerList().getPlayers()) {

@@ -117,7 +117,6 @@ public class WarnManager {
             dataFile = new File(dataFolder, "warns.json");
             if (dataFile.exists()) loadFromFile();
 
-            RpEssentials.LOGGER.info("[WarnManager] Initialized - File: {}", dataFile.getAbsolutePath());
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[WarnManager] Failed to initialize", e);
         }
@@ -143,7 +142,6 @@ public class WarnManager {
                         })
                         .max().orElse(0);
                 warnCounter.set(maxId + 1);
-                RpEssentials.LOGGER.info("[WarnManager] Loaded {} warns (next id={})", data.size(), maxId + 1);
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[WarnManager] Failed to load warns", e);

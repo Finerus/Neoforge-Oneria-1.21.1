@@ -14,7 +14,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class NoteManager {
 
@@ -61,7 +60,6 @@ public class NoteManager {
             notesDir = new File(RpEssentialsDataPaths.getDataFolder(), "notes");
             if (!notesDir.exists()) notesDir.mkdirs();
             loadAll();
-            RpEssentials.LOGGER.info("[NoteManager] Initialized - Dir: {}", notesDir.getAbsolutePath());
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[NoteManager] Failed to initialize", e);
         }
@@ -125,11 +123,19 @@ public class NoteManager {
     // =========================================================================
     // PUBLIC API
     // =========================================================================
-
     public static int addNote(UUID targetUUID, String targetName, String authorName, String authorUUID, String text) {
         ensureInitialized();
         playerNames.put(targetUUID, targetName);
         List<NoteEntry> list = notes.computeIfAbsent(targetUUID, k -> new ArrayList<>());
+
+        try {
+            int max = net.rp.rpessentials.config.ModerationConfig.NOTE_MAX_PER_PLAYER.get();
+            if (max > 0 && list.size() >= max) {
+                RpEssentials.LOGGER.warn("[NoteManager] Note limit ({}) reached for {}", max, targetName);
+                return -1;
+            }
+        } catch (IllegalStateException ignored) {}
+
         Set<Integer> usedIds = new HashSet<>();
         for (NoteEntry e : list) usedIds.add(e.id);
         int id = 1;

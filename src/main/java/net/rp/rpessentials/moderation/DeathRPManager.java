@@ -13,10 +13,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundSource;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
-import net.rp.rpessentials.ColorHelper;
-import net.rp.rpessentials.ImmersivePresetHelper;
-import net.rp.rpessentials.RpEssentialsDataPaths;
-import net.rp.rpessentials.RpEssentialsScheduleManager;
+import net.rp.rpessentials.*;
 import net.rp.rpessentials.config.RpEssentialsConfig;
 import net.rp.rpessentials.config.ScheduleConfig;
 import net.rp.rpessentials.identity.NicknameManager;
@@ -92,6 +89,7 @@ public class DeathRPManager {
             java.util.List<DeathHistoryEntry> data = GSON.fromJson(reader, t.getType());
             if (data != null) { history.clear(); history.addAll(data); }
         } catch (Exception e) { LOGGER.error("[DeathRP] Failed to load history", e); }
+        purgeOldHistory();
     }
 
     private static void saveHistory() {
@@ -102,6 +100,27 @@ public class DeathRPManager {
             try (FileWriter w = new FileWriter(target)) { GSON.toJson(snapshot, w); }
             catch (Exception e) { LOGGER.error("[DeathRP] Failed to save history", e); }
         });
+    }
+
+    public static void purgeOldHistory() {
+        try {
+            int maxDays = net.rp.rpessentials.config.ModerationConfig.DEATH_HISTORY_MAX_DAYS.get();
+            if (maxDays <= 0) return;
+            ensureHistoryInitialized();
+            java.time.LocalDateTime cutoff = java.time.LocalDateTime.now().minusDays(maxDays);
+            java.time.format.DateTimeFormatter fmt =
+                    java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+            int before = history.size();
+            history.removeIf(e -> {
+                try { return java.time.LocalDateTime.parse(e.timestamp, fmt).isBefore(cutoff); }
+                catch (Exception ex) { return false; }
+            });
+            int removed = before - history.size();
+            if (removed > 0) {
+                saveHistory();
+                LOGGER.info("[DeathRP] Purged {} history entries older than {} days", removed, maxDays);
+            }
+        } catch (IllegalStateException ignored) {}
     }
 
     public static java.util.List<DeathHistoryEntry> getHistory(UUID playerUUID) {
@@ -143,8 +162,12 @@ public class DeathRPManager {
     }
 
     private static void saveToFile() {
+        ensureInitialized();
+        if (dataFile == null) return;
+
         Map<UUID, Boolean> snapshot = new HashMap<>(overrides);
         MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+
         Map<String, Boolean> out = new HashMap<>();
         for (Map.Entry<UUID, Boolean> e : snapshot.entrySet()) {
             String mcName = "Unknown";
@@ -157,11 +180,12 @@ public class DeathRPManager {
             }
             out.put(e.getKey() + (mcName.equals("Unknown") ? "" : " (" + mcName + ")"), e.getValue());
         }
-        CompletableFuture.runAsync(() -> {
+
+        File targetFile = dataFile;
+        RpEssentialsIO.submit(() -> {
             try {
-                ensureInitialized();
-                if (dataFile == null) return;
-                try (FileWriter w = new FileWriter(dataFile)) { GSON.toJson(out, w); }
+                if (!targetFile.getParentFile().exists()) targetFile.getParentFile().mkdirs();
+                try (FileWriter w = new FileWriter(targetFile)) { GSON.toJson(out, w); }
             } catch (Exception e) { LOGGER.error("[DeathRP] Failed to save", e); }
         });
     }

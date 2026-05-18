@@ -186,7 +186,9 @@ public class RpEssentialsConfig {
 
         NAMED_ZONES = BUILDER
                 .comment("Named zones with entry/exit messages.",
-                        "Format: name;centerX;centerZ;radius;messageEnter;messageExit")
+                        "Format without dimension: name;centerX;centerZ;radius;messageEnter;messageExit",
+                        "Format with dimension:    name;centerX;centerZ;radius;dimension;messageEnter;messageExit",
+                        "Example: spawn;0;0;50;minecraft:overworld;Welcome to spawn!;You left spawn.")
                 .defineList("namedZones", Arrays.asList(), obj -> obj instanceof String);
 
         ZONE_MESSAGE_MODE = BUILDER

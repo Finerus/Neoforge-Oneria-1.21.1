@@ -98,6 +98,20 @@ public class RpLicenseCommands {
                                 })
                                 .executes(RpLicenseCommands::reissueLicense))));
 
+        licenseNode.then(Commands.literal("audit")
+                .executes(ctx -> licenseAudit(ctx, null, 20))
+                .then(Commands.argument("player", StringArgumentType.word())
+                        .suggests((ctx, builder) -> {
+                            LicenseManager.getAuditLog().stream()
+                                    .map(e -> e.targetName).distinct().sorted().forEach(builder::suggest);
+                            return builder.buildFuture();
+                        })
+                        .executes(ctx -> licenseAudit(ctx, StringArgumentType.getString(ctx, "player"), 20))
+                        .then(Commands.argument("count", IntegerArgumentType.integer(1, 100))
+                                .executes(ctx -> licenseAudit(ctx,
+                                        StringArgumentType.getString(ctx, "player"),
+                                        IntegerArgumentType.getInteger(ctx, "count"))))));
+
         return licenseNode;
     }
 
@@ -310,6 +324,42 @@ public class RpLicenseCommands {
                         "player", target.getName().getString())), true);
         target.sendSystemMessage(Component.literal(
                 MessagesConfig.get(MessagesConfig.LICENSE_REISSUE_PLAYER, "profession", profData.getFormattedName())));
+        return 1;
+    }
+
+    private static int licenseAudit(CommandContext<CommandSourceStack> ctx, String playerFilter, int count) {
+        List<LicenseManager.AuditEntry> log = LicenseManager.getAuditLog();
+
+        if (playerFilter != null) {
+            String filter = playerFilter.toLowerCase();
+            log = log.stream()
+                    .filter(e -> e.targetName != null && e.targetName.toLowerCase().contains(filter))
+                    .collect(java.util.stream.Collectors.toList());
+        }
+
+        if (log.isEmpty()) {
+            ctx.getSource().sendSuccess(() -> Component.literal("§7[Audit] No entries found."), false);
+            return 1;
+        }
+
+        List<LicenseManager.AuditEntry> recent = log.subList(Math.max(0, log.size() - count), log.size());
+        StringBuilder sb = new StringBuilder();
+        sb.append("§6╔═ License Audit §8(").append(recent.size()).append("/").append(log.size()).append(") ═╗\n");
+        for (LicenseManager.AuditEntry e : recent) {
+            String actionColor = switch (e.action) {
+                case "GIVE", "GIVE_RP" -> "§a";
+                case "REVOKE", "EXPIRE_RP" -> "§c";
+                default -> "§7";
+            };
+            sb.append("§6║ ").append(actionColor).append(e.action)
+                    .append(" §7| §f").append(e.targetName)
+                    .append(" §7| by §e").append(e.staffName)
+                    .append(" §7| §b").append(e.profession)
+                    .append(" §8(").append(e.timestamp).append(")\n");
+        }
+        sb.append("§6╚══════════════════════════════╝");
+        String msg = sb.toString();
+        ctx.getSource().sendSuccess(() -> Component.literal(msg), false);
         return 1;
     }
 

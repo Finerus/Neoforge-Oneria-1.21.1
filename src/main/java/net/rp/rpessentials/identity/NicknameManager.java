@@ -8,7 +8,6 @@ import net.minecraft.server.MinecraftServer;
 
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.lang.reflect.Type;
 import java.util.HashMap;
 import java.util.Map;
@@ -17,6 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.network.chat.Component;
 import net.rp.rpessentials.RpEssentials;
 import net.rp.rpessentials.RpEssentialsDataPaths;
+import net.rp.rpessentials.RpEssentialsIO;
 import net.rp.rpessentials.SyncNametagDataPacket;
 import net.rp.rpessentials.config.RpEssentialsConfig;
 
@@ -42,7 +42,6 @@ public class NicknameManager {
             nicknameFile = new File(dataFolder, "nicknames.json");
             if (nicknameFile.exists()) loadFromFile();
 
-            RpEssentials.LOGGER.info("[NicknameManager] Initialized - File: {}", nicknameFile.getAbsolutePath());
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[NicknameManager] Failed to initialize", e);
         }
@@ -71,7 +70,6 @@ public class NicknameManager {
                         RpEssentials.LOGGER.warn("[NicknameManager] Invalid UUID in key: {}", entry.getKey());
                     }
                 }
-                RpEssentials.LOGGER.info("[NicknameManager] Loaded {} nicknames", nicknames.size());
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[NicknameManager] Failed to load nicknames", e);
@@ -107,7 +105,7 @@ public class NicknameManager {
         }
 
         File targetFile = nicknameFile;
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+        RpEssentialsIO.submit(() -> {
             try {
                 File parent = targetFile.getParentFile();
                 if (parent != null && !parent.exists()) parent.mkdirs();

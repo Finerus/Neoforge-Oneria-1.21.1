@@ -1,6 +1,129 @@
 # Changelog - Rp Essentials
 All notable changes to this project will be documented in this file.
 
+## [4.1.10]
+
+**Performance overhaul, a lot of bug fix on nametag rendering and production crashes, complete config reload, new schedule commands.**
+
+---
+
+### Added
+
+* **Commands `/opennow` and `/closenow` (WIP):** Force the server open or closed outside of its configured schedule without editing any config file. `/opennow` broadcasts the opening message and resets daily flags so the schedule resumes normally afterward. `/closenow` kicks all non-staff players immediately with the configured kick message. Both require OP level 2.
+
+* **Note limit per player:** A new config option `noteMaxPerPlayer` (default: 20) in `rpessentials-moderation.toml` caps the number of staff notes that can be attached to any single player. Set to 0 for unlimited. When the limit is reached, the command and the GUI both return an explicit error instead of silently writing past the cap.
+
+* **Named zones: dimension support:** Zones in `namedZones` now accept an optional dimension field. A player in `minecraft:nether` will never trigger a zone defined for `minecraft:overworld`, and leaving a dimension counts as exiting the zone and fires the exit message. Old format without dimension still works unchanged.
+  - Old format: `name;centerX;centerZ;radius;enterMsg;exitMsg`
+  - New format: `name;centerX;centerZ;radius;dimension;enterMsg;exitMsg`
+
+* **Command `/rpessentials license audit [player] [count]`:** Consult the license audit log directly in-game without opening `license-audit.json`. Shows the most recent entries (default: 20), filterable by player name. Each line displays the action type (`GIVE`, `REVOKE`, `EXPIRE_RP`...), the target, the staff member, the profession, and the timestamp.
+
+* **Playtime persisted every minute:** The current session playtime is now flushed to disk every 60 seconds. Previously, a server crash lost the entire session. A clean shutdown or a crash after 59 seconds now loses at most 1 minute of playtime instead of the full session.
+
+* **AFK dimension validation on startup:** If the dimension configured in `afkDimension` does not exist on the server, a `WARN` log line is emitted immediately at server start, instead of silently failing at the first `/rp afk` use.
+
+* **Confirmation step in the Profession Editor GUI:** Clicking "Save changes" now shows a confirmation prompt with a "Confirm" and a "Cancel" button before sending the packet to the server. This prevents accidental overwrites on a live server.
+
+* **Automatic Death RP history purge:** `deathrp-history.json` now has a configurable maximum age for entries. Entries older than `deathHistoryMaxDays` days (default: 90) are automatically removed at 3 AM server time and on each server start. Set to 0 to disable. Without this, a server running Death RP continuously would accumulate thousands of entries over months with no way to clean them.
+
+---
+
+### Fixed
+
+* **Double nametag rendering:** `NicknameNametagHandler` and `ClientNametagRenderer` were both subscribed to `RenderNameTagEvent` and doing the exact same thing. Every nickname was applied twice, causing visible flickering on some clients. `NicknameNametagHandler` has been removed, `ClientNametagRenderer` is now the sole handler.
+
+* **Server config read on the client causing silent crashes:** `ClientNametagRenderer` was calling `RpEssentialsConfig.HIDE_NAMETAGS.get()`, a server-side config value, from a client-only event. This threw an `IllegalStateException` on every nametag render frame, caught silently, making the hide-nametags feature non-functional on clients. The renderer now reads `ClientNametagConfig` (the packet-synced value) as it should.
+
+* **`MixinPlayerList` missing `@Implements`:** The mixin implemented `IRpPlayerList` without the required `@Implements` annotation. This is technically incorrect and can cause compatibility issues with certain analysis tools or future loader versions. The annotation is now present.
+
+* **`DeathRPManager` reading server state from an async thread:** `saveToFile()` was calling `ServerLifecycleHooks.getCurrentServer()` inside an async task, meaning server state was accessed from a non-server thread. During shutdown or world unload this could produce inconsistent data or a crash. Player name resolution now happens synchronously on the server thread before the file write is handed off.
+
+* **`LicenseManager.addLicense` allowing duplicates:** Calling `give` through certain code paths (notably `SetPlayerProfilePacket`) could add the same profession twice to a player's license list, corrupting `licenses.json` with duplicate entries. A guard now exits early if the license is already present.
+
+* **Profession malformed entries now logged:** A badly formatted line in `rpessentials-professions.toml` (e.g. missing a field in `id;name;color`) was silently skipped with no feedback. The server now logs a `WARN` line with the exact offending entry so admins can spot the typo immediately.
+
+* **`WarnManager` had no `reload()` method:** `/rpessentials config reload` called `WarnManager.reload()` which did not exist. The method is now implemented and reloads warn data from disk.
+
+* **Config reload was incomplete:** `/rpessentials config reload` previously only reloaded the schedule and permission cache. It now also reloads `LicenseManager`, `MuteManager`, `LastConnectionManager`, `WarnManager`, clears the pattern cache, re-syncs profession restrictions to all currently connected players, and re-broadcasts the `hideNametags` state to all clients.
+
+* **Schedule setters not taking effect without restart:** Commands like `/rpessentials config set enableSchedule true` saved the value to disk but did not call `RpEssentialsScheduleManager.reload()`, so the change was invisible until the next server restart. All schedule-related setters now trigger a reload immediately.
+
+* **`ClientNametagCache.evictDisconnected()` never called:** The method was documented as something to call periodically but `RpClientTickHandler` never actually called it, meaning disconnected players accumulated in the cache indefinitely. It is now called every 200 ticks (~10 seconds).
+
+* **Verbose `SyncNametagDataPacket` logs flooding the console:** Two `INFO` log lines were emitted on every nametag sync, one client-side and one server-side. On a 30-player server, a single login event produced 60 log lines. Both are now `DEBUG` level and only appear when debug logging is explicitly enabled.
+
+* **Config Manager GUI: out-of-range values were silently accepted or discarded.** When a staff member entered a value outside the configured bounds (e.g. `proximityDistance = 999` with a max of 128), NeoForge would silently discard the change, leaving the admin unsure whether the save worked. The server now validates each value against its declared range before applying it, and logs an explicit warning with the expected bounds if the value is rejected.
+
+* **Config Manager GUI: any config path could be set by a modified client.** `SaveConfigEntriesPacket` applied changes to any config key sent by the client without checking whether those keys actually exist in the declared config files. A malicious or buggy client could write arbitrary paths. The server now validates every incoming path against the known entry list for the requested file and rejects unknown or oversized values before processing.
+
+* **Double `NicknameManager.getNickname` call per proximity chat message.** In the proximity chat path, `formatChatMessage` fetched the sender's nickname from the HashMap, then `resolveRpPlaceholders` fetched it again for the staff spy format. The spy format now reuses the value computed for the main message.
+
+
+---
+
+### Optimization
+
+* **Tab list blur broadcast: from 2 500 packets/min to near zero at rest.** The blur update packet was sent to every player every 2 seconds unconditionally. On a server with 50 players, that is 2 500 packets per minute regardless of whether anything changed. The packet is now only sent when at least one player has moved more than 2 blocks since the last check. During calm periods (AFK zones, idle sessions) the broadcast rate drops to zero.
+
+* **Single I/O thread for all disk writes.** Each manager (`NicknameManager`, `LicenseManager`, `WarnManager`, `MuteManager`, `LastConnectionManager`, `NoteManager`, `DeathRPManager`) was spawning a new thread for every save operation. A save-heavy sequence such as revoking a license (which triggers a nickname sync, a license write, an audit write, and a temp-license write) could spawn 4 threads simultaneously. All disk writes now go through a single shared `RpEssentialsIO` executor backed by one persistent daemon thread, eliminating thread churn entirely.
+
+* **Config reflection cached per class.** `ConfigInspector.buildValueMap()` used Java reflection to scan all fields of a config class on every call, including every time the Config Manager GUI applied a change. This scan is now cached per class: the first call pays the reflection cost and every subsequent call returns a pre-built map instantly.
+
+* **`MixinServerCommonPacketListenerImpl`: `instanceof` check moved first.** The mixin intercepts every outgoing packet to check whether it is a `ClientboundPlayerInfoUpdatePacket`. Previously, the blur config value was read (acquiring a lock) before the type check. Since the vast majority of packets are not player-info updates, the `instanceof` check is now done first, short-circuiting the rest of the method for 99%+ of all packets with zero overhead.
+
+* **Removed `NametagOcclusionCache`.** The class was initialized and reset on disconnect but never populated or consulted by any code. Its removal eliminates a `ConcurrentHashMap` allocation with no functional impact.
+
+* **Removed unused `playerProfessionsCache` in `ProfessionRestrictionManager`.** The map was declared, allocated, and cleared on reload but never written to or read from. Removing it saves a `ConcurrentHashMap` per server lifecycle.
+
+* **Profession action checks: result cached per player and item.** Methods `canCraft`, `canBreakBlock`, `canUseItem`, and `canEquip` previously re-evaluated the full restriction list on every call: iterating all blocked patterns, compiling wildcards, and fetching the player's license list. On a server with 20 restrictions and active crafting, this ran hundreds of times per minute. Results are now cached per `(UUID, action, item)` and returned instantly on subsequent calls. The cache is invalidated automatically when a player's licenses change (grant, revoke, reload).
+
+* **Config GUI reflection cached per class.** `ConfigInspector.buildValueMap()` now also benefits from the class-level cache introduced in 4.2.0 when called from the new range-validation path, ensuring reflection is never repeated for the same config class.
+
+* **RequestConfigFilePacket rate-limited to 1 request/second per player.** A player (or modified client) could flood the server with config file requests, each triggering a full reflection scan and serialization of a config class. Requests arriving faster than 1 per second per player are now silently dropped.
+
+* **Startup log noise reduced.** Each manager (`NicknameManager`, `LicenseManager`, `WarnManager`, `MuteManager`, `LastConnectionManager`, `NoteManager`, `DeathRPManager`) previously emitted two INFO lines on initialization ("Initialized" and "Loaded X entries"), producing 10+ lines on every player login. These are now DEBUG-level. A single INFO summary line is emitted once when the server finishes starting: `[RPEssentials] Data layer ready: X nickname(s), X license(s), X warn(s), X mute(s).`
+
+* **All data managers initialized eagerly at server start.** Managers were lazily initialized on first use, causing a visible lag spike at the first player login. They are now all initialized in a `ServerStartedEvent` handler before any player can connect, distributing the I/O cost to server startup instead.
+
+---
+
+### Technical
+
+* New class `RpEssentialsIO`: single-threaded daemon executor for all asynchronous file writes across the mod. Shuts down gracefully (5s timeout) on `ServerStoppingEvent`.
+* `NicknameNametagHandler` removed entirely.
+* `NametagOcclusionCache` removed entirely.
+* Duplicate `DICE_ROLL_FORMAT` and `DICE_ROLL_SPY_FORMAT` fields removed from `RpConfig`, `MessagesConfig` is the sole source for these strings.
+* `RpEssentialsScheduleManager.resetDailyFlags()` added as a public helper used by `/opennow`.
+* `SyncNametagDataPacket.CODEC` rewritten as an explicit `StreamCodec` instead of `StreamCodec.composite`, removing the 6-field limit constraint and improving future extensibility.
+* `PlaytimeManager.flush()` added: periodically checkpoints session playtime to disk without closing the session.
+* `LastConnectionManager.addPlaytimeSilent()` and `flushToDisk()` added as internal helpers for the flush mechanism.
+* `ConfigInspector.applyAndSave`: range validation added using pre-built `EntryData` map, no additional reflection cost.
+* `SaveConfigEntriesPacket.handleOnServer`: path whitelist and length guard added before forwarding to `ConfigInspector`.
+* `ProfessionRestrictionManager`: new field `actionCache` (`Map<UUID, Map<String, Boolean>>`), invalidated by `invalidatePlayerCache`, `clearCache`, and `reloadCache`.
+* `RpEssentialsChatFormatter`: new overload `resolveRpPlaceholders(format, player, precomputedNick)` accepting a pre-computed nickname string.
+* `DeathRPManager`: new public method `purgeOldHistory()`, called at load and nightly at 3 AM.
+* `ModerationConfig`: new `[Death RP History]` section with `deathHistoryMaxDays`.
+* `RequestConfigFilePacket`: static cooldown map `lastRequestTime` with 1s per-player rate limit.
+* `RpEssentialsEventHandler`: new `onServerStarted` handler consolidating eager init, AFK dimension validation (from 4.2.0), and the startup summary log.
+
+---
+
+### Removed
+
+* Typing `/whois 'nickname'` would also show notes of the player, this feature has been removed. You can still check notes using the GUI (or via command).
+
+---
+
+### Migration Notes
+
+* No breaking changes.
+* `rpessentials-moderation.toml` gains a new `noteMaxPerPlayer` key under `[Staff Notes]` on first launch.
+* `rpessentials-core.toml`: `namedZones` entries can optionally include a dimension between the radius and the entry message. Existing entries without a dimension continue to work in all dimensions as before.
+* Servers upgrading from 4.1.x should run `/rpessentials config reload` once after the update to ensure all in-memory caches reflect the current files.
+
+---
+
 ## [4.1.9]
 
 **Self-assigned nickname system via `/rp selfnick` with configurable restrictions and cooldown management. License card visual overhaul with physical in-hand rendering and a dedicated inspection screen.**

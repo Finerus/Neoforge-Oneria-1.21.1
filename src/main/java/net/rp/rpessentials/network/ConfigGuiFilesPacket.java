@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * Packet SERVER → CLIENT
- *
+ * -
  * Sent when the player requests the Config Manager GUI.
  * Contains only the lightweight list of available config files (id + display name).
  * The actual entries are loaded on demand via RequestConfigFilePacket / ConfigFileEntriesPacket.

@@ -74,7 +74,6 @@ public class LastConnectionManager {
             if (!dataFolder.exists()) dataFolder.mkdirs();
             dataFile = new File(dataFolder, "lastconnection.json");
             if (dataFile.exists()) loadFromFile();
-            RpEssentials.LOGGER.info("[LastConnectionManager] Initialized - File: {}", dataFile.getAbsolutePath());
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[LastConnectionManager] Failed to initialize", e);
         }
@@ -185,7 +184,6 @@ public class LastConnectionManager {
                         RpEssentials.LOGGER.warn("[LastConnectionManager] Invalid UUID key: {}", e.getKey());
                     }
                 }
-                RpEssentials.LOGGER.info("[LastConnectionManager] Loaded {} entries", entries.size());
             }
         } catch (Exception e) {
             RpEssentials.LOGGER.error("[LastConnectionManager] Failed to load", e);
@@ -291,6 +289,17 @@ public class LastConnectionManager {
         ConnectionEntry e = entries.get(uuid);
         if (e == null) return;
         e.totalPlaytimeMs += durationMs;
+        saveToFile();
+    }
+
+    public static void addPlaytimeSilent(UUID uuid, long durationMs) {
+        ensureInitialized();
+        ConnectionEntry e = entries.get(uuid);
+        if (e == null) return;
+        e.totalPlaytimeMs += durationMs;
+    }
+
+    public static void flushToDisk() {
         saveToFile();
     }
 

@@ -156,6 +156,11 @@ public class RpModerationCommands {
                                     String authorName = author != null ? author.getName().getString() : "Console";
                                     String authorUUID = author != null ? author.getUUID().toString() : "console";
                                     int id = NoteManager.addNote(target.getUUID(), target.getName().getString(), authorName, authorUUID, text);
+                                    if (id < 0) {
+                                        ctx.getSource().sendFailure(Component.literal(
+                                                "§c[NOTE] Note limit reached for §e" + target.getName().getString() + "§c."));
+                                        return 0;
+                                    }
                                     ctx.getSource().sendSuccess(() -> Component.literal(
                                             MessagesConfig.get(MessagesConfig.NOTE_ADDED,
                                                     "player", target.getName().getString(), "id", String.valueOf(id))), false);

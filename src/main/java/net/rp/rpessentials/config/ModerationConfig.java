@@ -42,6 +42,12 @@ public class ModerationConfig {
     public static final ModConfigSpec.ConfigValue<String> WARN_REMOVED_BROADCAST_FORMAT;
 
     // =========================================================================
+    // NOTE LIMIT
+    // =========================================================================
+    public static ModConfigSpec.IntValue NOTE_MAX_PER_PLAYER;
+    public static ModConfigSpec.IntValue DEATH_HISTORY_MAX_DAYS;
+
+    // =========================================================================
     // AUTO UNWHITELIST SYSTEM
     // =========================================================================
     public static ModConfigSpec.BooleanValue AUTO_UNWHITELIST_ENABLED;
@@ -185,6 +191,23 @@ public class ModerationConfig {
                 .define("removedBroadcastFormat",
                         "§6[STAFF][WARN] §e{staff} §7has deleted the warn §e#{id}§7.");
 
+        BUILDER.pop();
+
+        // ===============================================================================
+        // CATEGORY: NOTE/DEATHRPHISTORY LIMIT
+        // ===============================================================================
+        BUILDER.push("Staff Notes");
+        NOTE_MAX_PER_PLAYER = BUILDER
+                .comment("Maximum number of notes per player. 0 = unlimited.")
+                .defineInRange("noteMaxPerPlayer", 20, 0, 200);
+        BUILDER.pop();
+
+        BUILDER.push("Death RP History");
+        DEATH_HISTORY_MAX_DAYS = BUILDER
+                .comment("Maximum age of Death RP history entries in days.",
+                        "Entries older than this value are purged automatically at 3 AM.",
+                        "Set to 0 to disable purging.")
+                .defineInRange("deathHistoryMaxDays", 90, 0, 3650);
         BUILDER.pop();
 
         // ===============================================================================
